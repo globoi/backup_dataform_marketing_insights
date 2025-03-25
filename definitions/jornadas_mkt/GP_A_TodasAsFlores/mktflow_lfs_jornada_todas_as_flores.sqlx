@@ -1,0 +1,34 @@
+config {
+  type: "table",
+  name: "mktflow_lfs_jornada_todas_as_flores",
+  schema: "jornadas_mkt",
+  tags: ["GP_A_TodasAsFlores",'schedule_tag=jornadas_mkt_mktflow_lfs_jornada_todas_as_flores']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH live_primeiros_5eps_TAF AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref("consumo_enriched", "impression")}
+  INNER JOIN ${ref("usuarios", "Free users")} USING (globo_id)
+  WHERE (program_id = 23160 OR program_id = 23462)
+  AND title IN ("Live de estreia (audiodescrição)", "Estreia (audiodescrição)", "Capítulo de Estreia", "Live de estreia", "Capítulo 1", "Capítulo 2", "Capítulo 3", "Capítulo 4", "Capítulo 5", "Episódio 1")
+),
+
+tela_quente AS (
+  SELECT DISTINCT
+  globo_id
+  FROM ${ref("consumo_enriched", "impression")}
+  INNER JOIN ${ref("usuarios", "Free users")} USING (globo_id)
+  WHERE program_id = 9095
+  AND timestamp BETWEEN "2022-10-24 22:30:00-03" AND "2022-10-25 00:10:00-03"
+)
+
+SELECT DISTINCT globo_id
+FROM (
+  SELECT globo_id FROM live_primeiros_5eps_TAF 
+  UNION ALL 
+  SELECT globo_id FROM tela_quente)

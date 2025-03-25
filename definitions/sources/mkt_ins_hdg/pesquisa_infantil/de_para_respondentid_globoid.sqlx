@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "pesquisa_infantil",
+  name: "de_para_respondentid_globoid",
+  description: ""
+}

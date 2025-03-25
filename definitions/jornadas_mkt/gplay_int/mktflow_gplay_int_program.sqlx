@@ -1,0 +1,54 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_program',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 'schedule_tag=jornadas_mkt_mktflow_gplay_int_program']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH 
+    filterimp AS 
+    (SELECT 
+      * 
+      FROM ${ref('consumo_enriched', 'all_impression')} AS all_impression
+      WHERE all_impression.date >= DATE_ADD(CURRENT_DATE(), INTERVAL -8 DAY) AND all_impression.program_subset <> 'live'),
+    filteruser AS 
+    (SELECT globo_id 
+      FROM
+      ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) AS i
+      WHERE i.assinatura_gplay = 'internacional')
+
+
+SELECT
+    1 AS globo_id,
+    RANK() OVER(ORDER BY SUM (filterimp.hours_watched) DESC) AS rkg_program,
+    filterimp.program_id,
+    Program.media_kit_resource__poster,
+    Program.url_for_consumption,
+    Program.description,
+    Program.subset,
+    Program.title,
+    Program.media_kit_resource__on_air_mobile,
+    SUM (filterimp.hours_watched) AS watched 
+    FROM 
+      filterimp
+    LEFT JOIN
+      ${ref('conteudo_derived', 'program')}  AS Program
+      ON filterimp.program_id = Program.id
+    LEFT JOIN
+      filteruser
+      ON filterimp.userid = filteruser.globo_id
+
+WHERE 
+  filterimp.userid IN (SELECT DISTINCT filteruser.globo_id FROM filteruser) AND
+  Program.title <> 'Cinema' 
+  AND Program.title NOT LIKE '% Edição Especial%' 
+  AND Program.title NOT LIKE '% Vale a Pena Ver de Novo%' 
+  AND Program.subset <> 'disclosure'
+
+GROUP BY filterimp.program_id, Program.media_kit_resource__poster, Program.url_for_consumption, Program.description, Program.subset, Program.title, Program.media_kit_resource__on_air_mobile
+ORDER BY watched DESC

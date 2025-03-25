@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "campanhas_mkt",
+  name: "mktflow_base_max_diff_ott",
+  description: ""
+}

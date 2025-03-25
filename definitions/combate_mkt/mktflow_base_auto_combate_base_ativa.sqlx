@@ -1,0 +1,32 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=combate_mkt_mktflow_base_auto_combate_base_ativa', 'schedule_cron=30 12 * * *'],
+    name: 'mktflow_base_auto_combate_base_ativa',
+    schema: 'combate_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "combate_mkt"
+        }
+    }
+}
+
+SELECT
+  Dia,
+  globoid AS globo_id,
+  Produto,
+  Canal,
+  Preco,
+  Oferta,
+  Forma_Pagamento,
+  Plano
+FROM
+    -- estrutura-esportes.Time_Inteligencia.CRM_BaseAtiva_Combate
+    ${ref("Time_Inteligencia", "CRM_BaseAtiva_Combate")}
+WHERE
+  LENGTH(globoid) > 0
+  AND DATE(Dia) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)

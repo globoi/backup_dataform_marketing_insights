@@ -1,0 +1,19 @@
+config {
+  type: 'assertion',
+  tags: ["schedule_tag=CRM_Tabela_Jogos",
+    "schedule_cron=30 9 * * *",
+    "schedule_retry=0"]
+  }
+
+SELECT
+  *
+FROM
+  (
+    SELECT
+      COUNT(1) as ct
+    FROM
+      ${ref('Time_Inteligencia', "CRM_Tabela_Jogos")}
+   
+  )
+WHERE
+  ct = 0

@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "email_send",
+    schema: "mktcloud_gshow_enriched",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

@@ -1,0 +1,45 @@
+config {
+  type: 'table',
+  name: 'mktflow_lf_cluster_seriesbrasileiras',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AvisaQueTaBombando','schedule_tag=jornadas_mkt_mktflow_lf_cluster_seriesbrasileiras'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+impression AS (
+    SELECT
+        userid AS globo_id
+    FROM
+        ${ref("consumo_enriched","impression")} imp
+        INNER JOIN ${ref("usuarios", "Free users")} fu
+        ON imp.userid = fu.globo_id
+    WHERE
+        program_id IN (
+            11874, 11454, 12121, 10874, 12384, 11680, 11626, 11020,
+            11758, 12839, 12029, 11976, 12550)
+        AND `date` <= CURRENT_DATE()
+),
+
+tapume AS (
+    SELECT
+        globo_id_sessao AS globo_id
+    FROM
+        ${ref("jornadas_mkt", "tapume_ao_vivo_nao_assinante")}
+    WHERE
+        LOWER(eventAction) IN ('tapume.canal_brasil', 'tapume.canal brasil')
+),
+
+union_all AS (
+    SELECT * FROM impression
+    UNION ALL SELECT * FROM tapume
+)
+
+SELECT DISTINCT(globo_id) FROM union_all

@@ -1,0 +1,17 @@
+config {
+  type: 'table',
+  tags: ['consumo_copa'],
+  name: 'Consumo_live',
+  schema: 'copa_2022',
+  description: '',
+  columns: {
+  }
+}
+
+
+with base as (select globoid as globo_id,date_trunc(data_consumo,WEEK(MONDAY)) as semana,case when sum(playtime_hours) is null then 0 else sum(playtime_hours) end  as horas_assistidas,True as assistiu_live from ${ref("inteligencia", "copa22_lives")}
+where data_consumo>='2022-11-20'
+and globoid is not null
+group by 1,2)
+select distinct globo_id, semana, horas_assistidas, assistiu_live
+from base

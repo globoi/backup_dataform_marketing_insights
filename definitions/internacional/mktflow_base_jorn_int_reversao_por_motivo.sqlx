@@ -1,0 +1,58 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'mktflow_base_jorn_int_reversao_por_motivo',
+  tags: ['schedule_tag=internacional_mktflow_base_jorn_int_reversao_por_motivo.',
+         'schedule_cron=0 13 * * *'],
+   bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "internacional",
+            owner: "martech",
+            mktcloud: "true"
+    }
+}}
+SELECT
+    t0.globo_id,
+    t0.AssetId,
+    t0.name as product_name,
+    CAST(t0.dt_hr_cancelamento_final_ciclo AS DATE) as dt_fim_ciclo,
+    t0.subscription_status,
+    t0.caracteristica_produto,
+    t0.data_hora_compra,
+    t0.canal_compra,
+    t0.ato_de_cancelamento,
+    t0.canal_cancelamento,
+    t0.subscription_payment_method,
+    t0.forma_pagamento,
+    t0.data_conversao_efetiva,
+    t0.periodo_trial_form,
+    t0.is_trial,
+    t0.assinatura_internacional,
+    t0.data_hora_cancelamento,
+    t0.dt_hr_cancelamento_final_ciclo,
+    t0.scheduled_unsubscribe_at,
+    t0.motivo_cancelamento,
+    t0.tipo_cancelamento,
+    t0.unsubscription_event_action,
+    t0.unsubscribe_description,
+    t0.ProductCode,
+    t0.numero_assinaturas,
+    t0.teve_trial,
+    t0.dt_trial_inicio,
+    t0.dt_trial_fim,
+    t0.data_ultimo_consumo,
+    t0.ultimo_consumo_subset,
+    t0.Plano,
+    t0.ultima_assinatura,
+    t0.n_dependentes,
+    t1.oferta_consumo,
+    t1.country
+  FROM
+  ${ref("usuarios", "base_cancelamento_new")} AS t0
+  LEFT JOIN ${ref("internacional","base_ativa_internacional")} AS t1 ON t0.globo_id = t1.globo_id
+  WHERE  t0.assinatura_internacional = true
+ AND t0.dt_hr_cancelamento_final_ciclo BETWEEN DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY) AND DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 0 DAY)
+ AND t0.subscription_status = 'Cancelado'
+ ORDER BY t0.dt_hr_cancelamento_final_ciclo DESC
+

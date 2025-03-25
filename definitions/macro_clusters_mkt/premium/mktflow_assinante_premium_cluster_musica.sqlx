@@ -1,0 +1,55 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_musica',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_musica',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram programas vod do genero musica, musical ou documentarios musicais, ou que consumiram programas na tv ao vivo do genero ou subgenero musical nos ultimos 180 dias.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+
+
+--macro cluster premium musica
+--assinantes premium que consumiram programas vod do genero musica, musical ou documentarios musicais, ou que consumiram programas na tv ao vivo do genero ou subgenero musical nos ultimos 180 dias.
+
+with consumo_vod as (
+  SELECT distinct a.userId as globo_id
+  FROM ${ref('consumo_enriched','impression')} a
+  INNER JOIN ${ref('jornadas_mkt','genero_todas_combinacoes')} b
+    ON a.program_id = b.program_id
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND lower(b.genero) in ('documentários musicais','música', 'musical')
+),
+
+consumo_em_programas_ao_vivo as (
+  SELECT distinct globoid
+  FROM ${ref('simulcast','consumo_ibope')} 
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa in ('MUSICAL') OR subgenero_programa in ('MUSICAL')
+),
+
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT globo_id, 'consumo musica' as base FROM consumo_vod
+
+  UNION DISTINCT
+
+  SELECT globoid as globo_id, 'consumo musica' as base FROM consumo_em_programas_ao_vivo
+)
+
+SELECT 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+

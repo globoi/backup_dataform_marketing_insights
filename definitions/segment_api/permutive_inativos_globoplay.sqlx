@@ -1,0 +1,14 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_inativos_globoplay'],
+  name: 'permutive_inativos_globoplay',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  DISTINCT globo_id as user_id
+  FROM ${ref("usuarios","perfil_assinantes_ativo_reduzido")}
+  WHERE inativo = TRUE

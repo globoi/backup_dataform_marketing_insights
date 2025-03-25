@@ -1,0 +1,34 @@
+config {
+  type: 'incremental',
+  schema: 'jornadas_mkt',
+  name: 'tapume_ao_vivo_nao_assinante',
+  description: '',
+  columns: { },
+  tags: ['jornadas_mkt_consumo','schedule_tag=jornadas_mkt_tapume_ao_vivo_nao_assinante'],
+}
+
+pre_operations {
+  DECLARE max_dt DATE;
+  EXECUTE IMMEDIATE
+  "SELECT MAX(start_dt) FROM `gglobo-foundation-psd-hdg-prd.dataform_monitor.jobs_info` WHERE project_id ='gglobo-mkt-ins-hdg-prd' AND table_id = 'tapume_ao_vivo_nao_assinante' AND error_message IS NULL" INTO max_dt;
+}
+
+WITH tapume_av AS(
+  SELECT
+    *
+  FROM
+    ${ref("consumo_clean", "tageamento_eventos")}
+  WHERE
+    eventCategory = 'agora'
+    AND eventAction LIKE '%tapume%'
+    AND table_suffix_date <= CURRENT_DATE()
+    AND eventLabel = 'nao_assinante'
+      ${
+      when(incremental(), `AND  table_suffix_date >= max_dt
+      `)
+    }
+    
+)
+SELECT * FROM tapume_av
+
+

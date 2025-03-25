@@ -1,0 +1,33 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=familiag_mkt_mktflow_auto_g1_assine_newsletter', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_auto_g1_assine_newsletter',
+    schema: 'familiag_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "familiag_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT userid AS globo_id
+FROM
+  -- `valiant-circuit-129220.g1.pgt_*`
+  ${ref("g1", "pgt_*")}
+WHERE
+  _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY))
+  AND (object LIKE '%g1.globo.com/economia/%'
+    OR object LIKE '%g1.globo.com/politica/%'
+    OR object LIKE '%g1.globo.com/fato-ou-fake/%'
+    OR object LIKE '%g1.globo.com/educacao/%'
+    OR object LIKE '%g1.globo.com/ciencia/%'
+    OR object LIKE '%g1.globo.com/saude/%'
+    OR object LIKE '%g1.globo.com/mundo/%'
+    OR object LIKE '%g1.globo.com/pop-arte/%' )
+  AND provider = 'cadun'

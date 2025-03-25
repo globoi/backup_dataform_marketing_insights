@@ -1,0 +1,30 @@
+config {
+  type: "incremental",
+  name: "first_play_app",
+  schema: "usuarios",
+  tags: [ "schedule_tag=usuarios_first_play_app" ],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+WITH yesterday_play AS (
+  SELECT
+    userid,
+    timestamp,
+    CURRENT_DATE() AS dt_proc,
+  FROM
+    ${ref("consumo_enriched","all_impression")}
+  WHERE
+    `date` >= '2018-01-01'
+    AND environment like '%app%' 
+    ${when(incremental(), 'AND date >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)')} 
+  QUALIFY
+    ROW_NUMBER() OVER(PARTITION BY userid ORDER BY timestamp ASC) = 1
+)
+
+SELECT
+  yest.*
+FROM
+  yesterday_play yest
+   ${when(incremental(),`LEFT JOIN (SELECT userid FROM ${self()}) total USING(userid) WHERE total.userid IS NULL`)}

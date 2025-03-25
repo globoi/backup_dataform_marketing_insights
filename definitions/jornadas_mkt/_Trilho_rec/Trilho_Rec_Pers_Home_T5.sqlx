@@ -1,0 +1,121 @@
+config {
+  type: 'table',
+  name: 'Trilho Rec Pers Home T5',
+  schema: 'trilho',
+  description: ''
+}
+---tabela desativada
+---tags: ['trilho_rec', 'schedule_tag=trilho_Trilho_Rec_Pers_Home_T5'],
+
+WITH novelas_series AS (
+  SELECT DISTINCT
+    globo_id,
+    program_id AS DE_program_id
+  FROM ${ref("consumo", "series_history")}
+  INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  USING (globo_id)
+  WHERE terminou_episodio
+
+  UNION ALL
+
+  SELECT DISTINCT
+    globo_id,
+    program_id AS DE_program_id
+  FROM ${ref("consumo", "novela_history")}
+  INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  USING (globo_id)
+  WHERE terminou_episodio
+),
+
+series_novelas_assistidas AS (
+  SELECT
+  globo_id,
+  PARA_program_id AS program_id
+  FROM novelas_series
+  LEFT JOIN ${ref("raw", "Conteudos a Substituir")}
+  USING (DE_program_id)
+  WHERE PARA_program_id IS NOT NULL
+),
+
+program_poster AS (
+  SELECT DISTINCT
+    id AS program_id,
+    media_kit_resource__poster
+  FROM ${ref("conteudo_enriched", "program")}
+  WHERE media_kit_resource__poster IS NOT NULL
+),
+
+content_titles AS (
+  SELECT DISTINCT
+    ctt.program_id,
+    ctt.program_title_id AS title_id,
+    ctt.program_title,
+    ctt.title_url_for_consumption,
+    pp.media_kit_resource__poster
+  FROM
+    ${ref("conteudo_enriched", "content")} ctt
+    LEFT JOIN ${ref("raw", "Blocklist_de_Conteudos")} bdc
+    USING (program_id)
+    INNER JOIN program_poster pp
+    USING (program_id)
+    WHERE bdc.program_id IS NULL
+    AND ctt.program_subset = "series"
+    AND ctt.status = "published"
+    AND ctt.service_id != 6807
+    AND ctt.title_url_for_consumption IS NOT NULL
+    AND ctt.program_title_id IS NOT NULL
+),
+
+base_rec_reduzida1 AS (
+  SELECT
+    rcrm.globo_id,
+    titleId AS title_id,
+    MAX(timestamp) AS max_timestamp,
+    MAX(score) AS max_score,
+    MIN(position) AS min_position
+  FROM ${ref("consumo", "recomendacao_crm")} rcrm
+  INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")} bapct
+    USING (globo_id)
+  INNER JOIN content_titles ctt
+    ON (title_id = titleId)
+  LEFT JOIN series_novelas_assistidas sna
+    ON rcrm.globo_id=sna.globo_id AND rcrm.program_id = sna.program_id
+  WHERE 
+    DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 550 DAY) <= timestamp
+    AND sna.globo_id IS NULL OR sna.program_id IS NULL
+  GROUP BY
+    rcrm.globo_id,
+    titleId
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY max_timestamp DESC, max_score DESC, min_position ASC) <= 10
+),
+
+base_rec_reduzida AS (
+  SELECT *,
+  ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY max_score DESC, min_position ASC) AS rank_final
+  FROM base_rec_reduzida1
+),
+
+lista_trilho_rec_pers_home_t10_series AS (
+  SELECT 
+    globo_id,
+    program_title,
+    title_url_for_consumption,
+    rank_final,
+    program_id,
+    title_id
+  FROM base_rec_reduzida
+  INNER JOIN content_titles
+  USING (title_id)
+),
+
+cont5 AS (
+  SELECT DISTINCT
+    globo_id
+  FROM lista_trilho_rec_pers_home_t10_series
+  WHERE rank_final >= 5
+)
+
+SELECT *
+FROM lista_trilho_rec_pers_home_t10_series
+INNER JOIN cont5 USING (globo_id)
+WHERE rank_final <=5

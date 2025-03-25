@@ -1,0 +1,27 @@
+config {
+  type: "table",
+  name: "mktflow_sf_chega_de_trecho_15_dias_v2",
+  schema: "jornadas_mkt",
+  tags: ["GP_A_ChegaDeTrecho",'schedule_tag=jornadas_mkt_mktflow_sf_chega_de_trecho_15_dias_v2']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT 
+  CURRENT_DATE() AS dt_proc,
+  CASE
+    WHEN GP_internacional_ind = 'globo-play' THEN 'BR'
+    WHEN GP_internacional_ind = 'globo-play-us' THEN 'US'
+    WHEN GP_internacional_ind = 'globo-play-pt' THEN 'PT'
+    WHEN GP_internacional_ind = 'globo-play-eu' THEN 'EU'
+  ELSE 'BR' END AS GP_internacional_ind,
+  globo_id, 
+  title,
+  media_kit_resource__poster,   
+  country_code
+FROM
+  ${ref("jornadas_mkt", "chega_de_trecho")}

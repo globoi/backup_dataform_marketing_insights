@@ -1,0 +1,172 @@
+config {
+    type: 'table',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "olimpiadas_2024",
+            owner: "martech",
+            horario: "10h00min"
+        }
+    },
+    name: 'usuarios',
+    schema: 'olimpiadas_2024',
+    description: 'Tabela com os gids com possível interesse em olimpíadas. ',
+    columns: {
+        globo_id: "Código que identifica o usuário.",
+        dt_assinatura_comeco: "Identifica a data mínima de assinatura do usuário.",
+        assinou_cancelou_olimp_21: "Identifica se o usuário assinou durante o período de 13/07/2021 a 15/08/21 e solicitou cancelamento no período de 15/08/2021 a 31/08/2021 e teve a assinatura cancelada definitivamente no ano de 2021.",
+        tipo_usuario: "Classifica se o usuário é um Assinante, Ex-Assinante ou Logado Free.",
+        assinou_2021: "Identifica se o usuário assinou no período de 13/07/2021 a 15/08/2021.",
+        sol_cancel_vol_21: "Identifica se o usuário solicitou cancelamento no período de 15/08/2021 a '31/08/2021.",
+        cancel_efet_21: "Identifica se o usuário teve a assinatura cancelada definitivamente no período de 15/08/2021 a 31/08/2021.",
+        assinou_2024: "Identifica se o usuário assinou no período de 22/07/2024 a 11/08/2024.",
+        sol_cancel_vol_24: "Identifica se o usuário solicitou cancelamento no período de 22/07/2024 a 11/08/2024.",
+        assistiu_olimp_2021: "Identifica se o usuário assistiu a Olimpíada de 2021."
+    },
+}
+
+WITH
+  usuarios_geral AS (
+  SELECT
+    DISTINCT globoid AS globo_id
+  FROM
+    ${ref('public_globoid', 'users')}
+  WHERE
+    DATE(partition_date) = DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+    AND status IN ('ACTIVE',
+      'PENDING')),
+  assinantes_olimp AS (
+  SELECT
+    DISTINCT globo_id,
+    id_asset,
+    MIN(dt_assinatura_comeco) OVER(PARTITION BY globo_id) AS dt_assinatura_comeco,
+    MAX(dt_proc) OVER(PARTITION BY id_asset, globo_id) AS base_ativa
+  FROM
+    ${ref('usuarios', 'base_ativa_incremental_new')}
+  WHERE
+    dt_proc BETWEEN '2024-07-22'
+    AND '2024-08-11'
+    AND tipo_assinante != 'trial' ),
+  assinantes_olimp_2 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    base_ativa,
+    dt_assinatura_comeco,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, id_asset, base_ativa, dt_assinatura_comeco ORDER BY globo_id, id_asset, base_ativa, dt_assinatura_comeco ) AS rm,
+  FROM
+    assinantes_olimp
+  QUALIFY
+    rm = 1 ),
+  base_rein AS (
+  SELECT
+    DISTINCT id,
+    TIMESTAMP(subscription_at) AS data_hora_compra,
+    product_name,
+    ( DATE(subscription_at) BETWEEN '2021-07-13'
+      AND '2021-08-15' )
+    AND ( DATE(unsubscribe_at) BETWEEN '2021-08-15'
+      AND '2021-08-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2021 ) AS assinou_cancelou_olimp_21,
+    CASE
+      WHEN DATE(subscription_at) BETWEEN '2021-07-13' AND '2021-08-15' THEN TRUE
+  END
+    AS assinou_2021,
+    CASE
+      WHEN DATE(unsubscribe_at) BETWEEN '2021-08-15' AND '2021-08-31' THEN TRUE
+  END
+    AS sol_cancel_vol_21,
+    CASE
+      WHEN DATE(end_cycle_at) BETWEEN '2021-08-15' AND '2021-08-31' THEN TRUE
+  END
+    AS cancel_efet_21,
+    CASE
+      WHEN DATE(subscription_at) BETWEEN '2024-07-22' AND '2024-08-11' THEN TRUE
+  END
+    AS assinou_2024,
+    CASE
+      WHEN DATE(unsubscribe_at) BETWEEN '2024-07-22' AND '2024-08-11' THEN TRUE
+  END
+    AS sol_cancel_vol_24,
+    subscription_status,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at
+  FROM
+    ${ref('sales_gold', 'subscription_details')}),
+  base_rein2 AS (
+  SELECT
+    *
+  FROM
+    base_rein
+  JOIN
+    ${ref('sales_gold', 'last_subscription_state')} AS s
+  ON
+    s.object_id = base_rein.id
+  WHERE
+    LOWER(product_name) LIKE '%globoplay%' ),
+  base_rein3 AS (
+  SELECT
+    globo_id,
+    COALESCE(MAX(assinou_cancelou_olimp_21), FALSE) AS assinou_cancelou_olimp_21,
+    COALESCE(MAX(assinou_2021), FALSE) AS assinou_2021,
+    COALESCE(MAX(sol_cancel_vol_21), FALSE) AS sol_cancel_vol_21,
+    COALESCE(MAX(cancel_efet_21), FALSE) AS cancel_efet_21,
+    COALESCE(MAX(assinou_2024), FALSE) AS assinou_2024,
+    COALESCE(MAX(sol_cancel_vol_24), FALSE) AS sol_cancel_vol_24
+  FROM
+    base_rein2
+  GROUP BY
+    1 ),
+  users AS (
+  SELECT
+    globo_id,
+    dt_assinatura_comeco,
+    IFNULL(tipo_usuario, 'Ex-Assinante') AS tipo_usuario,
+    assinou_cancelou_olimp_21,
+    assinou_2021,
+    sol_cancel_vol_21,
+    cancel_efet_21,
+    assinou_2024,
+    sol_cancel_vol_24
+  FROM
+    assinantes_olimp_2
+  LEFT JOIN
+    base_rein3
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globo_id,
+      'Assinante' AS tipo_usuario
+    FROM
+      ${ref('usuarios', 'base_ativa_pagante_com_trial_new')})
+  USING
+    (globo_id))
+SELECT
+  * EXCEPT(tipo_usuario,
+    assistiu_olimp_2021,
+    assinou_2021,
+    sol_cancel_vol_21,
+    cancel_efet_21,
+    assinou_2024,
+    sol_cancel_vol_24),
+  IFNULL(tipo_usuario, 'Logado Free') AS tipo_usuario,
+  IFNULL(assinou_2021, FALSE) AS assinou_2021,
+  IFNULL(sol_cancel_vol_21, FALSE) AS sol_cancel_vol_21,
+  IFNULL(cancel_efet_21, FALSE) AS cancel_efet_21,
+  IFNULL(assinou_2024, FALSE) AS assinou_2024,
+  IFNULL(sol_cancel_vol_24, FALSE) AS sol_cancel_vol_24,
+  IFNULL(assistiu_olimp_2021,FALSE) AS assistiu_olimp_2021
+FROM
+  usuarios_geral
+LEFT JOIN
+  users
+USING
+  (globo_id)
+LEFT JOIN
+  ${ref('olimpiadas_2024', 'historico_olimpiadas_2021')}
+USING
+  (globo_id)

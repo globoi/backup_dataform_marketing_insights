@@ -1,0 +1,146 @@
+config {
+  type: "table",
+  name: "resumo_do_mes_2022_dados_macros",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_R_ResumoDoMes"]
+}
+
+
+WITH program AS(
+  SELECT
+    * EXCEPT(showtimes, content_rating_criteria, `format`)
+  FROM
+    ${ref("conteudo_derived", "program")}
+  ),
+
+impression_22 AS (
+  SELECT
+    globo_id, program_id, program_subset,
+    SUM(hours_watched) AS Horas_Assistidas,
+    COUNT(DISTINCT mediaid) AS Midias_Assistidas
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    `timestamp` >= '2022-01-01'
+
+  GROUP BY
+    globo_id, program_id, program_subset
+),
+
+filmes_assistidos AS (
+  SELECT
+    globo_id,
+    SUM(Horas_Assistidas) AS Horas_Assistidas_Filmes,
+    SUM(Midias_Assistidas) AS Filmes_Assistidos,
+  FROM 
+    impression_22
+  WHERE
+    program_id = 10122 
+    OR program_subset LIKE '%filmes%'
+    OR program_subset LIKE '%movies%'
+  GROUP BY
+    globo_id
+), 
+
+novelas AS (
+  SELECT
+    globo_id,
+    SUM(Horas_Assistidas) AS Horas_Assistidas_Novelas,
+    SUM(Midias_Assistidas) AS Novelas_Assistidas,
+  FROM 
+    impression_22
+  WHERE
+    program_subset LIKE '%novelas%'
+  GROUP BY
+    globo_id
+),
+
+series AS (
+  SELECT
+    globo_id,
+    SUM(Horas_Assistidas) AS Horas_Assistidas_Series,
+    SUM(Midias_Assistidas) AS Series_Assistidas,
+  FROM 
+    impression_22
+  WHERE
+    program_subset LIKE '%series%'
+  GROUP BY
+    globo_id
+),
+
+programa_mais_assistido AS (
+  SELECT
+    impression_22.globo_id, 
+    impression_22.program_id, 
+    impression_22.Horas_Assistidas, 
+    program.title AS Programa
+  FROM
+    impression_22
+  INNER JOIN
+    program ON impression_22.program_id = program.id
+  WHERE
+    NOT (impression_22.program_id = 10122 
+    OR impression_22.program_id = 9095
+    OR impression_22.program_subset LIKE '%filmes%'
+    OR impression_22.program_subset LIKE '%movies%')
+  QUALIFY row_number() over ( PARTITION BY globo_id ORDER BY Horas_Assistidas desc) = 1
+),
+
+serie_mais_assistida AS (
+  SELECT
+    impression_22.globo_id, 
+    impression_22.program_id, 
+    program.title AS Programa
+  FROM 
+    impression_22
+  INNER JOIN
+    program ON impression_22.program_id = program.id
+  WHERE
+    program_subset LIKE '%series%'
+  QUALIFY row_number() over ( PARTITION BY globo_id ORDER BY Horas_Assistidas desc) = 1
+)
+
+  
+SELECT 
+  globo_id,
+  programa_mais_assistido.program_id AS ProgramaMaisAssistido_program_id,
+  programa_mais_assistido.Horas_Assistidas AS ProgramaMaisAssistido_Horas_Assistidas,
+  programa_mais_assistido.Programa AS ProgramaMaisAssistido_Programa,
+  serie_mais_assistida.program_id AS SerieMaisAssistida_program_id,
+  serie_mais_assistida.Programa AS SerieMaisAssistida_Programa,
+  series.Horas_Assistidas_Series AS Series_Horas_Assistidas_Series,
+  series.Series_Assistidas AS Series_Series_Assistidas,
+  novelas.Novelas_Assistidas AS Novelas_Novelas_Assistidas,
+  novelas.Horas_Assistidas_Novelas AS Novelas_Horas_Assistidas_Novelas,
+  filmes_assistidos.Horas_Assistidas_Filmes AS Horas_Assistidas_Filmes,
+  filmes_assistidos.Filmes_Assistidos AS Filmes_Assistidos,
+
+FROM
+  `gglobo-mkt-ins-hdg-dev.usuarios.base_ativa_pagante_com_trial`
+LEFT JOIN
+  programa_mais_assistido USING(globo_id)
+LEFT JOIN
+  serie_mais_assistida USING(globo_id)
+LEFT JOIN
+  novelas USING(globo_id)
+LEFT JOIN
+  filmes_assistidos USING(globo_id)
+LEFT JOIN
+  series USING(globo_id)
+WHERE
+  assinatura_gplay = 'nacional'
+  /*
+  -- Esse bloco de código estava no Contour mas não refletia na tabela final
+  AND programa_mais_assistido.program_id IS NOT NULL
+  AND programa_mais_assistido.Horas_Assistidas IS NOT NULL 
+  AND programa_mais_assistido.Programa IS NOT NULL
+  AND serie_mais_assistida.program_id IS NOT NULL
+  AND serie_mais_assistida.program_id IS NOT NULL
+  AND series.Horas_Assistidas_Series IS NOT NULL
+  AND series.Series_Assistidas IS NOT NULL
+  AND novelas.Novelas_Assistidas IS NOT NULL
+  AND novelas.Horas_Assistidas_Novelas IS NOT NULL
+  AND filmes_assistidos.Horas_Assistidas_Filmes IS NOT NULL
+  AND filmes_assistidos.Filmes_Assistidos IS NOT NULL*/
+--2789327
+

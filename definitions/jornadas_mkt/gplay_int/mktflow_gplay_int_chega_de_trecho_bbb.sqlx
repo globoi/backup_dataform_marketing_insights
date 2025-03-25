@@ -1,0 +1,31 @@
+config {
+    type: 'table',
+    schema: 'jornadas_mkt',
+    name: 'mktflow_gplay_int_chega_de_trecho_bbb',
+    tags: ['gplay_int', 'schedule_tag=jornadas_mkt_mktflow_gplay_int_chega_de_trecho_bbb'],
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+SELECT
+  globo_id
+FROM (
+  SELECT
+    free_usr.globo_id,
+    COUNT(DISTINCT pc.mediaid) AS qtd
+  FROM
+    ${ref("usuarios", "Free users")} AS free_usr
+  LEFT JOIN
+    ${ref("consumo_enriched", "partial_content_impression")} AS pc
+  ON
+    pc.userid = free_usr.globo_id
+    AND pc.program_id IN (12082,
+      14907)
+    AND pc.date > '2022-01-01'
+  GROUP BY
+    free_usr.globo_id ) AS a
+WHERE
+  a.qtd > 2

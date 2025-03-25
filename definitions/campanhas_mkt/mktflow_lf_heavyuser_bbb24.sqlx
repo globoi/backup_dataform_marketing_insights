@@ -1,0 +1,31 @@
+config {
+  type: "table",
+  schema: 'campanhas_mkt',
+  tags: [
+    "schedule_tag=campanhas_mkt_mktflow_lf_heavyuser_bbb24"
+  ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech", 
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+
+with maxsemana as (
+  SELECT max(a.semana) as ultima_semana
+    FROM ${ref("bbb_24", "raiox_bbb_24_lf")} as a 
+),
+base_final as (
+  SELECT
+    DISTINCT b.globo_id,b.semana
+  FROM ${ref("bbb_24", "raiox_bbb_24_lf")} as b
+    WHERE semana = ((SELECT ultima_semana FROM maxsemana)-7)
+    AND cluster_bbb = '4. Heavy User'
+)
+ 
+SELECT distinct 'named_user'AS identifier_type, globo_id AS UUID
+FROM base_final

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.foundationDatabase,
+  schema: "consumo_enriched",
+  name: "anonymous_and_logged_in_impression",
+  description: ""
+}

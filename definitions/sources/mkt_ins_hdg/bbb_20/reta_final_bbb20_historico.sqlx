@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_20",
+  name: "reta_final_bbb_historico",
+  description: ""
+}

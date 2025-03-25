@@ -1,0 +1,117 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'perfil_assinante_ativo_internacional',
+  tags: ['perfil_internacional',
+         'schedule_tag=internacional_perfil_assinante_ativo_internacional',
+         'schedule_cron=0 12 * * *']
+
+}
+
+WITH acervo AS (
+  SELECT
+    id AS program_id,
+    channel_title,
+    Exclusividade,
+    Ineditismo,
+    Nacionalinternacional_Tratado,
+    Studio_Tratado,
+    Categoria_Tratada
+  FROM
+    ${ref('conteudo', 'acervo')}
+),
+perfil_assinantes_ativo_1 AS (
+  SELECT
+    *
+  except(assetid),
+    (
+      DATE_DIFF(
+        CURRENT_DATE(),
+        COALESCE(
+          CAST(data_ultimo_consumo AS DATE),
+          DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+        ),
+        DAY
+      ) >= 30
+    )
+    AND (
+      DATE_DIFF(
+        CURRENT_DATE(),
+        data_de_conversao,
+        DAY
+      ) > 30
+    ) AS inativo
+  FROM
+    ${ref('internacional', 'base_ativa_internacional')}
+    LEFT JOIN ${ref('internacional', 'step_consumo_internacional')} USING (globo_id)
+),
+perfil_assinantes_ativo_acervo AS (
+  SELECT
+    *
+  FROM
+    perfil_assinantes_ativo_1
+    LEFT JOIN acervo USING (program_id)
+),
+tabela_final as (
+  SELECT
+    distinct *
+  EXCEPT
+    (cluster),
+    COALESCE(cluster, "Não Clusterizado") AS cluster,
+    DATE_DIFF(CURRENT_DATE(), data_de_conversao, DAY) AS tempo_de_base
+  FROM
+    perfil_assinantes_ativo_acervo
+    LEFT JOIN ${ref('palantir_export', 'export_Cluster')} USING (globo_id)
+)
+select
+  globo_id,
+  program_id,
+  id_do_item_da_cesta as id_asset,
+  currency_price,
+  oferta_consumo,
+  country,
+  case
+    when oferta_consumo = 'globo-play-as' then 'Ásia'
+    when oferta_consumo = 'globo-play-eu' then 'Europa'
+    when oferta_consumo = 'globo-play-pt' then 'Portugal'
+    when oferta_consumo = 'globo-play-us' then 'Estados Unidos e Canadá'
+    when oferta_consumo = 'other' then 'Outros'
+  end as regiao,
+  status,
+  data_de_conversao as dt_assinatura_comeco,
+  CASE
+    WHEN tempo_de_base <= 30 THEN '1. Até 1 mês'
+    WHEN tempo_de_base <= 60 THEN '2. Entre 1 e 2 Meses'
+    WHEN tempo_de_base <= 90 THEN '3. Entre 2 e 3 Meses'
+    WHEN tempo_de_base <= 180 THEN '4. Entre 3 e 6 Meses'
+    WHEN tempo_de_base <= 360 THEN '5. Entre 6 e 12 Meses'
+    WHEN tempo_de_base <= 720 THEN '6. Entre 12 e 24 Meses'
+    ELSE '7. Mais de 24 Meses'
+  END AS tempo_de_base_agrupado,
+  dia as dt_proc,
+  device as canal_compra,
+  COALESCE(gender, gender_inf) AS gender,
+  age,
+  first_play,
+  first_play_subset,
+  data_first_play,
+  quantidade_dispositivos_utilizados,
+  program_subset,
+  program_title,
+  horas,
+  plays,
+  midias_distintas,
+  ultimo_consumo,
+  ultimo_consumo_subset,
+  data_ultimo_consumo,
+  inativo,
+  channel_title,
+  Exclusividade,
+  Ineditismo,
+  Nacionalinternacional_Tratado,
+  Studio_Tratado,
+  Categoria_Tratada,
+  cluster
+from
+  tabela_final
+  left join ${ref('globoid_enriched', 'demografia')} USING(globo_id)

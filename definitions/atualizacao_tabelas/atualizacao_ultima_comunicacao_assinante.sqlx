@@ -1,0 +1,31 @@
+config {
+  type: 'table',
+  name: 'atualizacao_ultima_comunicacao_assinante',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_ultima_comunicacao_assinante',
+ "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {
+  }
+}
+
+WITH
+  tabela AS (
+  SELECT
+    DATETIME(data_hora_compra, "America/Sao_Paulo") AS data_hora_compra,
+    DATETIME(Data_Envio_Ultimo_Email, "America/Sao_Paulo") AS Data_Envio_Ultimo_Email,
+    DATETIME(Data_Recebimento_Ultimo_Push, "America/Sao_Paulo") AS Data_Recebimento_Ultimo_Push,
+    DATETIME(Data_Abertura_Ultimo_Push, "America/Sao_Paulo") AS Data_Abertura_Ultimo_Push,
+    Data_Ultima_Abertura_App
+  FROM
+    ${ref('comunicacao', 'ultima_comunicacao_assinante')})
+SELECT
+  MAX(data_hora_compra) AS max_data_hora_compra,
+  MAX(Data_Envio_Ultimo_Email) AS max_data_envio_ultimo_email,
+  MAX(Data_Recebimento_Ultimo_Push) AS max_data_recebimento_ultimo_push,
+  MAX(Data_Abertura_Ultimo_Push) AS max_data_abertura_ultimo_push,
+  MAX(Data_Ultima_Abertura_App) AS max_data_ultima_abertura_app
+FROM
+  tabela

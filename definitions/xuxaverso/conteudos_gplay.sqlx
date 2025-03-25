@@ -1,0 +1,138 @@
+config {
+  type: "table",
+  schema: "xuxaverso",
+  description: 'Tabela com os conteúdos relacionados à Xuxa, no globoplay.',
+  columns: {
+    mediaid: 'Midias dos conteudos relacionados à Xuxa.',
+    program_id: 'Ids dos programas relacionados à Xuxa.',
+    program_title: 'Titulos dos programas relacionados à Xuxa.',
+    media_title: 'Títulos das mídias relacionadas à Xuxa.',
+    duracao_id: 'Duração em horas das midias relacionadas à Xuxa.',
+    duracao_program: 'Duração em horas dos programas relacionados à Xuxa.'
+  }
+}
+
+SELECT
+  distinct mediaid,
+  c.program_id,
+  c.program_title,
+  c.title as media_title,
+  (duration / 3600000) as duracao_id,
+  (
+    (sum(duration) over(partition by c.program_id)) / 3600000
+  ) as duracao_program
+FROM
+  ${ref('xuxaverso', 'conteudos_gplay_excel')} as gp
+  inner join ${ref('conteudo_enriched', 'all_content')} as c on c.id = gp.mediaid
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  id in (11767963, 11767831, 11761507, 11761500)
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  program_id = 25489
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  id in (
+    11778340,
+    11778338,
+    11778261,
+    11778352,
+    11778248,
+    11778241,
+    11778330,
+    11778262,
+    11778277,
+    11778212,
+    11778307
+  )
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  id in (
+    11781410,
+    11781426,
+    11781409,
+    11781366,
+    11781353,
+    11781521,
+    11781424,
+    11781400
+  )
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  id in (
+    11792138,
+    11789813,
+    11792134,
+    11792136,
+    11792137,
+    11792135,
+    11792133
+  )
+union all
+select
+  id as mediaid,
+  program_id,
+  program_title,
+  title as media_title,(duration / 3600000) as duracao_id,(
+    (sum(duration) over(partition by program_id)) / 3600000
+  ) as duracao_program
+from
+  ${ref('conteudo_enriched', 'all_content')}
+where
+  id in (
+    11805276,
+    11805258,
+    11805238,
+    11805245,
+    11805233,
+    11805241,
+    11805269,
+    11805260
+  )
+order by
+  3 desc

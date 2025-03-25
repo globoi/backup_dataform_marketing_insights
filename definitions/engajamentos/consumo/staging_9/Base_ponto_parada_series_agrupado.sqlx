@@ -1,0 +1,28 @@
+config {
+  type: "table",
+  name: "base_ponto_parada_series_agrupado",
+  schema: "consumo",
+  tags: ["consumo_staging_9", 
+        "schedule_tag=consumo_base_ponto_parada_series_agrupado"
+  ]
+}
+
+SELECT DISTINCT
+
+    a.program_id,
+    a.program_title,
+    a.Ultimo_Episodio,
+    a.Dias_Ultimo_Consumo,
+    a.Terminou_Ultimo_Episodio,
+    a.Temporada_Ultimo_Episodio,
+    a.Episodio_Temporada_Ultimo,
+    COUNT(DISTINCT(a.globo_id)) AS Qtd_Usuarios
+    
+    FROM ${ref("consumo", "base_ponto_parada_series")} a
+    GROUP BY a.program_id,
+    a.program_title,
+    a.Ultimo_Episodio,
+    a.Dias_Ultimo_Consumo,
+    a.Terminou_Ultimo_Episodio,
+    a.Temporada_Ultimo_Episodio,
+    a.Episodio_Temporada_Ultimo

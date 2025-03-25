@@ -1,0 +1,32 @@
+config {
+  type: 'table',
+  name: 'atualizacao_mobile_push_historico_send',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_mobile_push_historico_send',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH push AS (
+  SELECT
+    *
+  EXCEPT(date_time_send),
+    DATETIME(date_time_send, "America/Sao_Paulo") AS date_time_send
+  FROM
+    ${ref('mkt_clean', 'mobile_push')}
+)
+SELECT
+  DATE(date_time_send) AS date_time_send,
+  COUNT(*) AS total
+FROM
+  push
+WHERE
+  date_time_send >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  and table_suffix_date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+GROUP BY
+  1
+ORDER BY
+  1 desc

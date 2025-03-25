@@ -1,0 +1,25 @@
+config {
+  type: 'incremental',
+  tags: ['schedule_tag=experimentos_hi_historico_experimentos'],
+  uniqueKey: ["globo_id", "semana_ref_raioxbbb24"],
+  name: 'hi_historico_experimentos',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+
+-- Terceira etapa
+-- Histórico de usuário por grupo por semana a partir da data de inicio do experimento
+
+SELECT 
+  globo_id,
+  grupo_n,
+  semana_ref_raioxbbb24,
+  DATE_ADD(aa.semana_ref_raioxbbb24, INTERVAL 7 DAY) as semana_participacao_experimento,
+  'hi24_exp01_bbb24_v1' as experimento -- para dar referencia de qual experimento ele é quando for adicionado em algum tabelão
+FROM ${ref("experimentos", "hi24_exp01_bbb24_v1_usuarios_da_semana")} aa
+
+
+

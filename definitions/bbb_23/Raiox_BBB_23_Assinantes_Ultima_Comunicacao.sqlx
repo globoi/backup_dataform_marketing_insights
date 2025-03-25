@@ -1,0 +1,102 @@
+config {
+  type: 'table',
+  name: 'Raiox_BBB_23_Assinantes_Ultima_Comunicacao',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com os assinantes distintos que contém na tabela Raiox_BBB_23_Assinantes_Agrupado e os dados de comunicação desses assinantes.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    tipo_cadastro: 'Identifica que o usuário é um assinante.',
+    tipo_assinante: 'Identifica se o assinante é titular ou dependente.',
+    data_hora_compra: 'Data e hora do início da assinatura do usuário.',
+    produto: 'Informa o tipo de produto que o assinante possui. Ex: mensal, anual ou bianual.',
+    id_asset: 'Código que identifica a assinatura.',
+    mais_canais: 'Flag identificando se o assinante é tier 1 ou tier 2.',
+    addon_disney: 'Flag identificando se o assinante possui addon disney.',
+    addon_deezer: 'Flag identificando se o assinante possui addon deezer.',
+    dt_assinatura_comeco: 'Data início da assinatura do usuário.',
+    canal_compra: 'Canal pelo qual a compra do ativo foi realizada. Ex.: WEB',
+    tempo_de_base_agrupado: 'Tempo de base que o assinante possui. Ex: Até 1 mês.',
+    assinatura_gplay: 'Identifica se o assinante é nacional ou internacional.',
+    Produto_Contratado: 'Informa o nome do produto. Ex.: Globoplay e Telecine',
+    origem: 'Identifica a origem do assinante. Ex: upgrade, venda direta.',
+    telefone: 'Informa se o assinante possui número de telefone cadastrado.',
+    endereco: 'Informa se o assinante possui número endereço cadastrado.',
+    sistema: 'Informa por qual sistema o assinante entrou. Ex: Salesforce',
+    numero_assinaturas: 'Quantidade de assinaturas que o usuário possui.',
+    numero_dependentes: 'Quantidade de dependentes que o assinante possui.',
+    gender: 'Informa o gênero do assinante.',
+    age: 'Informa a idade do assinante.',
+    address_state: 'Informa o estado em que o assinante reside.',
+    first_play: 'Informa qual o primeiro programa que o assinante assistiu.',
+    first_play_subset: 'Informa qual o primeiro subset que o assinante assistiu.',
+    data_first_play: 'Informa qual a primeira data que o assinante assistiu seu primeiro programa.',
+    ultimo_consumo: 'Informa qual o último programa que o assinante assistiu.',
+    ultimo_consumo_subset: 'Informa qual o último subset que o assinante assistiu.',
+    data_ultimo_consumo: 'Informa qual a última data que o assinante assistiu seu último programa.',
+    whatsapp_optin_datetime: 'Informa a data em que o usuário realizou o optin no whatsapp.',
+    whatsapp_optin_status: 'Informa a se o assinante possui optin no whatsapp.',
+    push_ultimo_data_enviado: 'Informa a data do último push enviado pro assinante.',
+    push_ultimo_titulo_enviado: 'Informa o título do último push enviado pro assinante.',
+    push_ultimo_descricao_enviado: 'Informa a descrição do último push enviado pro assinante.',
+    push_ultimo_data_aberto: 'Informa a data do último push aberto pelo assinante.',
+    push_ultimo_titulo_aberto: 'Informa o título do último push aberto pelo assinante.',
+    push_ultimo_descricao_aberto: 'Informa a descrição do último push aberto pelo assinante.',
+    push_perfil_uso: 'Informa o perfil de push do assinante. Ex: Se abriu push há mais de 1 mês.',
+    push_qtd_enviado_30D: 'Quantidade de push enviados para o assinante nos últimos 30 dias.',
+    push_qtd_aberto_30D: 'Quantidade de push abertos pelo assinante nos últimos 30 dias.',
+    push_flag_enviado_30D: 'Flag informando se o assinante recebeu push nos últimos 30 dias.',
+    push_flag_aberto_30D: 'Flag informando se o assinante abriu push nos últimos 30 dias.',
+    push_optout_qtd: 'Quantidade de opt out em push que o assinante possui.',
+    push_optout_ultimo_data: 'Última data em que o assinante realizou opt out.',
+    push_optout_status: 'Informa se o assinante possui push ativo ou não.',
+    email_qtd_enviado_30D: 'Quantidade de e-mails enviados para o assinante nos últimos 30 dias.',
+    email_ultimo_data_enviado: 'Informa a data do último e-mail enviado pro assinante.',
+    email_ultimo_data_click: 'Informa a data do último click em e-mail pelo assinante.',
+    email_ultimo_data_aberto: 'Informa a data do último e-mail aberto pelo assinante.',
+    email_qtd_aberto_30D: 'Quantidade de e-mails abertos pelo assinante nos últimos 30 dias.',
+    email_perc_aberto_30D: 'Percentual de abertura de e-mail pelo assinante nos últimos 30 dias.',
+    email_perfil_30D: 'Informa o perfil de e-mail do assinante. Ex: Heavy User (abriu pelo menos 50% dos e-mails).',
+    email_flag_enviado_30D: 'Flag informando se o assinante recebeu e-mail nos últimos 30 dias.',
+    email_flag_aberto_30D: 'Flag informando se o assinante abriu e-mail nos últimos 30 dias.',
+    appopen_qtd_30D: 'Quantidade de vezes que o assinante abriu o app nos últimos 30 dias.',
+    appopen_qtd_devices: 'Quantidade de devices que o assinante usou para abrir o app.',
+    appopen_qtd_dias: 'Quantidade de dias que o assinante abriu o app.',
+    appopen_ultimo_data: 'Última data que o assinante abriu o app.',
+    appopen_flag_30D: 'Flag informando se o assinante abriu o app nos últimos 30 dias.',
+    acesso_qtd_dias: 'Quantidade de dias que o assinante acesso a plataforma.',
+    acesso_ultima_data: 'Última data que o assinante acessou a plataforma.',
+    acesso_qtd_plataformas: 'Quantidade de plataformas que o assinante acessou.',
+    acesso_flag_30D: 'Flag se o assinante acessou a plataforma nos últimos 30 dias.',
+    consumo_qtd_dias: 'Quantidade de dias que o assinante consumiu na plataforma.',
+    consumo_qtd_midia: 'Quantidade de midias que o assinante consumiu na plataforma.',
+    consumo_qtd_programs: 'Quantidade de programas que o assinante consumiu na plataforma.',
+    consumo_mean_hwatched: 'Médias de horas de consumo do assinante na plataforma.',
+    consumo_tipo_conteudo: 'Tipo de conteúdo que o assinante assistiu. Ex: íntegra, trecho, etc',
+    consumo_flag_30D: 'Flag se o assinante consumiu algum conteúdo nos últimos 30 dias.'
+  }
+}
+
+with cluster_bbb as (
+  select
+    distinct globo_id
+  from
+    ${ref("bbb_23", "Raiox_BBB_23_Assinantes_Agrupado")}
+)
+select
+  *
+from
+  cluster_bbb
+  inner join ${ref("comunicacao", "ultima_comunicacao_geral")} using(globo_id)
+where
+  tipo_cadastro = 'Assinante'

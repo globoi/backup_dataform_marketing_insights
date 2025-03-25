@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "usuarios",
+  name: "base_ex_assinantes_e_logado_free",
+  description: ""
+}

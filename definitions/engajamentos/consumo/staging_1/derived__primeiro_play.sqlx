@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  name: 'derived__primeiro_play',
+  schema: 'consumo',
+  tags: ['consumo_staging_1',
+        "schedule_tag=consumo_derived__primeiro_play"
+  ],
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+    userid AS globo_id,
+    AssetId,
+    program_id AS primeiro_play,
+    first_play_timestamp AS timestamp_do_primeiro_play,
+    program_title AS primeiro_play_titulo
+  FROM
+    ${ref("consumo", "first_play")}
+  WHERE
+    program_id != 8426 AND play_pago
+  QUALIFY
+     ROW_NUMBER() OVER(PARTITION BY globo_id, AssetId ORDER BY timestamp_do_primeiro_play) = 1

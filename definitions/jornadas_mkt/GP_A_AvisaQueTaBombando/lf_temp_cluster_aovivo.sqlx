@@ -1,0 +1,54 @@
+config {
+  type: 'table',
+  name: 'lf_temp_cluster_aovivo',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AvisaQueTaBombando','schedule_tag=jornadas_mkt_lf_temp_cluster_aovivo'],
+  description: '',
+  columns: {
+  }
+}
+
+WITH 
+impression_step_1 AS (
+    SELECT
+        userid AS globo_id,
+        `timestamp`
+    FROM
+        ${ref("consumo_enriched","impression")} imp
+        INNER JOIN ${ref("usuarios", "Free users")} fu
+        ON imp.userid = fu.globo_id
+    WHERE
+        program_id = 9095
+        AND (
+            EXTRACT(TIME FROM DATETIME(imp.`timestamp`)) BETWEEN '13:00:00' AND '13:30:00'
+            OR EXTRACT(TIME FROM DATETIME(imp.`timestamp`)) BETWEEN '20:30:00' AND '21:30:00'
+            OR (
+                EXTRACT(TIME FROM DATETIME(imp.`timestamp`)) BETWEEN '17:50:00' AND '18:30:00'
+                AND CAST(FORMAT_TIMESTAMP("%u", imp.`timestamp`) AS INT64) BETWEEN 1 AND 5
+                )
+            OR EXTRACT(TIME FROM DATETIME(imp.`timestamp`)) BETWEEN '14:45:00' AND '16:40:00'
+        )
+),
+
+impression_step_2 AS (
+    SELECT
+        globo_id,
+        CASE
+            WHEN EXTRACT(TIME FROM DATETIME(`timestamp`)) BETWEEN '13:00:00' AND '13:30:00'
+            THEN 'soccer'
+            WHEN EXTRACT(TIME FROM DATETIME(`timestamp`)) BETWEEN '20:30:00' AND '21:30:00'
+            THEN 'news'
+            WHEN 
+                EXTRACT(TIME FROM DATETIME(`timestamp`)) BETWEEN '17:50:00' AND '18:30:00'
+                AND CAST(FORMAT_TIMESTAMP("%u", `timestamp`) AS INT64) BETWEEN 1 AND 5
+            THEN 'teen'
+            WHEN EXTRACT(TIME FROM DATETIME(`timestamp`)) BETWEEN '14:45:00' AND '16:40:00'
+            THEN 'kids'
+        END AS segmentation
+    FROM
+        impression_step_1
+)
+
+SELECT *
+FROM impression_step_2
+WHERE segmentation IS NOT NULL

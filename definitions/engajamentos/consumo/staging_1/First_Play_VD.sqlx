@@ -1,0 +1,42 @@
+config {
+  type: "table",
+  name: "First_Play_VD",
+  schema: "consumo",
+  tags: ['consumo_staging_1']
+}
+
+with join_salesforce_venda_direta_step_2 AS (
+  SELECT 
+    imp.* EXCEPT(assetid, data_hora_compra),
+    sales.assetid,
+    sales.data_hora_compra
+  FROM
+    ${ref("consumo", "first_play")}  imp
+  RIGHT JOIN ${ref("sales_enriched", "salesforce_venda_direta")} sales
+  ON sales.globo_id = imp.userid
+  AND imp.first_play_timestamp >= sales.data_hora_compra 
+  AND imp.program_id != 8426 
+)
+
+,First_Play_VD_step_3 AS (
+  SELECT 
+    userid as globo_id,
+    AssetId,
+    program_id AS firstWatched,
+    program_title AS first_watched_title,
+    hours_watched AS hours_watched_for_first_program,
+    first_play_timestamp AS timestamp_for_first_program,
+    mediaid,
+    data_hora_compra
+  FROM
+    join_salesforce_venda_direta_step_2
+  QUALIFY ROW_NUMBER() 
+    OVER(PARTITION BY userid, AssetId ORDER BY first_play_timestamp) = 1
+)
+
+SELECT 
+  * 
+FROM 
+  First_Play_VD_step_3
+
+

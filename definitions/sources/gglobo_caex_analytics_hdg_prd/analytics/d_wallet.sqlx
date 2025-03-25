@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-caex-analytics-hdg-prd",
+  schema: "analytics",
+  name: "d_wallet",
+  description: ""
+}

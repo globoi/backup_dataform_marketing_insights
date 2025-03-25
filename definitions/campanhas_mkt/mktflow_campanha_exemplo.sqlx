@@ -1,0 +1,18 @@
+config {
+  type: 'table',
+  name: 'mktflow_campanha_exemplo',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--YOUR SQL
+SELECT
+MD5('campanha') as id,
+CURRENT_DATE() as dt

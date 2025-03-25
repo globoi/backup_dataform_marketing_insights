@@ -1,0 +1,13 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_retro_ge_2024'],
+    name: 'mktflow_base_retro_ge_2024',
+    schema: 'ge_mkt',
+    description: ''
+}
+
+SELECT distinct globoid AS globo_id
+, globoid_hash
+FROM --`gglobo-mkt-ins-hdg-prd.retrospectiva.retrospectiva_2024_vf`
+${ref("retrospectiva", "retrospectiva_2024_vf")}
+WHERE primeiroProduto = "ge" 

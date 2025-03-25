@@ -1,0 +1,51 @@
+config {
+    type: "table",
+    name: "mktflow_adimplentes_telecine_combo",
+    schema: "jornadas_mkt",
+    tags: ["telecine",
+        'schedule_tag=jornadas_mkt_mktflow_adimplentes_telecine_combo',
+        "schedule_cron=0 11 * * *"
+        ],
+    bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      mktcloud: "true"
+    }
+  },
+}
+SELECT
+    globo_id,
+    i.id_asset,
+    i.data_hora_compra,
+    i.dt_assinatura_comeco,
+    i.activation_at,
+    i.unsubscribe_at,
+    i.scheduled_unsubscribe_at,
+    i.end_cycle_at,
+    i.canal_compra,
+    i.flag_claro_wholesale,
+    i.Produto_Contratado,
+    i.produto,
+    i.origem,
+    i.assinatura_gplay,
+    i.subscription_type,
+    i.subscription_status,
+    i.status,
+    i.origin_id,
+    i.origin_name,
+    i.tempo_de_base,
+    i.tempo_de_base_agrupado,
+    i.mais_canais,
+    i.gplay_basico,
+    i.gplay_padrao,
+    i.gplay_padrao_ads,
+    i.combo,
+   CURRENT_DATE('America/Sao_Paulo') AS DT_PROC
+  FROM  ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS base_ativa_pagante_com_trial_new
+    CROSS JOIN UNNEST(base_ativa_pagante_com_trial_new.info) AS i
+  WHERE lower(Produto_Contratado) LIKE '%telecine%'
+   AND UPPER (i.canal_compra) in ( 'WEB','%INAPP%,' '%GOOGLE%', 'ANDROID', 'IOS')
+   AND subscription_status in ('Ativo', 'ACTIVE')
+   ORDER BY DT_ASSINATURA_COMECO DESC

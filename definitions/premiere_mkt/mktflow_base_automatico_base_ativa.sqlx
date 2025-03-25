@@ -1,0 +1,33 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=premiere_mkt_mktflow_base_automatica_base_ativa', 'schedule_cron=30 13 * * *'],
+    name: 'mktflow_base_automatica_base_ativa',
+    schema: 'premiere_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "premiere_mkt"
+        }
+    }
+}
+
+SELECT
+  Dia,
+  globoid AS globo_id,
+  Produto,
+  Canal,
+  Preco,
+  Oferta,
+  Forma_Pagamento,
+  Plano,
+  Clube
+FROM
+  -- estrutura-esportes.Time_Inteligencia.CRM_BaseAtiva_Premiere
+  ${ref("Time_Inteligencia", "CRM_BaseAtiva_Premiere")}
+WHERE
+  LENGTH(globoid) > 0
+  AND DATE(Dia) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)

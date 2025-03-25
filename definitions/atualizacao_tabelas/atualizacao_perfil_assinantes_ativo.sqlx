@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  name: 'atualizacao_perfil_assinantes_ativo',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+        'atualizacao_tabelas_2', 
+        'schedule_tag=atualizacao_tabelas_atualizacao_perfil_assinantes_ativo',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+with tabela as (
+  SELECT
+    DATETIME(data_hora_compra, "America/Sao_Paulo") as data_hora_compra,
+    DATETIME(data_ultimo_consumo, "America/Sao_Paulo") as data_ultimo_consumo
+  FROM
+    ${ref('usuarios', 'perfil_assinantes_ativo_reduzido')}
+)
+select
+  max(data_hora_compra) as max_data_hora_compra,
+  max(data_ultimo_consumo) as max_data_ultimo_consumo
+from
+  tabela

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-foundation-psd-hdg-prd",
+  schema: "legado",
+  name: "user_legado_only",
+  description: ""
+}

@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_hi_novelas_base_teste3'],
+  name: 'hi_novelas_base_teste3',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+-- Tabela que separa os usuarios do grupo 3
+-- tem que rodar DEPOIS da rotina hi_novelas_v2_grupos_da_semana
+
+-- CREATE OR REPLACE TABLE ${ref("segment_api", "hi_novelas_base_teste3")} AS
+-- gglobo-mkt-ins-hdg-prd.segment_api.hi_novelas_base_teste3
+
+SELECT
+  globo_id as user_id
+  FROM ${ref("experimentos", "hi_novelas_v2_grupos_da_semana")} 
+  WHERE 
+    grupo_n = 3

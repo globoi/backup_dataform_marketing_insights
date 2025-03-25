@@ -1,0 +1,55 @@
+config {
+  type: "table",
+  name: "20210728_push_optout_urban",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_7",'schedule_tag=comunicacao_20210728_push_optout_urban'],
+}
+
+WITH push AS (
+  SELECT DISTINCT 
+          globo_id,
+          mais_canais,
+          tempo_de_base_agrupado,
+          Data_Recebimento_Ultimo_Push,
+          Produto_Contratado,
+          Push_Titulo_Recebido,
+          Push_Descricao_recebido,
+          Qtd_Devices_30D                           
+  FROM ${ref("comunicacao","base_ultimo_push")}
+),
+base_1 AS (
+  SELECT globo_id, MAX(occurred) as occurred
+  FROM ${ref("clean","urban_opt_out")}
+  WHERE 
+    globo_id is not null
+    AND product = 'globoplay'
+  GROUP BY globo_id
+),
+base_2 AS (
+  SELECT DISTINCT 
+  push.globo_id,
+  tempo_de_base_agrupado,
+  mais_canais,
+  Produto_Contratado,
+  Data_Recebimento_Ultimo_Push,
+  Push_Titulo_Recebido,
+  Push_Descricao_recebido,
+  Qtd_Devices_30D,
+  occurred AS Data_Ultimo_Optout,
+  CASE
+    WHEN Produto_Contratado IS NULL 
+      THEN 'Não Assinante'
+      ELSE 'Assinante'
+  END AS Status_Assinatura,
+  CASE 
+    WHEN Data_Recebimento_Ultimo_Push > occurred 
+      THEN 'Push Ativo'
+      ELSE 'Optout'
+  END AS Ainda_OptOut
+  FROM base_1
+  INNER JOIN push
+  ON(push.globo_id = base_1.globo_id) 
+)
+
+SELECT * FROM base_2
+

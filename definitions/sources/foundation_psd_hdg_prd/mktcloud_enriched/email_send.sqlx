@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "email_send",
+    schema: "mkt_enriched",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

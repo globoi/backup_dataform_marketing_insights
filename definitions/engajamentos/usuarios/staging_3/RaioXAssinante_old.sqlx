@@ -1,0 +1,409 @@
+config {
+    type: "table",
+    name: "RaioXAssinante_old",
+    schema: "usuarios"
+}
+
+  -- Base Analise
+WITH
+  Base_analise_1 AS (
+  SELECT
+    * EXCEPT(timestamp,
+      date),
+    DATETIME(`timestamp`, "America/Sao_Paulo") AS timestamp,
+  FROM
+    ${ref("consumo", "pre_step_consumo")}
+  WHERE
+    is_full_content
+    AND program_id <> 8426
+    AND ( DATE(`timestamp`) >= '2021-01-01'
+      OR `timestamp` IS NULL ) ),
+  Base_analise AS (
+  SELECT
+    *,
+    LOWER( CAST(`timestamp` AS STRING FORMAT 'DY') ) AS day_week,
+    DATE_TRUNC (`timestamp`, WEEK(MONDAY)) AS semana,
+    DATE(`timestamp`) AS date
+  FROM
+    Base_analise_1 ),
+  -- Base Perfil dia
+  Base_Perfil_dia_1 AS (
+  SELECT
+    globo_id,
+    day_week,
+    semana,
+    timestamp,
+    date,
+    hours_watched
+  FROM
+    Base_analise ),
+  Base_Perfil_dia_2 AS (
+  SELECT
+    * EXCEPT(day_week),
+    CASE
+      WHEN LOWER(day_week) NOT IN ( 'sat', 'sun', 'fri' ) THEN 'horas_dia_de_semana'
+      ELSE 'horas_final_de_semana'
+  END
+    AS day_week,
+  FROM
+    Base_Perfil_dia_1 ),
+  Base_Perfil_dia_3 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      semana,
+      day_week,
+      hours_watched
+    FROM
+      Base_Perfil_dia_2 )
+  PIVOT
+    ( SUM (hours_watched) FOR day_week IN ('horas_dia_de_semana',
+        'horas_final_de_semana') ) ),
+  Base_Perfil_dia AS (
+  SELECT
+    globo_id,
+    semana,
+    COALESCE(horas_dia_de_semana, 0) AS horas_dia_de_semana,
+    COALESCE(horas_final_de_semana, 0) AS horas_final_de_semana,
+    CASE
+      WHEN horas_dia_de_semana >= horas_final_de_semana THEN 'dia_de_semana'
+      WHEN horas_dia_de_semana = horas_final_de_semana THEN 'igual'
+      ELSE 'final_de_semana'
+  END
+    AS perfil_dia_da_semana
+  FROM
+    Base_Perfil_dia_3 ),
+  --- Base PERFIL PERIODO DIA
+  Base_periodo_dia_1 AS (
+  SELECT
+    *,
+    CASE
+      WHEN EXTRACT( HOUR FROM `timestamp` ) BETWEEN 0 AND 5 THEN 'horas_madrugada'
+      WHEN EXTRACT( HOUR
+    FROM
+      `timestamp` ) BETWEEN 6
+    AND 11 THEN 'horas_manha'
+      WHEN EXTRACT( HOUR FROM `timestamp` ) BETWEEN 12 AND 17 THEN 'horas_tarde'
+      ELSE 'horas_noite'
+  END
+    AS periodo,
+  FROM
+    Base_analise ),
+  Base_periodo_dia_2 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      semana,
+      hours_watched,
+      periodo
+    FROM
+      Base_periodo_dia_1 )
+  PIVOT
+    ( SUM (hours_watched) FOR periodo IN ( 'horas_madrugada',
+        'horas_manha',
+        'horas_tarde',
+        'horas_noite' ) ) ),
+  Base_periodo_dia AS (
+  SELECT
+    globo_id,
+    semana,
+    COALESCE(horas_madrugada, 0) AS horas_madrugada,
+    COALESCE(horas_manha, 0) AS horas_manha,
+    COALESCE(horas_tarde, 0) AS horas_tarde,
+    COALESCE(horas_noite, 0) AS horas_noite
+  FROM
+    Base_periodo_dia_2),
+  inter AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_noite >= horas_madrugada AND horas_noite >= horas_tarde AND horas_noite >= horas_manha THEN 'Noite'
+      WHEN horas_tarde >= horas_madrugada
+    AND horas_tarde >= horas_manha
+    AND horas_tarde >= horas_noite THEN 'Tarde'
+      WHEN horas_manha >= horas_madrugada AND horas_manha >= horas_tarde AND horas_manha >= horas_noite THEN 'Manhã'
+      WHEN horas_madrugada >= horas_manha
+    AND horas_madrugada >= horas_tarde
+    AND horas_madrugada >= horas_noite THEN 'Madrugada'
+  END
+    AS perfil_periodo_do_dia
+  FROM
+    Base_periodo_dia),
+  -- Base Step_Intermediario_Conteudo
+  all_content AS (
+  SELECT
+    service_id,
+    id AS mediaid,
+    metadata_scheme
+  FROM
+    ${ref("conteudo_enriched", "all_content")} ),
+  imp AS(
+  SELECT
+    *,
+    COUNT(DISTINCT date) OVER (PARTITION BY assetid, globo_id, semana) AS frequencia
+  FROM
+    Base_analise
+  LEFT JOIN
+    all_content
+  USING
+    (mediaid) ),
+  imp_2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN service_id = 6807 THEN 'Mais_Canais'
+      WHEN program_subset = 'novelas' THEN 'Novela'
+      WHEN program_subset = 'series' THEN 'Series'
+      WHEN program_subset IN ('filmes',
+      'movies') THEN 'Filmes'
+      WHEN program_id = 9095 THEN 'Ao_Vivo_Tv_Globo'
+      ELSE 'outros_conteudos'
+  END
+    AS grupo
+  FROM
+    imp ),
+  imp_pivoted AS(
+  SELECT
+    *
+  FROM (
+    SELECT
+      assetid,
+      globo_id,
+      data_hora_compra,
+      semana,
+      frequencia,
+      hours_watched,
+      program_id,
+      `date`,
+      mediaid,
+      grupo
+    FROM
+      imp_2 )
+  PIVOT
+    ( SUM (hours_watched) AS horas,
+      COUNT(DISTINCT program_id) AS qtnd_programas,
+      COUNT(DISTINCT `date`) AS freq,
+      COUNT(DISTINCT mediaid) AS qtnd_midias FOR grupo IN ( 'Ao_Vivo_Tv_Globo',
+        'Mais_Canais',
+        'Novela',
+        'Series',
+        'Filmes',
+        'outros_conteudos' ) ) ),
+  imp_fillna AS (
+  SELECT
+    assetid,
+    globo_id,
+    data_hora_compra,
+    semana,
+    COALESCE(frequencia,0) AS frequencia,
+    COALESCE(horas_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_horas,
+    COALESCE(qtnd_programas_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_qtnd_programas,
+    COALESCE(freq_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_freq,
+    COALESCE(qtnd_midias_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_qtnd_midias,
+    COALESCE(horas_Filmes,0) AS Filmes_horas,
+    COALESCE(qtnd_programas_Filmes,0) AS Filmes_qtnd_programas,
+    COALESCE(freq_Filmes,0) AS Filmes_freq,
+    COALESCE(qtnd_midias_Filmes,0) AS Filmes_qtnd_midias,
+    COALESCE(horas_Mais_Canais,0) AS Mais_Canais_horas,
+    COALESCE(qtnd_programas_Mais_Canais,0) AS Mais_Canais_qtnd_programas,
+    COALESCE(freq_Mais_Canais,0) AS Mais_Canais_freq,
+    COALESCE(qtnd_midias_Mais_Canais,0) AS Mais_Canais_qtnd_midias,
+    COALESCE(horas_Novela,0) AS Novela_horas,
+    COALESCE(qtnd_programas_Novela,0) AS Novela_qtnd_programas,
+    COALESCE(freq_Novela,0) AS Novela_freq,
+    COALESCE(qtnd_midias_Novela,0) AS Novela_qtnd_midias,
+    COALESCE(horas_Series,0) AS Series_horas,
+    COALESCE(qtnd_programas_Series,0) AS Series_qtnd_programas,
+    COALESCE(freq_Series,0) AS Series_freq,
+    COALESCE(qtnd_midias_Series,0) AS Series_qtnd_midias,
+    COALESCE(horas_outros_conteudos,0) AS outros_conteudos_horas,
+    COALESCE(qtnd_programas_outros_conteudos,0) AS outros_conteudos_qtnd_programas,
+    COALESCE(freq_outros_conteudos,0) AS outros_conteudos_freq,
+    COALESCE(qtnd_midias_outros_conteudos,0) AS outros_conteudos_qtnd_midias
+  FROM
+    imp_pivoted ),
+  Step_Intermediario_Conteudo AS (
+  SELECT
+    assetid,
+    globo_id,
+    data_hora_compra,
+    semana,
+  IF
+    (frequencia >=8, 7, frequencia) AS frequencia,
+    Ao_Vivo_Tv_Globo_horas,
+    Ao_Vivo_Tv_Globo_qtnd_programas,
+  IF
+    (Ao_Vivo_Tv_Globo_freq >=8, 7, Ao_Vivo_Tv_Globo_freq) AS Ao_Vivo_Tv_Globo_freq,
+    Ao_Vivo_Tv_Globo_qtnd_midias,
+    Filmes_horas,
+    Filmes_qtnd_programas,
+  IF
+    (Filmes_freq >=8, 7, Filmes_freq) AS Filmes_freq,
+    Filmes_qtnd_midias,
+    Mais_Canais_horas,
+    Mais_Canais_qtnd_programas,
+  IF
+    (Mais_Canais_freq >=8, 7, Mais_Canais_freq) AS Mais_Canais_freq,
+    Mais_Canais_qtnd_midias,
+    Novela_horas,
+    Novela_qtnd_programas,
+  IF
+    (Novela_freq >=8, 7, Novela_freq) AS Novela_freq,
+    Novela_qtnd_midias,
+    Series_horas,
+    Series_qtnd_programas,
+  IF
+    (Series_freq >=8, 7, Series_freq) AS Series_freq,
+    Series_qtnd_midias,
+    outros_conteudos_horas,
+    outros_conteudos_qtnd_programas,
+  IF
+    (outros_conteudos_freq >=8, 7, outros_conteudos_freq) AS outros_conteudos_freq,
+    outros_conteudos_qtnd_midias,
+    (Filmes_horas + Mais_Canais_horas + Novela_horas + Series_horas + outros_conteudos_horas + Ao_Vivo_Tv_Globo_horas) AS total_horas
+  FROM
+    imp_fillna ),
+  base AS (
+  SELECT
+    *,
+    CASE
+      WHEN Filmes_horas < 1 AND Mais_Canais_horas < 1 AND Novela_horas < 1 AND Series_horas < 1 AND outros_conteudos_horas < 1 AND Ao_Vivo_Tv_Globo_horas < 1 THEN 'Sem_Consumo_Suficiente'
+      WHEN Filmes_horas > Novela_horas
+    AND Filmes_horas > Series_horas
+    AND Filmes_horas > Mais_Canais_horas
+    AND Filmes_horas > outros_conteudos_horas
+    AND Filmes_horas > Ao_Vivo_Tv_Globo_horas THEN 'Filmes'
+      WHEN Novela_horas > outros_conteudos_horas AND Novela_horas > Series_horas AND Novela_horas > Mais_Canais_horas AND Novela_horas > Ao_Vivo_Tv_Globo_horas THEN 'Novelas'
+      WHEN Series_horas > outros_conteudos_horas
+    AND Series_horas > Mais_Canais_horas
+    AND Series_horas > Ao_Vivo_Tv_Globo_horas THEN 'Series'
+      WHEN Mais_Canais_horas > outros_conteudos_horas AND Mais_Canais_horas > Ao_Vivo_Tv_Globo_horas THEN 'Mais Canais'
+      WHEN Ao_Vivo_Tv_Globo_horas > outros_conteudos_horas THEN 'Ao_Vivo_Tv_Globo'
+      ELSE 'Outros Conteúdos'
+  END
+    AS Cluster_Conteudo_Mais_Assistido
+  FROM
+    Step_Intermediario_Conteudo ),
+  base_1 AS (
+  SELECT
+    *
+  FROM
+    base
+  LEFT JOIN
+    Base_Perfil_dia
+  USING
+    (globo_id,
+      semana)
+  LEFT JOIN
+    inter
+  USING
+    (globo_id,
+      semana) ),
+  base_2 AS (
+  SELECT
+    * EXCEPT(horas_dia_de_semana,
+      horas_final_de_semana),
+    COALESCE(horas_dia_de_semana, 0) AS horas_dia_de_semana,
+    COALESCE(horas_final_de_semana, 0) AS horas_final_de_semana,
+    NTILE(4) OVER (PARTITION BY semana ORDER BY total_horas DESC) AS Cluster_Engajamento,
+    CASE
+      WHEN total_horas > 10 THEN '4. Heavy Users'
+      WHEN total_horas BETWEEN 0
+    AND 1 THEN '1. Light Users'
+      WHEN total_horas BETWEEN 1 AND 5 THEN '2. Mid-Light Users'
+      WHEN total_horas BETWEEN 5
+    AND 10 THEN '3. Mid-Heavy Users'
+      ELSE 'Sem consumo suficiente'
+  END
+    AS novo_cluster_engajamento
+  FROM
+    base_1 ),
+  base_3 AS (
+  SELECT
+    * EXCEPT (Cluster_Engajamento),
+    CASE
+      WHEN Cluster_Engajamento = 1 THEN '4. Heavy Users'
+      WHEN Cluster_Engajamento = 2 THEN '3. Mid-Heavy Users'
+      WHEN Cluster_Engajamento = 3 THEN '2. Mid-Light Users'
+      WHEN Cluster_Engajamento = 4 THEN '1. Light Users'
+  END
+    AS Cluster_Engajamento,
+  IF
+    (Ao_Vivo_Tv_Globo_horas>=1,1,0) +
+  IF
+    (Filmes_horas>=1,1,0) +
+  IF
+    (Mais_Canais_horas>=1,1,0) +
+  IF
+    (Novela_horas>=1,1,0) +
+  IF
+    (Series_horas>=1,1,0) +
+  IF
+    (outros_conteudos_horas>=1,1,0) AS diversidade,
+    CASE
+      WHEN Ao_Vivo_Tv_Globo_qtnd_programas IS NOT NULL THEN Ao_Vivo_Tv_Globo_qtnd_programas
+      WHEN Mais_Canais_qtnd_programas IS NOT NULL THEN Mais_Canais_qtnd_programas
+      WHEN Novela_qtnd_programas IS NOT NULL THEN Novela_qtnd_programas
+      WHEN outros_conteudos_qtnd_programas IS NOT NULL THEN outros_conteudos_qtnd_programas
+      WHEN Series_qtnd_programas IS NOT NULL THEN Series_qtnd_programas
+      WHEN Filmes_qtnd_midias IS NOT NULL THEN Filmes_qtnd_midias
+  END
+    AS Diversidade_Conteudo
+  FROM
+    base_2 ),
+  Raiox_assinante AS (
+  SELECT
+    * EXCEPT (Diversidade_Conteudo),
+    Ao_Vivo_Tv_Globo_qtnd_programas + Mais_Canais_qtnd_programas + Novela_qtnd_programas + outros_conteudos_qtnd_programas + Series_qtnd_programas + Filmes_qtnd_midias AS Diversidade_Conteudo
+  FROM
+    base_3 )
+SELECT
+  globo_id,
+  semana,
+  assetid,
+  data_hora_compra,
+  frequencia,
+  Ao_Vivo_Tv_Globo_horas,
+  Ao_Vivo_Tv_Globo_qtnd_programas,
+  Ao_Vivo_Tv_Globo_freq,
+  Ao_Vivo_Tv_Globo_qtnd_midias,
+  Filmes_horas,
+  Filmes_qtnd_programas,
+  Filmes_freq,
+  Filmes_qtnd_midias,
+  Mais_Canais_horas,
+  Mais_Canais_qtnd_programas,
+  Mais_Canais_freq,
+  Mais_Canais_qtnd_midias,
+  Novela_horas,
+  Novela_qtnd_programas,
+  Novela_freq,
+  Novela_qtnd_midias,
+  Series_horas,
+  Series_qtnd_programas,
+  Series_freq,
+  Series_qtnd_midias,
+  outros_conteudos_horas,
+  outros_conteudos_qtnd_programas,
+  outros_conteudos_freq,
+  outros_conteudos_qtnd_midias,
+  total_horas,
+  Cluster_Conteudo_Mais_Assistido,
+  horas_dia_de_semana,
+  horas_final_de_semana,
+  perfil_dia_da_semana,
+  horas_madrugada,
+  horas_manha,
+  horas_noite,
+  horas_tarde,
+  perfil_periodo_do_dia,
+  Cluster_Engajamento,
+  novo_cluster_engajamento,
+  diversidade,
+  Diversidade_Conteudo
+FROM
+  Raiox_assinante

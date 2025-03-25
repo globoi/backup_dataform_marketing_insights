@@ -1,0 +1,28 @@
+config {
+  type: 'table',
+  name: 'mktflow_Base_jornada_noveleiros_lf',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_noveleiros_lf','schedule_tag=jornadas_mkt_mktflow_Base_jornada_noveleiros_lf'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+with aux as(
+SELECT distinct globoid,
+    SUM(playtime_hours) AS hrs
+FROM ${ref("simulcast", "consumo_ibope")} 
+    --`gglobo-pp-globoplay-hdg-prd.simulcast.consumo_ibope`
+WHERE
+    DATE(data_consumo) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) AND CURRENT_DATE()
+    AND genero_programa = 'NOVELA'
+    AND canal = 'GLOBO'
+GROUP BY all
+HAVING
+    hrs >= 0.75)
+ 
+select globoid
+ 
+from aux

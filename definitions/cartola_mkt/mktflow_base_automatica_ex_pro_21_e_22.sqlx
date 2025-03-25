@@ -1,0 +1,57 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_pro_21_e_22','schedule_cron=55 16 * * *'],
+  name: 'mktflow_base_automatica_ex_pro_21_e_22',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+
+
+--Usuários que sao Ex Cartoleiros Pro em 2021 e 2022, mas foram free em 2023 ou sao free em 2024
+with ex_pro_atual_free as (
+with 
+cartoleiros_pro_21 as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a
+where a.temporada in (2021)
+and a.pro_em is not null),
+
+cartoleiros_pro_22 as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a
+where a.temporada in (2022)
+and a.pro_em is not null),
+
+cartoleiros_free_23_ou_24 as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a
+where a.temporada in (2023,2024)
+and a.pro_em is null
+),
+
+cartoleiros_pro_21_e_22 as (
+select distinct cartoleiros_pro_21.globo_id
+from cartoleiros_pro_21
+inner join cartoleiros_pro_22
+on cartoleiros_pro_21.globo_id = cartoleiros_pro_22.globo_id
+)
+
+select distinct a.globo_id
+from cartoleiros_pro_21_e_22 a
+inner join cartoleiros_free_23_ou_24 b
+on a.globo_id = b.globo_id
+)
+
+select distinct 'named_user' as identifier_type, ex_pro_atual_free.globo_id as UUID
+from ex_pro_atual_free

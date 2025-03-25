@@ -1,0 +1,52 @@
+config {
+  type: "incremental",
+  name: "filmes_history",
+  schema: "consumo",
+  tags: ["consumo_staging_1_history",
+        "schedule_tag=consumo_filmes_history"
+  ],
+  uniqueKey: ["globo_id", "title_filmes", "mediaid"]
+}
+
+WITH impression AS (
+  SELECT
+  userid AS globo_id,
+  mediaid,
+  title AS title_filmes,
+  duration,
+  played,
+  date,
+  FROM ${ref("consumo_enriched", "impression")}
+  WHERE program_id = 10122
+  AND userid IS NOT NULL
+  ${
+    when(incremental(), `AND date > (SELECT DATE(MAX(update_date)) FROM ${self()})
+    UNION ALL
+    SELECT
+    globo_id,
+    mediaid,
+    title_filmes,
+    duration,
+    played,
+    update_date AS date
+    FROM ${self()}
+    `)
+  }
+),
+
+base_filmes AS (
+  SELECT
+  globo_id,
+  mediaid,
+  title_filmes,
+  MAX(duration) AS duration,
+  SUM(played) AS played,
+  MAX(date) AS update_date
+  FROM impression
+  GROUP BY globo_id, mediaid, title_filmes
+)
+
+SELECT *,
+SAFE_DIVIDE(played, duration) AS completude,
+SAFE_DIVIDE(played, duration) > 0.75 AS terminou_filme
+FROM base_filmes

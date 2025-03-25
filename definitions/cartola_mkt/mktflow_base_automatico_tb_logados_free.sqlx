@@ -1,0 +1,25 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_tb_logados_free', 'schedule_cron=25 11 * * *'],
+    name: 'mktflow_base_automatica_tb_logados_free',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT globo_id, temporada
+FROM
+    -- `gglobo-cartola-hdg-prd.dfs.cartola_classico_users`
+    ${ref("dfs", "cartola_classico_users")}
+WHERE
+  temporada = 2025
+  AND pro_em IS NULL

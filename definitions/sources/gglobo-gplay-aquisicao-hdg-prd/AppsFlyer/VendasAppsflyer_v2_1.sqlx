@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-gplay-aquisicao-hdg-prd",
+  schema: "AppsFlyer",
+  name: "VendasAppsflyer_v2_1",
+  description: ""
+}

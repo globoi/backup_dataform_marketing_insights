@@ -1,0 +1,24 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'primeiro_play_internacional',
+  tags: ['perfil_internacional',
+         'schedule_tag=internacional_primeiro_play_internacional',
+         'schedule_cron=0 12 * * *']
+
+}
+
+  SELECT
+    bai.globo_id,
+    bai.id_do_item_da_cesta AS assetid,
+    fp.program_title AS first_play,
+    fp.program_subset AS first_play_subset,
+    fp.first_play_timestamp AS data_first_play
+  FROM
+    ${ref("consumo", "first_play")} fp
+    INNER JOIN ${ref("internacional", "base_ativa_internacional")} bai
+    ON fp.userid = bai.globo_id
+  WHERE
+    fp.is_full_content AND fp.play_pago
+  QUALIFY
+    ROW_NUMBER() OVER(PARTITION BY globo_id, assetid ORDER BY data_first_play) = 1

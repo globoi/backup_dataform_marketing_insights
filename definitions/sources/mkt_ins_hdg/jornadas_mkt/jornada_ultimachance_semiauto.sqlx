@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "jornadas_mkt",
+  name: "jornada_ultimachance_semiauto",
+  description: ""
+}

@@ -1,0 +1,35 @@
+config {
+  type: "table",
+  name: "nome_episodio",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_ContinueAssistindo",'schedule_tag=jornadas_mkt_nome_episodio']
+}
+
+WITH cont AS(
+  SELECT
+    id AS mediaid,
+    title AS nome_episodio,
+    program_id,
+    service_id
+  FROM
+    ${ref("conteudo_enriched", "content")}
+),
+progr AS(
+  SELECT
+    id AS program_id,
+    media_kit_resource__poster,
+    media_kit_resource__logotipo_xl
+  FROM
+    ${ref("conteudo_enriched", "program")}
+),
+tb_join AS(
+  SELECT
+    *
+  FROM
+    cont
+    INNER JOIN progr USING (program_id)
+)
+SELECT
+  *
+FROM
+  tb_join

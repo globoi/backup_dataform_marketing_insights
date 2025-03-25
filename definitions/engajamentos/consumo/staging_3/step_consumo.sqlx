@@ -1,0 +1,91 @@
+config {
+  type: 'table',
+  name: 'step_consumo',
+  schema: 'consumo'
+}
+
+
+WITH resumo_3meses_step1 AS (
+  SELECT 
+    CAST(p.timestamp AS DATE) AS date_timestamp,
+    CURRENT_DATE() AS date_current,
+    assetid,
+    hours_watched,
+    environment,
+    sessionId,
+    mediaid,
+    globo_id,
+    program_subset,
+    program_id,
+    program_title
+  FROM ${ref("consumo", "pre_step_consumo")} p
+  WHERE program_id != 8426 AND is_full_content
+
+
+),
+resumo_3meses_step2 AS (
+  SELECT 
+    date_timestamp,
+    date_current,
+    hours_watched,
+    environment,
+    sessionId,
+    mediaid,
+    globo_id,
+    program_subset,
+    program_id,
+    program_title
+  FROM resumo_3meses_step1
+  WHERE DATE_DIFF(date_current, date_timestamp, DAY) <= 30
+
+),
+resumo_3meses_step3 AS (
+  SELECT 
+    globo_id,
+    hours_watched,
+    COUNT(DISTINCT environment)
+    OVER (PARTITION BY globo_id) AS quantidade_dispositivos_utilizados,
+    sessionId,
+    mediaid,
+    program_subset,
+    program_id,
+    program_title
+  FROM resumo_3meses_step2
+
+),
+resumo_3meses_step4 AS (
+  SELECT 
+    globo_id,
+    SUM(hours_watched) AS horas,
+    quantidade_dispositivos_utilizados,
+    COUNT(DISTINCT sessionId) AS plays,
+    COUNT(DISTINCT mediaid) AS midias_distintas,
+    program_subset,
+    program_id,
+    program_title
+  FROM resumo_3meses_step3
+  GROUP BY globo_id,program_subset,program_id,program_title,quantidade_dispositivos_utilizados
+)
+
+SELECT 
+  p.globo_id,
+  p.assetid,
+  p.first_play,
+  p.first_play_subset,
+  p.data_first_play,
+  r.quantidade_dispositivos_utilizados,
+  r.program_subset,
+  r.program_id,
+  r.program_title,
+  r.horas,
+  r.plays,
+  r.midias_distintas,
+  u.ultimo_consumo,
+  u.ultimo_consumo_subset,
+  u.data_ultimo_consumo
+FROM ${ref("consumo","perfil_assinante__primeiro_play")} p
+LEFT JOIN resumo_3meses_step4 r 
+USING (globo_id)
+LEFT JOIN ${ref("consumo","ultimo_consumo")} u
+USING (globo_id, assetid)
+

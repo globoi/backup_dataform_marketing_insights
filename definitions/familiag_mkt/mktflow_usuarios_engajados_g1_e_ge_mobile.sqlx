@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=familiag_mkt_mktflow_usuarios_engajados_g1_e_ge_mobile','schedule_cron=00 09 * * *'],
+  name: 'mktflow_usuarios_engajados_g1_e_ge_mobile',
+  schema: 'familiag_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "familiag_mkt"
+    }
+  }
+}
+
+with ultima_semana as (
+select max(date_start) as data_maxima
+from ${ref("engajamento_portfolio", "semanas_moveis_mobile")}
+)
+
+
+select distinct userid, combo, indice_de_engajamento
+from ${ref("engajamento_portfolio", "semanas_moveis_mobile")} s
+inner join ultima_semana u
+on s.date_start = u.data_maxima
+where date_start = data_maxima
+and combo like '%g1%ge%'
+and indice_de_engajamento > 0.90

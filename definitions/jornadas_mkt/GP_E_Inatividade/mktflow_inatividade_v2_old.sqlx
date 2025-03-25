@@ -1,0 +1,68 @@
+config {
+  type: "table",
+  name: "mktflow_inatividade_v2_old",
+  schema: "jornadas_mkt",
+  tags: []
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH mais_canais AS (
+  SELECT DISTINCT
+    program_id,
+    service_id
+  FROM ${ref("conteudo_enriched", "content")}
+),
+pre_step_join_mais_canais AS (
+  SELECT *
+  FROM ${ref("consumo", "pre_step_consumo")}
+  LEFT JOIN mais_canais
+  USING (program_id)
+  WHERE date <= CURRENT_DATE()
+),
+
+pg AS (
+  SELECT
+    globo_id,
+    mais_canais
+  FROM ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  WHERE assinatura_gplay = "nacional" AND LOWER(tipo_assinante) NOT LIKE "%trial%"
+),
+
+base1 AS (
+  SELECT * EXCEPT (timestamp),
+  timestamp AS data_ultimo_consumo
+  FROM pre_step_join_mais_canais JOIN pg USING (globo_id)
+  WHERE (NOT ((NOT mais_canais) AND service_id = 6807))
+  AND program_id NOT IN (8426, 10122)
+  AND assinante_only
+  AND is_full_content
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY assetid, globo_id ORDER BY timestamp DESC) = 1
+),
+
+base2 AS (
+  SELECT *
+  FROM base1
+  WHERE DATE_DIFF(CURRENT_DATE(), DATE(data_ultimo_consumo), DAY) >= 15
+),
+
+b AS (
+  SELECT
+  id AS program_id,
+  media_kit_resource__on_air_mobile,
+  media_kit_resource__poster
+  FROM ${ref("conteudo_enriched", "program")}
+)
+
+SELECT 
+  globo_id,
+  program_title,
+  DATETIME(data_ultimo_consumo) AS data_ultimo_consumo,
+  media_kit_resource__on_air_mobile,
+  media_kit_resource__poster,
+  CURRENT_DATE() AS dt_proc
+FROM base2 LEFT JOIN b USING (program_id)
+WHERE globo_id IS NOT NULL AND globo_id != ""

@@ -1,0 +1,42 @@
+config {
+  type: 'table',
+  /*name: 'jornada_upgrade_categoria',*/
+  schema: 'jornadas_mkt',
+  /*tags: ['GP_A_UpgradeCategoria','schedule_tag=jornadas_mkt_jornada_upgrade_categoria'],*/
+  description: ''
+}
+
+WITH base_1 AS (
+  SELECT * except(eventAction, date),
+  table_suffix_date as date,
+  case 
+  when ARRAY_LENGTH(split(eventAction, '.')) >= 3 
+    THEN LEFT(eventAction,
+              INSTR(eventAction, '.') +
+              INSTR(
+                substring(
+                  eventAction,INSTR(eventAction, '.') + 1
+                ) ,
+                '.' 
+              ) -1) 
+    ELSE  eventAction 
+  END AS eventAction,
+FROM ${ref("consumo_clean", "tageamento_eventos")}
+  WHERE table_suffix_date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+    AND LOWER(eventAction) LIKE '%tapume%'
+    AND assinatura_hit = 'assinante' 
+    AND assinatura_sessao = 'assinante'
+) 
+
+SELECT *,
+  REGEXP_REPLACE(
+                  REGEXP_REPLACE(eventAction, '_', ' '),
+                  'tapume.',
+                  ''
+                ) as canais,
+FROM base_1
+WHERE LOWER(eventLabel) LIKE '%conteudo_exclusivos%'
+AND LOWER(eventAction) != 'tapume'
+QUALIFY (ROW_NUMBER() OVER (PARTITION BY globo_id_sessao ) = 1)
+AND (ROW_NUMBER() OVER (PARTITION BY globo_id_hit ) = 1)
+

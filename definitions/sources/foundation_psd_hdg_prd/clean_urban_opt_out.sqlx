@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "urban_opt_out",
+    schema: "mkt_clean",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

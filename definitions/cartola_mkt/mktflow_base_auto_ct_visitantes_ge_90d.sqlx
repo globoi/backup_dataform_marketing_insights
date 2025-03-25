@@ -1,0 +1,28 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_auto_ct_visitantes_ge_90d', 'schedule_cron=30 13 * * *'],
+    name: 'mktflow_base_auto_ct_visitantes_ge_90d',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT userid AS globo_id
+FROM
+  -- `valiant-circuit-129220.globo_esporte.pgt_*`
+  ${ref("globo_esporte", "pgt_*")}
+WHERE
+  ( _TABLE_SUFFIX BETWEEN FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) )
+    AND FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) ) )
+  AND provider = 'cadun'
+  AND userid IS NOT NULL
+  AND object LIKE '%ge.globo.com/'

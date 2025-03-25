@@ -1,0 +1,59 @@
+config {
+
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_jornada_incentivo_disputas_pagas', 'schedule_cron=30 10 * * 4'],
+    name: 'mktflow_base_automatica_jornada_incentivo_disputas_pagas',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  new_users AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.d_account`
+    ${ref("analytics", "d_account")}
+  WHERE
+    created_at >= "2023-03-28" ),
+  entradas_gratis AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_entry`
+    ${ref("analytics", "f_entry")}
+  WHERE
+    status_ds != "CANCELED"
+    AND bet_value = 0 ),
+  entradas_pagas AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_entry`
+    ${ref("analytics", "f_entry")}
+  WHERE
+    status_ds != "CANCELED"
+    AND bet_value > 0 )
+SELECT
+  DISTINCT n.globo_id
+FROM
+  new_users n
+INNER JOIN
+  entradas_gratis
+USING
+  (globo_id)
+LEFT JOIN
+  entradas_pagas ep
+ON
+  n.globo_id = ep.globo_id
+WHERE
+  ep.globo_id IS NULL

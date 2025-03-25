@@ -1,0 +1,180 @@
+config {
+  type: "table",
+  name: "20210111 - Base Respostas Pesquisa Infantil Tratada",
+  schema: "pesquisa_infantil"
+}
+
+WITH respostas_pesquisa_infantil AS (
+  SELECT DISTINCT
+    CAST(respondent_id AS INT64) AS respondent_id,
+    collector_id,
+    date_created,
+    date_modified,
+    ip_address,
+    email_address,
+    first_name,
+    last_name,
+    custom_1,
+    Voce_esta_gostando_do_Globoplay,
+    Qual_a_chance_de_voce_recomendar_o_Globoplay_para_um_amigo_ou_familiar,
+    Voce_tem_filhos,
+    Quantos_filhos_voce_tem_ou_quantas_criancas_residem_com_voce,
+    Qual_aidade_deles AS Qual_aidade_deles_Ate_2_anos,
+    untitled_column_1 AS Qual_aidade_deles_3a5anos,
+    untitled_column_2 AS Qual_aidade_deles_6a8anos,
+    untitled_column_3 AS Qual_aidade_deles_9a11anos,
+    untitled_column_4 AS Qual_aidade_deles_12mais,
+Somando_a_sua_renda_com_a_renda_das_pessoas_que_moram_com_voce_quanto__aproximadamente_a_renda_familiar_mensal_Salario_MinimoR_104500,
+    Voce_eou_as_criancas_que_residem_com_voce_assistemconteudo_infantil,
+    Onde_voce_eou_as_criancas_que_residem_com_voce_assistem_a_conteudos_infantis AS Assistem_a_conteudos_infantis_Netflix,
+    untitled_column_5 AS Assistem_a_conteudos_infantis_Amazon,
+    untitled_column_6 AS Assistem_a_conteudos_infantis_Disney,
+    untitled_column_7 AS Assistem_a_conteudos_infantis_TVCabo,
+    untitled_column_8 AS Assistem_a_conteudos_infantis_PlayKids,
+    untitled_column_9 AS Assistem_a_conteudos_infantis_Noggin,
+    untitled_column_10 AS Assistem_a_conteudos_infantis_YTKids,
+    untitled_column_11 AS Assistem_a_conteudos_infantis_YT,
+    untitled_column_12 AS Assistem_a_conteudos_infantis_Discovery,
+    untitled_column_13 AS Assistem_a_conteudos_infantis_Telecine,
+    untitled_column_14 AS Assistem_a_conteudos_infantis_Apple,
+    Porque_voce_eou_as_criancas_que_residem_com_voce_assistem_a_conteudos_infantis_em_outra_plataforma AS Assistem_a_conteudos_infantis_em_outra_plataforma_Favoritos,
+    untitled_column_15 AS Assistem_a_conteudos_infantis_em_outra_plataforma_Novos,
+    untitled_column_16 AS Assistem_a_conteudos_infantis_em_outra_plataforma_Opcoes,
+    untitled_column_17 AS Assistem_a_conteudos_infantis_em_outra_plataforma_Perfil,
+    untitled_column_18 AS Assistem_a_conteudos_infantis_em_outra_plataforma_Costume,
+    Sobre_assistir_aconteudosinfantis_no_Globoplay_o_que_voce_acha_das_opcoes_abaixo AS Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Favoritos,
+    untitled_column_19 AS Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Novos,
+    untitled_column_20 AS Sobre_assistir_aconteudosinfantis_no_Globoplay_Opcoes,
+    untitled_column_21 AS Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Inadequados,
+    untitled_column_22 AS Sobre_assistir_aconteudosinfantis_no_Globoplay_Costume,
+    Quantas_estrelas_nossos_conteudos_infantis_merecem,
+    Voce_sente_falta_de_algum_desses_conteudos_infantis_no_Globoplay AS Voce_sente_falta_Menores,
+    untitled_column_23 AS Voce_sente_falta_Maiores,
+    untitled_column_24 AS Voce_sente_falta_Musical,
+    untitled_column_25 AS Voce_sente_falta_Engracado,
+    untitled_column_26 AS Voce_sente_falta_Curtos,
+    untitled_column_27 AS Voce_sente_falta_Filmes,
+    Deixe_um_comentario_sobre_os_nossos_conteudos,
+    Pensando_em_consumo_de_conteudos_infantisqual__o_grau_de_importancia_para AS qual_e_o_grau_de_importancia_para_Jogos,
+    untitled_column_28 AS qual_e_o_grau_de_importancia_para_Audio,
+    untitled_column_29 AS qual_e_o_grau_de_importancia_para_Livros,
+    untitled_column_30 AS qual_e_o_grau_de_importancia_para_Series,
+    untitled_column_31 AS qual_e_o_grau_de_importancia_para_Curtos,
+    Quais_servicos_abaixo_voce_assina AS Quais_servicos_abaixo_voce_assina_Netflix,
+    untitled_column_33 AS Quais_servicos_abaixo_voce_assina_Spotify,
+    untitled_column_34 AS Quais_servicos_abaixo_voce_assina_Amazon,
+    untitled_column_35 AS Quais_servicos_abaixo_voce_assina_Yt,
+    untitled_column_36 AS Quais_servicos_abaixo_voce_assina_HBO,
+    untitled_column_37 AS Quais_servicos_abaixo_voce_assina_Telecine,
+    untitled_column_38 AS Quais_servicos_abaixo_voce_assina_Premiere,
+    untitled_column_39 AS Quais_servicos_abaixo_voce_assina_Disney,
+    untitled_column_40 AS Quais_servicos_abaixo_voce_assina_TVCabo,
+    untitled_column_41 AS Quais_servicos_abaixo_voce_assina_Nao_Assino,
+    untitled_column_42 AS Quais_servicos_abaixo_voce_assina_PlayKids,
+    untitled_column_43 AS Quais_servicos_abaixo_voce_assina_Apple,
+    untitled_column_44 AS Quais_servicos_abaixo_voce_assina_Noggin,
+    REGEXP_REPLACE(userid, r"\[|\]", "") AS userid,
+    CASE
+      WHEN collector_id = "399717728" THEN 'Segunda Onda'
+      WHEN collector_id = "397068695" THEN 'Primeira Onda'
+      WHEN collector_id = "399177670" THEN 'Primeira Onda'
+      ELSE 'teste'
+    END AS Onda,
+    GloboID_Avaliado
+  FROM
+    ${ref("raw", "20210121 - Respostas Pesquisa Infantil")}
+    LEFT JOIN ${ref("pesquisa_infantil", "de_para_respondentid_globoid")} USING (respondent_id)
+),
+
+add_globoid_final AS (
+  SELECT
+    * EXCEPT (userid, GloboID_Avaliado),
+    IF(userid = 'n_value?utm_source=newsletter', GloboID_Avaliado, userid) AS GloboID_Final
+  FROM
+    respostas_pesquisa_infantil
+),
+
+base_final AS (
+  SELECT DISTINCT
+    agf.* REPLACE (
+      IF(Onda = "Segunda Onda", "Sim", Voce_tem_filhos) AS Voce_tem_filhos
+    ),
+    IF(bc.Flag_Infantil = "", "Segunda Onda", bc.Flag_Infantil) AS Flag_Infantil,
+  FROM
+    add_globoid_final agf
+    LEFT JOIN ${ref("pesquisa_infantil", "Base_Completa_Infantil_Sem_Filtro")} bc
+    ON GloboID_Final = globo_id
+)
+
+SELECT 
+  GloboID_Final,
+  respondent_id,
+  collector_id,
+  date_created,
+  date_modified,
+  ip_address,
+  email_address,
+  first_name,
+  last_name,
+  custom_1,
+  Voce_esta_gostando_do_Globoplay,
+  Qual_a_chance_de_voce_recomendar_o_Globoplay_para_um_amigo_ou_familiar,
+  Voce_tem_filhos,
+  Quantos_filhos_voce_tem_ou_quantas_criancas_residem_com_voce,
+  Qual_aidade_deles_Ate_2_anos,
+  Qual_aidade_deles_3a5anos,
+  Qual_aidade_deles_6a8anos,
+  Qual_aidade_deles_9a11anos,
+  Qual_aidade_deles_12mais,
+  Somando_a_sua_renda_com_a_renda_das_pessoas_que_moram_com_voce_quanto__aproximadamente_a_renda_familiar_mensal_Salario_MinimoR_104500,
+  Voce_eou_as_criancas_que_residem_com_voce_assistemconteudo_infantil,
+  Assistem_a_conteudos_infantis_Netflix,
+  Assistem_a_conteudos_infantis_Amazon,
+  Assistem_a_conteudos_infantis_Disney,
+  Assistem_a_conteudos_infantis_TVCabo,
+  Assistem_a_conteudos_infantis_PlayKids,
+  Assistem_a_conteudos_infantis_Noggin,
+  Assistem_a_conteudos_infantis_YTKids,
+  Assistem_a_conteudos_infantis_YT,
+  Assistem_a_conteudos_infantis_Discovery,
+  Assistem_a_conteudos_infantis_Telecine,
+  Assistem_a_conteudos_infantis_Apple,
+  Assistem_a_conteudos_infantis_em_outra_plataforma_Favoritos,
+  Assistem_a_conteudos_infantis_em_outra_plataforma_Novos,
+  Assistem_a_conteudos_infantis_em_outra_plataforma_Opcoes,
+  Assistem_a_conteudos_infantis_em_outra_plataforma_Perfil,
+  Assistem_a_conteudos_infantis_em_outra_plataforma_Costume,
+  Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Favoritos,
+  Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Novos,
+  Sobre_assistir_aconteudosinfantis_no_Globoplay_Opcoes,
+  Sobre_assistir_aconteudosinfantis_no_Globoplay_Conteudos_Inadequados,
+  Sobre_assistir_aconteudosinfantis_no_Globoplay_Costume,
+  Quantas_estrelas_nossos_conteudos_infantis_merecem,
+  Voce_sente_falta_Menores,
+  Voce_sente_falta_Maiores,
+  Voce_sente_falta_Musical,
+  Voce_sente_falta_Engracado,
+  Voce_sente_falta_Curtos,
+  Voce_sente_falta_Filmes,
+  Deixe_um_comentario_sobre_os_nossos_conteudos,
+  qual_e_o_grau_de_importancia_para_Jogos,
+  qual_e_o_grau_de_importancia_para_Audio,
+  qual_e_o_grau_de_importancia_para_Livros,
+  qual_e_o_grau_de_importancia_para_Series,
+  qual_e_o_grau_de_importancia_para_Curtos,
+  Quais_servicos_abaixo_voce_assina_Netflix,
+  Quais_servicos_abaixo_voce_assina_Spotify,
+  Quais_servicos_abaixo_voce_assina_Amazon,
+  Quais_servicos_abaixo_voce_assina_Yt,
+  Quais_servicos_abaixo_voce_assina_HBO,
+  Quais_servicos_abaixo_voce_assina_Telecine,
+  Quais_servicos_abaixo_voce_assina_Premiere,
+  Quais_servicos_abaixo_voce_assina_Disney,
+  Quais_servicos_abaixo_voce_assina_TVCabo,
+  Quais_servicos_abaixo_voce_assina_Nao_Assino,
+  Quais_servicos_abaixo_voce_assina_PlayKids,
+  Quais_servicos_abaixo_voce_assina_Apple,
+  Quais_servicos_abaixo_voce_assina_Noggin,
+  Flag_Infantil,
+  Onda
+FROM base_final

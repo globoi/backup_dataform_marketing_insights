@@ -1,0 +1,28 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_usuarios_entraram_liga_meliuz_lf', 'schedule_cron=0 10 * * 6'],
+    name: 'mktflow_base_automatica_usuarios_entraram_liga_meliuz_lf',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT m.GLOBO_ID AS globo_id
+FROM
+  `gglobo-cartola-hdg-prd.marketing.meliuz` m
+LEFT JOIN
+  `gglobo-cartola-hdg-prd.report_staging.report_temporada` rt
+ON
+  m.GLOBO_ID = rt.globo_id
+WHERE
+  temporada = 2023
+  AND pro_em IS NULL

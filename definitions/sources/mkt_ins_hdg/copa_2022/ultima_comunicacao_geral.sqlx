@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "copa_2022",
+  name: "ultima_comunicacao_geral",
+  description: ""
+}

@@ -1,0 +1,18 @@
+config {
+  type: 'table',
+  name: 'max_semana_bbb22',
+  schema: 'bbb_22',
+  tags: ['bbb_22'],
+  description: '',
+  columns: {}
+}
+
+
+
+SELECT 
+  assinou_2022, MAX(semana) AS max_of_semana
+FROM 
+  ${ref("bbb_22", "Raiox_BBB_22_historico")}
+WHERE assinou_2022 IS NOT NULL
+GROUP BY assinou_2022
+

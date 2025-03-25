@@ -1,0 +1,13 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt",
+    bigquery: {
+        labels: {mktcloud: "true",
+            schedule: "diario",
+            tags: "syncs_mc_mkt",
+            owner: "mins"
+        }
+    }
+}
+
+select * from ${ref('estrela_da_casa','raiox_lf_estrela_da_casa_agrupado')}

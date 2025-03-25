@@ -1,0 +1,37 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_pro_2023','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_ex_pro_2023',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+with 
+cartoleiros_pro_23 as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a
+where a.temporada in (2023)
+and a.pro_em is not null),
+
+cartoleiros_pro_24 as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a
+where a.temporada in (2024)
+and a.pro_em is not null
+)
+
+select distinct 'named_user' as identifier_type, cartoleiros_pro_23.globo_id as UUID
+from cartoleiros_pro_23
+left join cartoleiros_pro_24
+on cartoleiros_pro_23.globo_id = cartoleiros_pro_24.globo_id
+where cartoleiros_pro_24.globo_id is null

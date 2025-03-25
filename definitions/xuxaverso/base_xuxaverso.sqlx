@@ -1,0 +1,361 @@
+config {
+  type: "table",
+  schema: "xuxaverso",
+  description: 'Tabela com os usuários que consumiram algum conteúdo relacionado à Xuxa desde o início de 2023 no gplay e interagiram, ou não, em outras plataformas, como gshow e g1.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    tipo_cadastro: 'Identifica se o usuário é Assinante ou Logado Free.',
+    gplay_qtd_midias: 'Quantidade de mídias distintas relacionadas à Xuxa que o usuário consumiu.',
+    gplay_qtd_programas: 'Quantidade de programas distintos relacionados à Xuxa que o usuário consumiu.',
+    gplay_soma_horas: 'Total de horas consumidas pelo usuário nos conteudos relacionados à Xuxa.',
+    gplay_qtd_dias: 'Quantidade de dias distintos que o usuario consumiu conteudos relacionados à Xuxa.',
+    gplay_min_data: 'Data do primeiro consumo do usuário em algum conteudo relacionado à Xuxa.',
+    gplay_max_data: 'Data do último consumo do usuário em algum conteudo relacionado à Xuxa.',
+    assistiu_trailer_doc: 'Identifica se o usuário assistiu ou não o trailer do documentário da Xuxa.',
+    assistiu_mais_voce_simulcast: 'Identifica se o usuário assistiu ou não o programa Mais Você com participação da Xuxa (Fonte: GA).',
+    assistiu_papo_de_segunda_simulcast: 'Identifica se o usuário assistiu ou não o programa Papo de Segunda com participação da Xuxa (Fonte: GA).',
+    assistiu_domingao_simulcast: 'Identifica se o usuário assistiu ou não o programa Domingão com Huck com participação da Xuxa (Fonte: GA).',
+    gplay: {
+      description: "Array com as informações de mídias, programas e títulos das mídias assistidas.",
+      columns: {
+        midias_assistidas: "Array com as mídias assistidas.",
+        titulo_midias_assistidas: "Array com os títulos das mídias assistidas.",
+        programas_assistidos: "Array com os programas assistidos."
+      }
+    },
+    gshow_views: 'Quantidade de views que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do Gshow.',
+    gshow_pageviews: 'Quantidade de pageviews que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do Gshow.',
+    gshow_max_data: 'Data da última interação do usuário em algum conteudo relacionado à Xuxa dentro da plataforma do Gshow.',
+    g1_views: 'Quantidade de views que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do G1.',
+    g1_pageviews: 'Quantidade de pageviews que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do G1.',
+    g1_max_data: 'Data da última interação do usuário em algum conteudo relacionado à Xuxa dentro da plataforma do G1.',
+    tipo_assinante: 'Identifica se o usuário é Titular, Dependente ou Logado Free.',
+    id_asset: 'Código que identifica a assinatura.',
+    data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+    dt_assinatura_comeco: 'Identifica a data de início de vigência da assinatura, ou para o LF, a data de início do consumo free.',
+    produto: 'Identifica a periodicidade da cobrança do produto adquirido. Ex: Anual, bianual ou mensal.',
+    canal_compra: 'Identifica o canal de aquisição da assinatura (WEB, Inaap Google etc).',
+    produto_contratado: 'Identifica o produto contratado pelo usuário (Ex.: Globoplay + canais ao vivo, Globoplay) ou Globoplay Free para o usuário LF.',
+    internacional: 'Identifica se o usuário é internacional ou não.',
+    telefone: 'Identifica se o usuário possui o telefone cadastrado.',
+    endereco: 'Identifica se o usuário possui o endereço cadastrado',
+    dt_aniversario: 'Identifica se o usuário possui a data de nascimento cadastrada',
+    gender: 'Identifica o gênero do usuário.',
+    age: 'Identifica a idade do assinante.',
+    address_state: 'Identifica o estado de residência.',
+    first_play: 'Identifica o título do conteúdo do primeiro consumo do usuário.',
+    ultimo_consumo: 'Identifica o conteúdo do último consumo do usuário.',
+    data_ultimo_consumo: 'Identifica a data do último consumo do usuário.',
+    whatsapp_optin_status: 'Identifica se o usuário possui optin no WhatsApp.',
+    push_perfil_uso: 'Perfil do usuário em relação ao engajamento com push (Ex.: 0. Nunca Abriu um Push).',
+    push_flag_enviado_30D: 'Check se houve push enviado nos últimos 30 dias.',
+    push_flag_aberto_30D: 'Check se houve push aberto nos últimos 30 dias.',
+    push_optout_status: 'Identifica o status atual para recebimento de push (Push Ativo ou Opt-out).',
+    email_perfil_30D: 'Perfil do usuário em relação ao engajamento com e-mail (Ex.: 3. Heavy User).',
+    email_flag_aberto_30D: 'Check se houve e-mail aberto nos últimos 30 dias.',
+    appopen_flag_30D: 'Check se houve abertura de aplicativo nos últimos 30 dias, monitorado por Urban.',
+    acesso_flag_30D: 'Check se houve acesso ao Globoplay nos últimos 30 dias, monitorado por GA.'
+
+  }
+}
+
+WITH gplay AS (
+  SELECT
+    userId AS globo_id,
+    COUNT(DISTINCT i.mediaid) AS gplay_qtd_midias,
+    COUNT(DISTINCT i.program_id) AS gplay_qtd_programas,
+    SUM(i.hours_watched) AS gplay_soma_horas,
+    COUNT(DISTINCT i.date) AS gplay_qtd_dias,
+    min(i.date) as gplay_min_data,
+    max(i.date) as gplay_max_data,
+    array_agg(
+      struct(
+        i.mediaid as midias_assistidas,
+        i.title as titulo_midias_assistidas,
+        i.program_title as programas_assistidos
+      )
+    ) as gplay2,
+  FROM
+    ${ref('consumo_enriched', 'all_impression')} as i
+    INNER JOIN ${ref('xuxaverso', 'conteudos_gplay')} USING (mediaid)
+  WHERE
+    date >= '2023-01-01'
+  GROUP BY
+    1
+),
+trailer as (
+  SELECT
+    distinct userId AS globo_id,
+    true as assistiu_trailer_doc
+  FROM
+    ${ref('consumo_enriched', 'all_impression')} as i
+  WHERE
+    date >= '2023-04-27'
+    and mediaid in(11571116, 11761175)
+),
+pagina_gshow AS (
+  SELECT
+    globoId AS globo_id,
+    COUNT(1) AS gshow_views,
+    COUNTIF(h.tipoConsumo = 'pageview') AS gshow_pageviews,
+    max(data) as gshow_max_data
+  FROM
+    ${ref('foundation_gshow', 'foundation_gshow_sessions')} AS s,
+    UNNEST(hits) AS h
+  WHERE
+    DATA >= '2023-01-01'
+    AND LOWER(screenName) LIKE '%xuxa%'
+    AND LOWER(screenName) NOT LIKE '%nadador%'
+  GROUP BY
+    1
+),
+pagina_g1 AS (
+  SELECT
+    globoId AS globo_id,
+    COUNT(1) AS g1_views,
+    COUNTIF(h.tipoConsumo = 'pageview') AS g1_pageviews,
+    max(data) as g1_max_data
+  FROM
+    ${ref('foundation_g1', 'foundation_g1_sessions')} AS s,
+    UNNEST(hits) AS h
+  WHERE
+    DATA >= '2023-01-01'
+    AND LOWER(screenName) LIKE '%xuxa%'
+    AND LOWER(screenName) NOT LIKE '%nadador%'
+  GROUP BY
+    1
+),
+base_final as (
+  SELECT
+    globo_id,
+    case
+      when (
+        assinatura_gold = 'Logado Free'
+        and produto_contratado is null
+      ) then 'Logado Free Internacional'
+      when tipo_cadastro = 'Assinante' then 'Assinante Nacional'
+      when tipo_cadastro = 'Logado Free' then 'Logado Free Nacional'
+      when tipo_cadastro = 'Internacional' then 'Assinante Internacional'
+      else tipo_cadastro
+    end as tipo_cadastro,
+    gplay_qtd_midias,
+    gplay_qtd_programas,
+    gplay_soma_horas,
+    gplay_qtd_dias,
+    gplay_min_data,
+    gplay_max_data,
+    gplay2,
+    assistiu_trailer_doc,
+    assistiu_mais_voce_simulcast,
+    assistiu_papo_de_segunda_simulcast,
+    assistiu_domingao_simulcast,
+    IFNULL(gshow_views, 0) AS gshow_views,
+    IFNULL(gshow_pageViews, 0) AS gshow_pageviews,
+    gshow_max_data,
+    IFNULL(g1_views, 0) AS g1_views,
+    IFNULL(g1_pageViews, 0) AS g1_pageviews,
+    g1_max_data,
+    tipo_assinante,
+    c.id_asset,
+    data_hora_compra,
+    c.dt_assinatura_comeco,
+    produto,
+    c.canal_compra,
+    Produto_Contratado as produto_contratado,
+    internacional,
+    c.telefone,
+    c.endereco,
+    dt_aniversario,
+    c.gender,
+    c.age,
+    c.address_state,
+    first_play,
+    ultimo_consumo,
+    data_ultimo_consumo,
+    c.whatsapp_optin_status,
+    c.push_perfil_uso,
+    c.push_flag_enviado_30D,
+    c.push_flag_aberto_30D,
+    c.push_optout_status,
+    c.email_perfil_30D,
+    c.email_flag_aberto_30D,
+    c.appopen_flag_30D,
+    c.acesso_flag_30D
+  FROM
+    gplay as g
+    LEFT JOIN pagina_gshow USING (globo_id)
+    LEFT JOIN pagina_g1 USING (globo_id) full
+    outer join (
+      select
+        *,
+        true as assistiu_mais_voce_simulcast
+      from
+        ${ref('xuxaverso', 'mais_voce_13_07_23_simulcast')}
+      where
+        globo_id is not null
+    ) using(globo_id) full
+    outer join (
+      select
+        *,
+        true as assistiu_papo_de_segunda_simulcast
+      from
+        ${ref('xuxaverso', 'papo_de_segunda_17_07_23_simulcast')}
+      where
+        globo_id is not null
+    ) using(globo_id) full
+    outer join (
+      select
+        *
+      from
+        ${ref('xuxaverso', 'domingao_23_07_23_simulcast')}
+      where
+        globo_id is not null
+    ) using(globo_id)
+    left join (
+      select
+        distinct globo_id,
+        id_asset,
+        tipo_assinante,
+        tipo_cadastro,
+        data_hora_compra,
+        cast(dt_assinatura_comeco as date) as dt_assinatura_comeco,
+        produto,
+        canal_compra,
+        Produto_Contratado,
+        false as internacional,
+        telefone,
+        endereco,
+        dt_aniversario,
+        gender,
+        age,
+        address_state,
+        first_play,
+        ultimo_consumo,
+        data_ultimo_consumo,
+        whatsapp_optin_status,
+        push_perfil_uso,
+        push_flag_enviado_30D,
+        push_flag_aberto_30D,
+        push_optout_status,
+        email_perfil_30D,
+        email_flag_aberto_30D,
+        appopen_flag_30D,
+        acesso_flag_30D
+      from
+        ${ref('comunicacao', 'ultima_comunicacao_geral')}
+      union
+        distinct
+      select
+        distinct globo_id,
+        id_asset,
+        cast(null as string) as tipo_assinante,
+        'Internacional'as tipo_cadastro,
+        cast(null as timestamp) as data_hora_compra,
+        dt_assinatura_comeco,
+        'mensal'as produto,
+        canal_compra,
+        'Globoplay Internacional' as Produto_Contratado,
+        true as internacional,
+        telefone,
+        endereco,
+        cast(null as BOOLEAN) as dt_aniversario,
+        gender,
+        age,
+        cast(null as string) as address_state,
+        cast(null as string) as first_play,
+        cast(null as string) as ultimo_consumo,
+        cast(null as date) as data_ultimo_consumo,
+        whatsapp_optin_status,
+        push_perfil_uso,
+        push_flag_enviado_30D,
+        push_flag_aberto_30D,
+        push_optout_status,
+        email_perfil_30D,
+        email_flag_aberto_30D,
+        appopen_flag_30D,
+        acesso_flag_30D
+      from
+        ${ref('internacional', 'ultima_comunicacao_internacional')}
+    ) as c using(globo_id)
+    left join ${ref('internacional', 'base_lf_internacional')} using(globo_id)
+    left join trailer using(globo_id)
+),
+base_final2 as (
+  select
+    *
+  from
+    base_final
+),
+final as (
+  select
+    globo_id,
+    tipo_cadastro,
+    gplay_qtd_midias,
+    gplay_qtd_programas,
+    gplay_soma_horas,
+    gplay_qtd_dias,
+    gplay_min_data,
+    gplay_max_data,
+    ifnull(assistiu_trailer_doc, false) as assistiu_trailer_doc,
+    ifnull(assistiu_mais_voce_simulcast, false) as assistiu_mais_voce_simulcast,
+    ifnull(assistiu_papo_de_segunda_simulcast, false) as assistiu_papo_de_segunda_simulcast,
+    ifnull(assistiu_domingao_simulcast,false) as assistiu_domingao_simulcast,
+    gplay2,
+    --  dedup(gplay2) as gplay,
+    (
+      SELECT
+        ARRAY_AGG(t)
+      FROM
+        (
+          SELECT
+            DISTINCT *
+          FROM
+            UNNEST(gplay2) v
+          ORDER BY
+            midias_assistidas ASC
+        ) t
+    ) as gplay,
+    gshow_views,
+    gshow_pageviews,
+    gshow_max_data,
+    g1_views,
+    g1_pageviews,
+    g1_max_data,
+    tipo_assinante,
+    id_asset,
+    data_hora_compra,
+    dt_assinatura_comeco,
+    produto,
+    canal_compra,
+    produto_contratado,
+    case
+      when tipo_cadastro = 'Logado Free Internacional' then true
+      when tipo_cadastro = 'Assinante Internacional' then true
+      else internacional
+    end as internacional,
+    telefone,
+    endereco,
+    dt_aniversario,
+    gender,
+    age,
+    address_state,
+    first_play,
+    ultimo_consumo,
+    data_ultimo_consumo,
+    whatsapp_optin_status,
+    push_perfil_uso,
+    push_flag_enviado_30D,
+    push_flag_aberto_30D,
+    push_optout_status,
+    email_perfil_30D,
+    email_flag_aberto_30D,
+    appopen_flag_30D,
+    acesso_flag_30D
+  from
+    base_final2
+)
+select
+  *
+except(gplay2)
+from
+  final

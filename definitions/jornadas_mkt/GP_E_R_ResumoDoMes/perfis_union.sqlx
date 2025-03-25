@@ -1,0 +1,656 @@
+config {
+  type: "table",
+  name: "perfis_union",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_R_ResumoDoMes"]
+}
+
+WITH
+
+filmes AS (
+    SELECT 
+    id AS mediaid,
+    duration / 3600000 AS duration,
+    FROM
+    ${ref("conteudo_enriched", "content")}
+    WHERE
+    program_subset IN ('filmes','movies')
+    AND `status` = 'published'
+    AND program_url_for_consumption LIKE '%globoplay%'
+),
+
+cinefilo_1 AS (
+    SELECT
+        userId as globo_id,
+        mediaid,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+        SUM(hours_watched) AS hrs,
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        program_id = 10122
+        AND is_full_content
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+    GROUP BY
+        globo_id,
+        mediaid,
+        `timestamp`
+),
+
+cinefilo_2 AS (
+    SELECT
+        *
+    FROM
+        cinefilo_1
+        INNER JOIN filmes
+        USING(mediaid)
+    WHERE
+        SAFE_DIVIDE(hrs, duration) >= 0.75
+),
+
+base_ativa_v1 AS (
+    SELECT
+        globo_id
+    FROM
+        ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+    UNNEST (info) as info_trial 
+    WHERE
+        info_trial.assinatura_gplay = 'nacional'
+        AND LOWER(tipo_assinante) NOT LIKE '%trial%'
+        AND (
+            DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) >= dt_assinatura_comeco
+            OR Produto_Contratado LIKE '%Globoplay + canais ao vivo%'
+            OR Produto_Contratado LIKE '%Globoplay + canais ao vivo e Disney+%'
+            OR Produto_Contratado LIKE '%Globoplay e Disney+%')
+),
+
+cinefilo AS (
+    SELECT
+        globo_id,
+        mes,
+        'Cinefilo' AS badge
+    FROM
+        cinefilo_2
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        COUNT(DISTINCT(mediaid)) >= 4 
+),
+
+ao_vivaco_1 AS (
+    SELECT
+        userId as globo_id,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+        hours_watched
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        (mediaid IN (
+            7339140,7339060,7339078,7420604,7339101,7339146,7339323,7339128,7339135,
+            7339152,7339131,7339108,7339117,7339123,7339326,7339224,7339279,7339091)
+        OR program_subset = "live")
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+ao_vivaco_2 AS (
+    SELECT
+        globo_id,
+        mes
+    FROM
+        ao_vivaco_1
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        SUM(hours_watched) >= 20
+),
+
+base_ativa_v2 AS (
+    SELECT
+        globo_id,
+    FROM
+        ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+    UNNEST (info) as info_trial 
+    WHERE
+        info_trial.assinatura_gplay = 'nacional'
+        AND LOWER(tipo_assinante) NOT LIKE '%trial%'
+        AND LOWER(Produto_Contratado) NOT LIKE '%trial%'
+        AND (
+            DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) >= dt_assinatura_comeco
+            OR Produto_Contratado LIKE '%Globoplay + canais ao vivo%'
+            OR Produto_Contratado LIKE '%Globoplay + canais ao vivo e Disney+%'
+            OR Produto_Contratado LIKE '%Globoplay e Disney+%')
+),
+
+ao_vivaco AS (
+    SELECT
+        globo_id,
+        mes,
+        'Ao_Vivaco' as badge
+    FROM
+        ao_vivaco_2
+        INNER JOIN base_ativa_v2
+        USING (globo_id)
+),
+
+humor AS (
+    SELECT
+        id AS mediaid,
+        (duration / 3600000) AS duration
+    FROM
+        ${ref("conteudo_enriched", "content")}
+    WHERE
+        (
+            program_subset = 'humor'
+            OR program_id IN (12554,11104,11190,12615,11186,12550)
+        )
+        AND program_url_for_consumption LIKE '%globoplay%'
+        AND duration IS NOT NULL
+        AND status = 'published'
+
+),
+
+humorista_1 AS (
+    SELECT
+        userId as globo_id,
+        mediaid,
+        `timestamp`,
+        SUM(hours_watched) AS hrs_assistidas
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        is_full_content
+    GROUP BY
+        globo_id,
+        program_id,
+        mediaid,
+        `timestamp` 
+),
+
+humorista_2 AS (
+    SELECT
+        *,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes
+    FROM
+        humorista_1
+        INNER JOIN humor
+        USING(mediaid)
+    WHERE
+        SAFE_DIVIDE(hrs_assistidas, duration) >= 0.75
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+
+humorista AS (
+    SELECT DISTINCT
+        globo_id,
+        mes,
+        'Humorista' AS badge
+    FROM
+        humorista_2
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+),
+
+badge_novelas AS (
+    SELECT
+        userId as globo_id,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        program_subset LIKE '%novelas%'
+        AND is_full_content
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+    QUALIFY
+        SUM(hours_watched) 
+        OVER (PARTITION BY globo_id, DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH))) >= 30
+),
+
+noveleiro AS (
+    SELECT DISTINCT
+        globo_id,
+        mes,
+        'Noveleiro' AS badge
+    FROM
+        badge_novelas
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+),
+
+vipao AS (
+    SELECT
+        DISTINCT(globo_id),
+        DATE(TIMESTAMP_TRUNC(dt_assinatura_comeco, MONTH)) AS mes,
+        'Vipao' AS badge
+    FROM
+        ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+    UNNEST (info) as info_trial 
+    WHERE
+        info_trial.assinatura_gplay = 'nacional'
+        AND LOWER(tipo_assinante) NOT LIKE '%trial%'
+        AND info_trial.mais_canais
+        AND LOWER(Produto_Contratado) NOT LIKE '%trial%'
+        AND dt_assinatura_comeco >= '2021-01-01'
+        AND DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) >= dt_assinatura_comeco
+),
+
+jornalista_1 AS (
+    SELECT
+        *,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        (
+            program_subset = 'news'
+            OR mediaid = 7339101
+        )
+        AND is_full_content
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+reporter AS (
+    SELECT
+        userId as globo_id,
+        mes,
+        'Reporter' AS badge
+    FROM
+        jornalista_1
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        SUM(hours_watched) >= 5
+),
+
+ecletico_1 AS (
+    SELECT
+        `timestamp`,
+        is_full_content,
+        userId as globo_id,
+        program_subset,
+        hours_watched,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        is_full_content
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+ecletico_2 AS (
+    SELECT
+        globo_id,
+        mes,
+        program_subset
+    FROM
+        ecletico_1
+    GROUP BY
+        globo_id,
+        program_subset,
+        mes
+    HAVING
+        SUM(hours_watched) >= 0.25
+),
+
+ecletico AS (
+    SELECT
+        globo_id,
+        mes,
+        'Ecletico' AS badge
+    FROM
+        ecletico_1
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        COUNT(DISTINCT(program_subset)) >= 3
+),
+
+todos_os_conteudos AS (
+    SELECT DISTINCT 
+        program_id
+    FROM
+        ${ref("conteudo_enriched","content")}
+    WHERE 
+        `status`='published'
+        AND program_id != 10122
+        AND program_url_for_consumption LIKE '%globoplay%'
+        AND published_at IS NOT NULL
+        AND is_full_content
+        AND program_id != 9095
+        AND program_subset != 'live'
+        AND program_subset != 'realities'
+),
+
+maratonista_1 AS (
+    SELECT
+        userId as globo_id,
+        program_id,
+        program_title,
+        DATE(`timestamp`) AS `timestamp`,
+        SUM(hours_watched) AS hrs_assistidas        
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        is_full_content
+    GROUP BY
+        userId,
+        program_id,
+        program_title,
+        `timestamp`        
+),
+
+maratonista_2 AS (
+    SELECT
+        globo_id,
+        program_id,
+        `timestamp`,
+        SUM(hrs_assistidas) OVER(PARTITION BY globo_id, program_id, `timestamp`) AS hrs_assistidas
+    FROM
+        maratonista_1
+        INNER JOIN todos_os_conteudos
+        USING(program_id)
+    WHERE
+        EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+maratonista AS(
+    SELECT DISTINCT
+        globo_id,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+        'Maratonista' AS badge
+    FROM
+        maratonista_2
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+    WHERE
+        hrs_assistidas BETWEEN 4 AND 12
+        AND program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+),
+
+tecnologico_1 AS (
+    SELECT
+        userId as globo_id,
+        environment,
+        hours_watched,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes
+    FROM
+        ${ref("consumo_enriched", "impression")}
+),
+
+tecnologico_2 AS (
+    SELECT
+        globo_id,
+        mes,
+        environment
+    FROM
+        tecnologico_1
+    WHERE
+        mes >= '2021-01-01'
+        AND (
+            environment LIKE '%app tv%'
+            OR environment LIKE '%web tv%'
+            OR environment LIKE '%app mobile android%'
+            OR environment LIKE '%app mobile ios%'
+            OR environment LIKE '%web mobile%'
+            OR environment LIKE '%web desktop%'
+        )
+    GROUP BY
+        globo_id,
+        mes,
+        environment
+    HAVING SUM(hours_watched) >= 0.25
+),
+
+tecnologico_3 AS (
+    SELECT
+        globo_id,
+        mes,
+        CASE 
+            WHEN (environment='app tv' OR environment='app tv ios' OR environment='web tv')
+            THEN 'Tv'
+            WHEN (environment ='app mobile android' OR environment ='app mobile ios' OR environment ='web mobile')
+            THEN 'Mobile'
+            WHEN environment ='web desktop' THEN 'Desktop'
+            ELSE 'Outros'
+            END AS tipo_dispositivo
+    FROM
+        tecnologico_2
+        INNER JOIN base_ativa_v1
+        USING (globo_id)
+),
+
+tecnologico AS (
+    SELECT
+        globo_id,
+        mes,
+        'Tecnologico' AS badge
+        FROM
+            tecnologico_3
+        GROUP BY
+            globo_id,
+            mes
+        HAVING
+            COUNT(DISTINCT(tipo_dispositivo)) >=3
+),
+
+conteudo_ligeirinho AS (
+    SELECT
+        id AS mediaid,
+        duration/3600000 AS duration,
+        DATE(published_at) AS published_at
+    FROM
+        ${ref("conteudo_enriched", "content")}
+    WHERE
+        program_url_for_consumption LIKE '%globoplay%'
+        AND (
+            published_at IS NOT NULL
+            AND STRING(published_at) != ''
+        )
+        AND `status` = 'published'
+        AND is_full_content
+        AND program_id != 9095
+        AND EXTRACT(YEAR from published_at) >= 2020
+
+),
+
+ligeirinho_1 AS (
+    SELECT
+        userId as globo_id,
+        mediaid,
+        program_id,
+        program_title,
+        DATE(`timestamp`) AS `timestamp`,
+        SUM(hours_watched) AS hrs_assistidas,
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        EXTRACT(YEAR FROM `timestamp`) >= 2022
+    GROUP BY
+        userId,
+        mediaid,
+        program_id,
+        program_title,
+        DATE(`timestamp`)
+),
+
+ligeirinho_2 AS (
+    SELECT
+        *
+    FROM
+        ligeirinho_1
+        INNER JOIN conteudo_ligeirinho
+        USING(mediaid)
+    WHERE
+        SAFE_DIVIDE(hrs_assistidas, duration) >= 0.75
+    QUALIFY
+        COUNT(*) OVER(PARTITION BY globo_id, program_id) >= 3
+),
+
+ligeirinho_3 AS(
+    SELECT
+        globo_id,
+        mediaid,
+        program_id,
+        program_title,
+        `timestamp`,
+        published_at
+    FROM
+        ligeirinho_2
+        INNER JOIN base_ativa_v1
+        USING (globo_id)
+    WHERE
+        DATE_DIFF(`timestamp`, published_at, DAY) BETWEEN 0 AND 2
+),
+
+ligeirinho AS (
+    SELECT DISTINCT
+        globo_id,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+        'Ligeirinho' AS badge
+    FROM
+        ligeirinho_3
+    GROUP BY
+        globo_id,
+        program_id,
+        program_title,
+        `timestamp`,
+        published_at
+    HAVING
+        COUNT(DISTINCT(mediaid)) >= 3
+),
+
+series AS (
+    SELECT 
+        id AS mediaid,
+        duration / 3600000 AS duration,
+        MAX(season) OVER (PARTITION BY program_id) AS max_season,
+        MIN(season) OVER (PARTITION BY program_id) AS min_season
+    FROM
+        ${ref("conteudo_enriched", "content")}
+    WHERE
+        program_subset = "series"
+        AND duration IS NOT NULL
+        AND program_url_for_consumption LIKE "%globoplay%"
+        AND status = "published"
+),
+
+apegado_apaixonado1 AS (
+    SELECT
+        mediaid,
+        userId as globo_id,
+        `timestamp`,
+        hours_watched,
+        is_full_content,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+    FROM 
+        ${ref("consumo_enriched", "impression")}
+    WHERE  
+        program_subset = "series"
+        AND is_full_content
+        AND EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+apegado_apaixonado AS (
+    SELECT
+        globo_id,
+        mes
+    FROM 
+        apegado_apaixonado1
+        INNER JOIN series
+        USING(mediaid)
+    WHERE
+        max_season > 5
+        AND min_season = 1
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        SUM(hours_watched) >= 10
+),
+
+apegado AS (
+    SELECT
+        globo_id,
+        mes,
+        "Apegado" AS badge
+    FROM 
+        apegado_apaixonado
+        INNER JOIN base_ativa_v1
+        USING(globo_id)
+),
+
+viciado1 AS (
+    SELECT
+        userId as globo_id,
+        program_id,
+        mediaid,
+        timestamp,
+        SUM(hours_watched) AS hrs,
+        DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+    FROM
+        ${ref("consumo_enriched", "impression")}
+    WHERE
+        program_subset LIKE "%series%"
+        AND is_full_content
+    GROUP BY
+        userId,
+        program_id,
+        mediaid,
+        timestamp
+    HAVING
+        EXTRACT(YEAR FROM `timestamp`) >= 2022
+),
+
+viciado2 AS (
+    SELECT
+        globo_id,
+        program_id,
+        mes
+    FROM
+        viciado1
+        INNER JOIN series
+        USING(mediaid)
+    QUALIFY
+        SUM(IF(SAFE_DIVIDE(hrs, duration) >= 0.75, 1, 0)) 
+            OVER (PARTITION BY globo_id, program_id) >= 3
+),
+
+viciado AS (
+    SELECT
+        globo_id,
+        mes,
+        "Viciado" AS badge
+    FROM 
+        viciado2
+        INNER JOIN base_ativa_v1
+        USING (globo_id)
+    GROUP BY
+        globo_id,
+        mes
+    HAVING
+        COUNT(DISTINCT program_id) >= 5
+)
+
+
+SELECT * FROM cinefilo
+UNION ALL SELECT * FROM ao_vivaco
+UNION ALL SELECT * FROM humorista
+UNION ALL SELECT * FROM noveleiro
+UNION ALL SELECT * FROM vipao
+UNION ALL SELECT * FROM reporter
+UNION ALL SELECT * FROM ecletico
+UNION ALL SELECT * FROM maratonista
+UNION ALL SELECT * FROM tecnologico
+UNION ALL SELECT * FROM ligeirinho
+UNION ALL SELECT * FROM apegado
+UNION ALL SELECT * FROM viciado

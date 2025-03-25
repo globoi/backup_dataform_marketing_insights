@@ -1,0 +1,35 @@
+config {
+  type: 'table',
+  tags: ['GP_E_Aniversariantes','schedule_tag=jornadas_mkt_mktflow_segment_media_kits_nova'],
+  name: 'mktflow_segment_media_kits_nova',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT
+  id,
+  title,
+    REPLACE(title, ',', '@@') AS title,
+    REPLACE(description, ',', '@@') AS sinopse
+  subset,
+  media_kit_resource__background_tv,
+  media_kit_resource__cover,
+  media_kit_resource__destaque,
+  media_kit_resource__logotipo_xl,
+  media_kit_resource__on_air_mobile,
+  media_kit_resource__poster,
+  title_id,
+  1 as globo_id,
+  CURRENT_DATE as dt_proc
+FROM
+  ${ref("conteudo_enriched", "program")}
+WHERE
+  url_for_consumption LIKE '%globoplay%'

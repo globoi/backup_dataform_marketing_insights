@@ -1,0 +1,85 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_novos_cadastros',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 
+         'schedule_tag=jornadas_mkt_mktflow_gplay_int_novos_cadastros',
+         "schedule_cron=0 12 * * *"]
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+with assinantes as (
+SELECT
+distinct
+ss.globo_id,
+ss.state_date as dia,
+case when pd.is_international = true then 'INT' else 'BR' end as br_int
+FROM ${ref("sales_gold", "subscription_state")} ss
+JOIN ${ref("sales_gold", "subscription_details")} sd
+ON ss.object_id = sd.id
+JOIN ${ref("sales_gold", "product_details")} pd
+ON sd.product_id = pd.id
+LEFT JOIN
+${ref("sales_gold", "order_details")} od ON sd.order_id = od.id
+LEFT JOIN
+${ref("sales_gold", "country_details")} cd ON od.country_id = cd.id
+WHERE DATE(ss.state_date) >= current_date-180
+AND
+ss.state = 'active'
+),
+
+basecad AS (SELECT distinct globoid, _TABLE_SUFFIX as datacad 
+FROM ${ref("globoid_public", "globoid_user_*")}
+WHERE _TABLE_SUFFIX = FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))),
+
+segmentacao as (
+SELECT *,
+case
+when asgloboid is not null and dia is not null and br_int = 'INT' then 'Assinante INT'
+when asgloboid is not null and dia is not null and br_int = 'BR' then 'Assinante BR'
+when cadgloboid is not null then 'Logado Free'
+else 'anonimo'
+end as assinatura_gold
+FROM(
+SELECT
+date_trunc(a.date,month) as mes,
+a.customDimensions.oferta_consumo,
+a.customDimensions.globoid as cdgloboid,
+globo_id as asgloboid,
+dia,
+br_int,
+c.globoid as cadgloboid
+FROM ${ref("google_analytics", "all_globo_videos_globoplay")} as a
+left join assinantes as b
+on a.customDimensions.globoid = b.globo_id and a.date = b.dia
+left join basecad as c on a.customDimensions.globoid = c.globoid
+,unnest(a.videos) as videos
+WHERE
+a.date >= current_date-180
+and a.customDimensions.oferta_consumo like '%globo-play-%'
+and a.customDimensions.oferta_consumo <> 'globo-play-beta'
+)),
+
+agrupamento as (
+select
+--distinct
+oferta_consumo,
+cdgloboid,
+count(cdgloboid) as qtd
+from segmentacao
+where assinatura_gold = 'Logado Free' and cdgloboid is not null
+group by 1,2
+order by 2 desc
+),
+
+tab_rank as (
+select *, row_number() over(partition by cdgloboid order by qtd) as rnk
+from agrupamento
+order by cdgloboid asc
+)
+
+select oferta_consumo, cdgloboid from tab_rank where rnk = 1

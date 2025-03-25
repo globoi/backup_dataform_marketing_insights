@@ -1,0 +1,48 @@
+config {
+  type: 'table',
+  name: 'ultimo_consumo',
+  schema: 'consumo',
+  tags: ['consumo_staging_2',
+        "schedule_tag=consumo_ultimo_consumo"
+  ],
+  description: 'Base de ultimo consumo dos usuários',
+  columns: {
+    globo_id:'Código de identificação do usuário.',
+    assetid:'Código do item da Cesta (Produto que o cliente adquiriu).',
+    ultimo_consumo:'Identifica o horário do ultimo consumo do usuário.',
+    ultimo_consumo_subset:'Identifica o grupo dos conteúdos.(Ex:. Novelas, filmes, series, etc..).',
+    assinante_only:'Somente assinante pode assistir.',
+    hours_watched:'Identifica a quantidade de horas assistidas durante a ultima sessão do usuário.',
+    program_id:'Código do programa.'
+  }
+}
+
+WITH
+pre_step_1 AS (
+  SELECT 
+    *,
+    ROW_NUMBER() OVER(PARTITION BY assetid, globo_id ORDER BY `timestamp` DESC) AS first_play
+  FROM
+    ${ref("consumo","pre_step_consumo")}
+  WHERE
+    program_id != 8426
+    AND is_full_content
+),
+
+pre_step_2 AS (
+  SELECT
+    globo_id,
+    assetid,
+    program_title AS ultimo_consumo,
+    `timestamp` AS data_ultimo_consumo,
+    program_subset AS ultimo_consumo_subset,
+    assinante_only,
+    hours_watched,
+    program_id
+  FROM
+    pre_step_1
+  WHERE
+    first_play = 1
+)
+
+SELECT * FROM pre_step_2

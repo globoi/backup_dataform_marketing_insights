@@ -1,0 +1,97 @@
+config {
+  type: 'table',
+  tags: [],
+  name: 'mktflow_projeto_gnt_cluster_recomendacao_2_old',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--CREATE OR REPLACE TABLE `gglobo-mkt-ins-hdg-prd.campanhas_mkt.mktflow_projeto_gnt_cluster_recomendacao_2` as
+
+WITH
+  -- etapa com os filtros de negócio principal
+  recomendacao AS (
+with consumo_tier2_em_gnt_ultimos_4meses as (
+SELECT DISTINCT
+  globo_id
+FROM 
+  ${ref("conteudo_enriched", "content")} a
+INNER JOIN 
+  ${ref("consumo", "pre_step_consumo")} b
+USING (program_id)
+INNER JOIN
+  ${ref("usuarios", "base_ativa_pagante_com_trial")} c
+USING (globo_id)
+WHERE 
+  LOWER(a.channel_title) LIKE "%gnt%" 
+  AND DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 120
+  AND assinatura_gplay = "nacional"
+  AND mais_canais = true
+  ORDER BY 1 ASC
+  ),
+
+consumo_tier2_ultimos_4meses as (
+SELECT DISTINCT
+  globo_id
+FROM 
+  ${ref("consumo", "pre_step_consumo")} b
+INNER JOIN
+  ${ref("usuarios", "base_ativa_pagante_com_trial")} c
+USING (globo_id)
+WHERE
+  DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 120
+  AND assinatura_gplay = "nacional"
+  AND mais_canais = true
+  ORDER BY 1 ASC
+  ),
+
+tier2_mas_nao_consome_gnt_ultimos_4meses as (
+SELECT DISTINCT a.globo_id
+FROM consumo_tier2_ultimos_4meses a
+LEFT JOIN consumo_tier2_em_gnt_ultimos_4meses b
+ON a.globo_id = b.globo_id
+WHERE b.globo_id IS NULL), 
+
+conteudos_leves as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.channel.title
+FROM  ${ref("conteudo", "all_content_program")} c,
+unnest(c.genres) g
+WHERE  g.name in ('Gastronomia','Culinária/Gastronomia','Moda e Beleza',
+'Viagem','Culinária','Diversidade e Identidade','Saúde e Bem-estar',
+'Entrevistas e Reflexões','Família','Alimentação','Pessoas e Lugares',
+'Natureza','Mesa Redonda','Socioculturais','Casa e Decoração','Arquitetura',
+'Para toda a família')
+AND c.channel.title NOT IN ('GNT', 'GNT OTT')
+ORDER BY 3 ASC, 1 ASC
+),
+
+consumo_conteudos_leves_ultimos_4meses as (
+SELECT distinct globo_id
+from ${ref("consumo", "pre_step_consumo")} tt
+inner join conteudos_leves ll
+on tt.program_id = ll.id
+where DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 120
+)
+
+select distinct ss.globo_id
+from tier2_mas_nao_consome_gnt_ultimos_4meses aa
+inner join consumo_conteudos_leves_ultimos_4meses ss
+on aa.globo_id = ss.globo_id
+order by globo_id asc
+)
+
+SELECT b.globo_id, b.grupo
+FROM recomendacao as a
+INNER JOIN ${ref("experimentos", "projeto_gnt_cluster_recomendacao_relacao_grupos")} as b
+on a.globo_id = b.globo_id
+
+
+
+

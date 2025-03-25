@@ -1,0 +1,37 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_automatica_sportv',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_base_automatica_sportv'],
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+with base_ativa_pagante_com_trial_new_unnest AS (
+    SELECT globo_id FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ,
+    UNNEST(info) i
+    WHERE mais_canais
+   AND assinatura_gplay = "nacional" 
+    
+)
+
+SELECT DISTINCT
+ 'named_user' as identifier_type, globo_id
+FROM
+  ${ref("conteudo_enriched", "content")} 
+INNER JOIN 
+  ${ref("consumo", "pre_step_consumo")} 
+USING (program_id)
+INNER JOIN base_ativa_pagante_com_trial_new_unnest
+USING (globo_id)
+WHERE 
+  LOWER(channel_title) LIKE "%sportv%" 
+  AND DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 60
+
+
+

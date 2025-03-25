@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-globoplay-int-hdg-dev",
+  schema: "Consumo",
+  name: "video_subs_ga_v4",
+  description: ""
+}

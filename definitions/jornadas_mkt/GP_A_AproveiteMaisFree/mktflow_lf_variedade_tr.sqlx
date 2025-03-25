@@ -1,0 +1,23 @@
+config {
+  type: 'table',
+  name: 'mktflow_lf_variedade_tr',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AproveiteMaisFree','schedule_tag=jornadas_mkt_mktflow_lf_variedade_tr'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+    DISTINCT(userid) AS globo_id
+FROM 
+    ${ref("consumo_enriched", "partial_content_impression")} pci
+    INNER JOIN ${ref("usuarios", "Free users")} fu
+    ON fu.globo_id = pci.userid
+WHERE
+    pci.program_id IN (13373, 8601, 5821, 5885, 2533)

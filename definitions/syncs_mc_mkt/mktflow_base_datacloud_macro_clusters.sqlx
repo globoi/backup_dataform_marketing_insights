@@ -1,0 +1,22 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt",
+  tags: ["syncs_mc_mkt", 'schedule_tag=syncs_mc_mkt_mktflow_base_datacloud_macro_clusters',
+    'schedule_cron=15 12 * * *'
+  ]
+,
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "syncs_mc_mkt",
+            owner: "mins"
+        }
+    }
+}
+
+
+
+SELECT
+  *
+FROM
+  ${ref('datacloud', 'base_macro_clusters')}

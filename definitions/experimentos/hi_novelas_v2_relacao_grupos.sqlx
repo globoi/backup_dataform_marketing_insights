@@ -1,0 +1,63 @@
+config {
+  type: 'incremental',
+  uniqueKey: ["globo_id"],
+  name: 'hi_novelas_v2_relacao_grupos',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+-- Query para fazer atribuir novos noveleiros aos seus grupos na hi_novelas_v2_relacao_grupos
+-- Tem que rodar antes da hi_novelas_v2_grupos_da_semana
+
+-- INSERT INTO ${ref("experimentos", "hi_novelas_v2_relacao_grupos")}
+-- Não a necessidade de colocar INSERT, pois o type incremental ja age nesse formato
+
+WITH
+  -- etapa com os filtros de negócio principal
+  raiox_semana AS (
+  SELECT
+    globo_id,
+    MAX(total_horas) AS total_horas
+  FROM
+    ${ref("usuarios", "RaioXAssinante")}
+  WHERE
+    semana = DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7
+    AND Cluster_Conteudo_Mais_Assistido = 'Novelas'
+  GROUP BY
+    globo_id,
+    semana,
+    Cluster_Conteudo_Mais_Assistido
+  HAVING
+    total_horas <= (1.8 * 7) -- garantir a regra de desengajamento da plataforma de <=1,8h por dia (*7 para semana)
+  ), 
+
+  -- etapa para atribuir a grupos apenas os novos entrantes
+  novos_usuarios_distribuidos AS (
+  SELECT
+    aa.globo_id,
+    NTILE(8) OVER (ORDER BY RAND()) AS grupo,
+    FROM raiox_semana AS aa
+    
+    -- pedaço que faz pegar apenas os novos entrantes
+    -- na primera iteração, não confere com ela mesma
+    ${when(incremental(), 
+    `LEFT JOIN ${self()} AS bb ON aa.globo_id = bb.globo_id WHERE bb.globo_id IS NULL`,
+    ` `)
+    }
+    
+  ),
+  
+  -- nomear os grupos 
+  novos_usuarios_organizados AS (
+  SELECT
+    globo_id,
+    IF (grupo > 3,0,grupo) AS grupo_n
+    FROM novos_usuarios_distribuidos
+  )
+
+SELECT
+  globo_id,
+  grupo_n
+  FROM novos_usuarios_organizados

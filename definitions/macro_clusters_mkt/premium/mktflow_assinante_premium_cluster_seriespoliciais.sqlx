@@ -1,0 +1,60 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_seriespoliciais',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_seriespoliciais',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram series policiais vod ou series policiais/investigativas na tv ao vivo nos ultimos 180 dias.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+
+
+--macro cluster premium series policiais
+--assinantes premium que consumiram series policiais vod ou series policiais/investigativas na tv ao vivo nos ultimos 180 dias.
+
+with consumo_em_genero_series_policiais as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  INNER JOIN ${ref('jornadas_mkt', 'genero_todas_combinacoes')} as b
+  ON a.program_id = b.program_id
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND program_subset = 'series'
+    AND  lower(genero) in ('investigação', 'policial', 'crime')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 1
+),
+
+consumo_em_programas_ao_vivo_series_policiais as (
+  SELECT distinct globoid, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')}  
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa in ('SERIES')
+    AND subgenero_programa in ('INVESTIGACAO')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT DISTINCT globo_id, 'consumo series policiais' as base FROM consumo_em_genero_series_policiais
+  
+  UNION DISTINCT
+  
+  SELECT DISTINCT globoid as globo_id, 'consumo series policiais' as base FROM consumo_em_programas_ao_vivo_series_policiais
+)
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+

@@ -1,0 +1,123 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_internacional_lf_cluster_cinema'],
+  name: 'mktflow_internacional_lf_cluster_cinema',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+---------------------------------------VERSÃO 2---------------------------------------------------
+
+--macro cluster lf internacional cinema/filmes
+
+--lf internacional que consumiram filmes vod ou filmes ao vivo nos ultimos 180 dias.
+
+with todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.program.subset, c.program.metadata_scheme, c.program.format
+FROM  ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_cinema as (
+SELECT *
+FROM todos_os_generos
+WHERE metadata_scheme in ('movie')
+AND format in ('filmes','Filme','Movie')
+AND name not in ('Documentário', 'Música', 'Infantil', 'Infantojuvenil')
+),
+
+consumo_em_genero_cinema as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_cinema b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_cinema as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND genero_programa in ('FILME')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo filmes' as base
+FROM consumo_em_genero_cinema
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo filmes' as base
+FROM consumo_em_programas_ao_vivo_cinema),
+
+--ex-assinantes de produtos com telecine
+ex_assinante_telecine as (
+  with 
+  asset AS (
+    SELECT
+      sd.id AS assetid,
+      sd.product_name AS AssetName,
+      TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+      DATETIME(end_cycle_at) AS dt_cancelamento_final_ciclo,
+      e.globo_id,
+      e.event AS status,
+      sd.subscription_status
+    FROM
+      ${ref("sales_gold", "subscription_details")} AS sd
+    INNER JOIN
+      ${ref("sales_gold", "customer_events")}  AS e
+      ON e.object_id = sd.id
+  ),  
+  
+  ex_ass_telecine as (
+    select distinct globo_id
+    from asset
+    where lower(AssetName) like '%telecine%'
+    and status = 'unsubscription'
+    order by 1 asc)
+
+  select ex_ass_telecine.globo_id, 'ex-assinante telecine' as base
+  from ex_ass_telecine
+  inner join ${ref("internacional", "base_ativa_internacional")} b
+  on ex_ass_telecine.globo_id = b.globo_id),
+
+--uniao de todos os atuais usuarios assinantes internacional que:
+--consumiram filmes vod ou filmes ao vivo nos ultimos 180 dias, ou
+--são ex-assinantes de produtos com telecine
+
+basefinal as (
+SELECT distinct globo_id, base
+FROM uniao_consumo_vod_e_ao_vivo
+union distinct
+SELECT distinct globo_id, base
+FROM ex_assinante_telecine
+),
+
+basefinal_2 as (
+select *
+from basefinal
+order by 1,2
+),
+
+basefinal_3 as (
+select distinct globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+from basefinal_2
+group by 1)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal_3 d
+INNER JOIN ${ref("internacional", "base_lf_internacional")} e
+ON d.globo_id = e.globo_id
+
+
+--select distinct count(distinct globo_id) as gid, bases 
+--from oi
+--group by rollup(2)
+--order by 2 asc
+
+

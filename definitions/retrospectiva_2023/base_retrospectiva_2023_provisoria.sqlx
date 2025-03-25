@@ -1,0 +1,562 @@
+config {
+  type: "table",
+  name: "base_retrospectiva_2023_provisoria",
+  schema: "retrospectiva_2023"
+}
+
+with base_impression AS (
+  SELECT
+    DISTINCT *
+  FROM
+    ${ref('retrospectiva_2023', 'consumo_top10_retro')}
+),
+assinantes as (
+  select
+    distinct globo_id,
+    status_assinatura,
+    assinatura_gplay
+  from
+    ${ref('retrospectiva_2023', 'consumo_top10_retro')}
+),
+base_impression_grouped AS (
+  SELECT
+    globo_id,
+    ROUND(SUM(hours_watched), 0) AS horas_total,
+    COUNT(DISTINCT date) AS qtd_dias_assistidos
+  FROM
+    base_impression
+  GROUP BY
+    globo_id
+),
+horas_assistidas AS (
+  SELECT
+    DISTINCT *
+  EXCEPT(status_assinatura),
+    ROUND((horas_total / qtd_dias_assistidos), 2) AS media_hrs,
+    CASE
+      WHEN horas_total >= 20
+      AND status_assinatura = 'Cancelado' THEN 'Cancelado - com consumo'
+      WHEN horas_total >= 20
+      AND status_assinatura = 'Ativo' THEN 'Ativo - com consumo'
+      WHEN horas_total < 20
+      AND status_assinatura = 'Cancelado' THEN 'Cancelado - sem consumo'
+      WHEN horas_total < 20
+      AND status_assinatura = 'Ativo' THEN 'Ativo - sem consumo'
+      ELSE 'sem_grupo'
+    END AS grupo
+  FROM
+    base_impression_grouped
+    INNER JOIN assinantes USING (globo_id)
+),
+consumo AS (
+  SELECT
+    *,
+    CASE
+      WHEN program_subset = 'novelas' THEN 'horas_novelas'
+      WHEN program_subset = 'series' THEN 'horas_series'
+      WHEN program_subset IN ('movies', 'filmes') THEN 'horas_filmes'
+      -- WHEN program_id = 9095 THEN 'ao_vivo_globo'
+      WHEN program_subset = 'live'
+      OR is_live THEN 'horas_live'
+      ELSE 'horas_outros'
+    END AS grupo2
+  FROM
+    base_impression
+    INNER JOIN horas_assistidas USING (globo_id)
+),
+pivot_consumo AS (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        globo_id,
+        hours_watched,
+        grupo2
+      FROM
+        consumo
+    ) PIVOT(
+      SUM(hours_watched) FOR grupo2 IN (
+        'horas_novelas',
+        'horas_series',
+        'horas_filmes',
+        'horas_live',
+        'horas_outros'
+      )
+    )
+),
+hrs_tipo AS(
+  SELECT
+    globo_id,
+    ROUND(COALESCE(horas_novelas, 0), 0) AS horas_novelas,
+    ROUND(COALESCE(horas_series, 0), 0) AS horas_series,
+    ROUND(COALESCE(horas_filmes, 0), 0) AS horas_filmes,
+    ROUND(COALESCE(horas_live, 0), 0) AS horas_live,
+    ROUND(COALESCE(horas_outros, 0), 0) AS horas_outros
+  FROM
+    pivot_consumo
+),
+hrs_tipo_2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_novelas > horas_live
+      AND horas_novelas > horas_series
+      AND horas_novelas > horas_filmes THEN 'Novelas'
+      WHEN horas_series > horas_live
+      AND horas_series > horas_filmes
+      AND horas_series > horas_novelas THEN 'Series'
+      WHEN horas_filmes > horas_novelas
+      AND horas_filmes > horas_series
+      AND horas_filmes > horas_live THEN 'Filmes'
+      WHEN horas_live > horas_series
+      AND horas_live > horas_filmes
+      AND horas_live > horas_novelas THEN 'Live'
+      -- ELSE 'Series'
+    END AS tipo_conteudo
+  FROM
+    hrs_tipo
+),
+hrs_por_tipo AS (
+  SELECT
+    DISTINCT globo_id,
+    grupo,
+    assinatura_gplay,
+    horas_total,
+    media_hrs,
+    qtd_dias_assistidos,
+    horas_novelas,
+    horas_series,
+    horas_filmes,
+    horas_live,
+    horas_outros,
+    tipo_conteudo AS tipo_conteudo_mais_assistido
+  FROM
+    horas_assistidas
+    LEFT JOIN hrs_tipo_2 USING (globo_id)
+),
+mais_assistido AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    SUM(hours_watched) AS hrs
+  FROM
+    base_impression
+  WHERE
+    program_id NOT IN (8426, 9095, 9191)
+  GROUP BY
+    1,
+    2,
+    3
+),
+mais_assistido_2 AS (
+  SELECT
+    globo_id,
+    program_id AS program_id_mais_assistido,
+    program_title AS programa_mais_assistido,
+    programa_mais_assistido_program_poster_url,
+    ROUND(hrs, 0) AS hrs_programa_mais_assistido,
+    ROW_NUMBER() OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        hrs DESC
+    ) AS `top`
+  FROM
+    mais_assistido AS m
+    INNER JOIN (
+      SELECT
+        DISTINCT id AS program_id_programa_mais_assistido,
+        media_kit_resource__poster AS programa_mais_assistido_program_poster_url
+      FROM
+        ${ref('conteudo_enriched', 'program')}
+      WHERE
+        media_kit_resource__poster IS NOT NULL
+    ) AS p ON p.program_id_programa_mais_assistido = m.program_id QUALIFY top = 1
+),
+categoria AS (
+  SELECT
+    globo_id,
+    program_subset,
+    SUM(hours_watched) AS hrs_subset
+  FROM
+    base_impression
+  WHERE
+    program_id NOT IN (8426, 9095, 9191)
+  GROUP BY
+    1,
+    2
+),
+categoria_mais_assistida AS (
+  SELECT
+    globo_id,
+    Categoria AS subset_mais_assistido,
+    ROUND(hrs_subset, 0) AS hrs_subset_mais_assistido,
+    ROW_NUMBER() OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        hrs_subset DESC
+    ) AS `top`
+  FROM
+    categoria AS c
+    LEFT JOIN ${ref('raw', 'De_para_subset_padronizado')} AS s ON s.Subset = c.program_subset QUALIFY top = 1
+),
+dia_semana_maior_consumo AS (
+  SELECT
+    globo_id,
+    date AS data_maior_consumo,
+    COALESCE(ROUND(SUM(hours_watched), 0), 0) AS horas_data_maior_consumo,
+  FROM
+    base_impression
+  GROUP BY
+    1,
+    2 QUALIFY ROW_NUMBER() OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        horas_data_maior_consumo DESC
+    ) = 1
+),
+dia_da_semana_maior_consumo_2 AS (
+  SELECT
+    globo_id,
+    LOWER(CAST(date AS STRING FORMAT 'DY')) AS dia_semana,
+    SUM(hours_watched) AS sum_hours_watched
+  FROM
+    base_impression
+  GROUP BY
+    1,
+    2
+  ORDER BY
+    3 DESC
+),
+horario_mais_consome1 AS (
+  SELECT
+    globo_id,
+    hours_watched,
+    DATETIME(`timestamp`, "America/Sao_Paulo") AS timestamp
+  FROM
+    base_impression
+),
+horario_mais_consome2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN EXTRACT(
+        HOUR
+        FROM
+          `timestamp`
+      ) BETWEEN 0
+      AND 5 THEN 'Madrugada'
+      WHEN EXTRACT(
+        HOUR
+        FROM
+          `timestamp`
+      ) BETWEEN 6
+      AND 11 THEN 'Manhã'
+      WHEN EXTRACT(
+        HOUR
+        FROM
+          `timestamp`
+      ) BETWEEN 12
+      AND 17 THEN 'Tarde'
+      ELSE 'Noite'
+    END AS periodo
+  FROM
+    horario_mais_consome1
+),
+horario_mais_consome3 AS (
+  SELECT
+    globo_id,
+    periodo AS periodo_mais_assistido,
+    SUM(hours_watched) AS hrs_assistidas_periodo,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        SUM(hours_watched) DESC
+    ) AS n_periodo
+  FROM
+    horario_mais_consome2
+  GROUP BY
+    1,
+    2 QUALIFY n_periodo = 1
+),
+original_assistido AS(
+  SELECT
+    *
+  FROM
+    base_impression
+    INNER JOIN (
+      SELECT
+        *
+      EXCEPT(program_title)
+      FROM
+        ${ref('retrospectiva_2023', 'conteudos_originais_retro')}
+    ) USING (program_id)
+),
+original_assistido2 AS (
+  SELECT
+    globo_id,
+    program_id AS program_id_original_preferido,
+    program_title AS original_preferido,
+    media_kit_resource__poster as original_preferido_program_poster_url,
+    SUM(hours_watched) AS hrs,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        SUM(hours_watched) DESC
+    ) AS n_o
+  FROM
+    original_assistido AS o
+  GROUP BY
+    1,
+    2,
+    3,
+    4
+),
+primeiro_play AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    DATETIME(`timestamp`, "America/Sao_Paulo") AS timestamp
+  FROM
+    base_impression
+  WHERE
+    program_id NOT IN (8426, 9095, 9191)
+),
+primeiro_play2 AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title AS primeiro_play_2023,
+    primeiro_play_2023_program_poster_url,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp
+    ) AS first_play1
+  FROM
+    primeiro_play AS pp
+    INNER JOIN (
+      SELECT
+        DISTINCT id AS program_id_primeiro_play_2023,
+        media_kit_resource__poster AS primeiro_play_2023_program_poster_url
+      FROM
+        ${ref('conteudo_enriched', 'program')}
+      WHERE
+        media_kit_resource__poster IS NOT NULL
+    ) AS p ON p.program_id_primeiro_play_2023 = pp.program_id QUALIFY first_play1 = 1
+),
+gen AS (
+  SELECT
+    *
+  FROM
+    base_impression
+    INNER JOIN (
+      SELECT
+        genero,
+        program_id
+      FROM
+        ${ref('retrospectiva_2023', 'generos_retrospectiva_2023')}
+    ) USING (program_id)
+),
+gen2 AS (
+  SELECT
+    globo_id,
+    genero,
+    SUM(hours_watched) AS hrs_gen
+  FROM
+    gen
+  GROUP BY
+    1,
+    2
+),
+gen3 AS (
+  SELECT
+    globo_id,
+    genero AS genero_mais_consumido,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        hrs_gen DESC
+    ) AS n_g
+  FROM
+    gen2 QUALIFY n_g = 1
+),
+base_final AS (
+  SELECT
+    *
+  EXCEPT(
+      top,
+      dia_semana,
+      dia_semana_new,
+      sum_hours_watched,
+      dia_semana_old,
+      hrs_assistidas_periodo,
+      first_play1,
+      n_o,
+      n_periodo,
+      n_g,
+      program_id
+    ),
+    dia_semana_new AS dia_semana_maior_consumo,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        sum_hours_watched DESC
+    ) AS n_dia
+  FROM
+    hrs_por_tipo
+    LEFT JOIN mais_assistido_2 USING (globo_id)
+    LEFT JOIN categoria_mais_assistida USING (globo_id)
+    LEFT JOIN dia_semana_maior_consumo USING (globo_id)
+    LEFT JOIN dia_da_semana_maior_consumo_2 AS c USING (globo_id)
+    LEFT JOIN ${ref('retrospectiva_2023', 'dias_da_semana')} AS d ON d.dia_semana_old = c.dia_semana
+    LEFT JOIN horario_mais_consome3 USING (globo_id)
+    LEFT JOIN (
+      SELECT
+        globo_id,
+        original_preferido,
+        original_preferido_program_poster_url,
+        n_o
+      FROM
+        original_assistido2
+    ) USING (globo_id)
+    LEFT JOIN (
+      SELECT
+        globo_id,
+        ROUND(SUM(hrs), 0) AS hrs_originais
+      FROM
+        original_assistido2
+      GROUP BY
+        1
+    ) USING (globo_id)
+    LEFT JOIN primeiro_play2 USING (globo_id)
+    LEFT JOIN gen3 USING (globo_id) QUALIFY n_dia = 1
+    AND n_o = 1
+),
+top_10 as (
+  select
+    globo_id,
+    'n' as n,
+    ifnull(max(assistiu_top1), false) assistiu_top1,
+    ifnull(max(assistiu_top2), false) assistiu_top2,
+    ifnull(max(assistiu_top3), false) assistiu_top3,
+    ifnull(max(assistiu_top4), false) assistiu_top4,
+    ifnull(max(assistiu_top5), false) assistiu_top5,
+    ifnull(max(assistiu_top6), false) assistiu_top6,
+    ifnull(max(assistiu_top7), false) assistiu_top7,
+    ifnull(max(assistiu_top8), false) assistiu_top8,
+    ifnull(max(assistiu_top9), false) assistiu_top9,
+    ifnull(max(assistiu_top10), false) assistiu_top10
+  from
+    base_impression
+  group by
+    1,
+    2
+)
+SELECT
+  distinct *
+EXCEPT(n_dia, n, optin_whatsapp),
+  ifnull(optin_whatsapp, false) as optin_whatsapp
+FROM
+  base_final as b
+  left join top_10 using(globo_id) full
+  outer join (
+    with base1 AS (
+      SELECT
+        *
+      FROM
+        (
+          SELECT
+            n,
+            program_id,
+            program_title,
+            media_kit_resource__poster,
+            top
+          FROM
+            (
+              select
+                *,
+                'n'as n
+              from
+                ${ref('retrospectiva_2023', 'top_10')}
+            )
+        ) PIVOT(
+          max(program_id) program_id,
+          max(program_title) program_title,
+          max(media_kit_resource__poster) program_poster_url FOR top IN (
+            'top_1',
+            'top_2',
+            'top_3',
+            'top_4',
+            'top_5',
+            'top_6',
+            'top_7',
+            'top_8',
+            'top_9',
+            'top_10'
+          )
+        )
+    )
+    select
+      *
+    from
+      base1
+  ) using(n)
+  left join (
+    select
+      distinct globo_id,
+      program_title_rec1,
+      program_poster_url_rec1,
+      url_add_minha_lista_rec1,
+      program_title_rec2,
+      program_poster_url_rec2,
+      url_add_minha_lista_rec2,
+      program_title_rec3,
+      program_poster_url_rec3,
+      url_add_minha_lista_rec3
+    from
+      ${ref('jornadas_mkt', 'Lst_Rec_Pers_Genero_T5_Pivoted')} as l
+      left join (
+        select
+          *
+        except(media_kit_resource__poster),
+          program_title as program_title_rec1,
+          media_kit_resource__poster as program_poster_url_rec1,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_rec1
+        from
+          ${ref('jornadas_mkt', 'Lst_Rec_Pers_Genero_T5_Pivoted_Aux')}
+      ) as p on p.title_id = l.rank_1
+      left join (
+        select
+          *
+        except(media_kit_resource__poster),
+          program_title as program_title_rec2,
+          media_kit_resource__poster as program_poster_url_rec2,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_rec2
+        from
+          ${ref('jornadas_mkt', 'Lst_Rec_Pers_Genero_T5_Pivoted_Aux')}
+      ) as a on a.title_id = l.rank_2
+      left join (
+        select
+          *
+        except(media_kit_resource__poster),
+          program_title as program_title_rec3,
+          media_kit_resource__poster as program_poster_url_rec3,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_rec3
+        from
+          ${ref('jornadas_mkt', 'Lst_Rec_Pers_Genero_T5_Pivoted_Aux')}
+      ) as t on t.title_id = l.rank_3
+  ) using(globo_id)
+  left join (
+    SELECT
+      distinct globoid as globo_id,
+      true as optin_whatsapp
+    FROM
+      ${ref('retrospectiva_2023', 'optin_gplay_whatsapp')}
+    where
+      globoid is not null
+  ) using(globo_id)
+WHERE
+  grupo IN ('Ativo - com consumo', 'Cancelado - com consumo') and hrs_originais>=1

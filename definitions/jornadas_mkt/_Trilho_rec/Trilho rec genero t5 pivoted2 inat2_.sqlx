@@ -1,0 +1,24 @@
+config {
+  type: "table",
+  name: "Trilho rec genero t5 pivoted2 inat2",
+  schema: "trilho"
+}
+
+--tabela desativada
+--tags: ['trilho_rec', 'schedule_tag=trilho_Trilho_rec_genero_t5_pivoted2_inat2']
+
+SELECT * FROM (
+    SELECT
+        globo_id,
+        rank_final,
+        title_id,
+        personalizado,
+        ROW_NUMBER() OVER(PARTITION BY globo_id, rank_final) AS line
+    FROM
+        ${ref("trilho", "Trilho rec pers por genero t5 inat2")}
+        )
+    PIVOT (
+        MAX(IF(line = 1, title_id, NULL)) rank
+        FOR rank_final IN (1,2,3)
+        )
+

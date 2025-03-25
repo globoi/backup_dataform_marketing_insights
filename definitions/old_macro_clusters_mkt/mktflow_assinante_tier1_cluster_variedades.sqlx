@@ -1,0 +1,265 @@
+config {
+    type: 'table',
+    tags: ['macrocluster_old', 'schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_variedades'],
+    name: 'mktflow_assinante_tier1_cluster_variedades',
+    schema: 'macro_clusters_mkt',
+    description: '',
+    columns: {},
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            urban: 'list'
+        }
+    }
+}
+
+  -------------------------------------------------VERSÃO 2---------------------------------------------------
+  --macro cluster tier 1 variedades
+  --assinantes tier 1 que consumiram programas vod do subset variedades ou programas ao vivo variados/variedades nos ultimos 180 dias.
+WITH
+  subset_variedades AS (
+  SELECT
+    DISTINCT g.name,
+    c.program.title,
+    c.program.id,
+    c.program.subset,
+    c.program.metadata_scheme,
+    c.program.format
+  FROM
+    ${ref("conteudo", "all_content_program")} c,
+    UNNEST(c.genres) g
+  WHERE
+    program.subset = "varieties" ),
+  consumo_em_variedades AS (
+  SELECT
+    DISTINCT a.userId AS globo_id
+  FROM
+    ${ref("consumo_enriched", "impression")} a
+  INNER JOIN
+    subset_variedades b
+  ON
+    a.program_id = b.id
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY) ),
+  consumo_em_programas_ao_vivo_de_variedades AS (
+  SELECT
+    DISTINCT globoid
+  FROM
+    ${ref("simulcast", "consumo_ibope")}
+  WHERE
+    data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa IN ('AUDITORIO',
+      'CULINARIO',
+      'GAME SHOW',
+      'HUMORISTICO',
+      '	PREMIACAO',
+      'SAUDE',
+      'SHOW') ),
+  uniao_consumo_vod_e_ao_vivo AS (
+  SELECT
+    globo_id,
+    'consumo variedades' AS base
+  FROM
+    consumo_em_variedades
+  UNION DISTINCT
+  SELECT
+    globoid AS globo_id,
+    'consumo variedades' AS base
+  FROM
+    consumo_em_programas_ao_vivo_de_variedades),
+  --assinantes tier 1 que tentaram dar play nos canais VIVA, Canal Brasil, OFF, Multishow, Modo Viagem ou GNT e levaram tapume nos últimos 30 dias.
+  tier1_tapumevariedades_ultimos30d AS (
+  WITH
+    tapume AS (
+    SELECT
+      *
+    FROM
+      ${ref("consumo_clean", "tageamento_eventos")}
+    WHERE
+      eventCategory = 'agora'
+      AND eventAction IN ('tapume.viva',
+        'tapume.canal_brasil',
+        'tapume.canal_off',
+        'tapume.multishow',
+        'tapume.modo-viagem',
+        'tapume.modo_viagem',
+        'tapume.canal-off',
+        'tapume.VIVA',
+        'tapume.canal-brasil',
+        'tapume.gnt')
+      AND eventLabel = 'nao_assinante'
+      AND table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+  SELECT
+    DISTINCT a.globo_id_hit AS globo_id,
+    'tapume' AS base
+  FROM
+    tapume a
+  INNER JOIN
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} b
+  ON
+    a.globo_id_hit = b.globo_id
+  CROSS JOIN
+    UNNEST(b.info) AS info
+  WHERE
+    info.mais_canais = FALSE
+    AND globo_id_hit IS NOT NULL),
+  --assinantes tier 1 que navegaram em editorias do GSHOW (menos Novelas) pelo menos 15 vezes nos últimos 15 dias
+  acesso_gshow_ultimos15d AS (
+  WITH
+    acesso AS (
+    SELECT
+      globoId AS globo_id
+    FROM
+      ${ref("foundation_gshow", "foundation_gshow_sessions")} w,
+      UNNEST (w.hits) h
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+      AND h.provider = "cadun"
+      AND h.editoriaN1 NOT IN ("Novelas")
+      AND globoId IS NOT NULL),
+    pelo_menos_15_acessos AS (
+    SELECT
+      globo_id,
+      COUNT(*) AS quantidade
+    FROM
+      acesso
+    GROUP BY
+      globo_id
+    HAVING
+      COUNT(*) >= 15)
+  SELECT
+    DISTINCT a.globo_id,
+    'acesso GSHOW' AS base
+  FROM
+    pelo_menos_15_acessos a
+  INNER JOIN
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} b
+  ON
+    a.globo_id = b.globo_id
+  CROSS JOIN
+    UNNEST(b.info) AS info
+  WHERE
+    info.mais_canais = FALSE
+    AND a.globo_id IS NOT NULL ),
+  --Ex-assinantes de produtos com lionsgate
+  ex_assinante_lionsgate AS (
+  WITH
+    ex_ass_lg AS (
+    SELECT
+      DISTINCT globo_id
+    FROM
+      ${ref("sales_gold", "asset_gold")}
+    WHERE
+      LOWER(asset_name) LIKE '%lionsgate%'
+      AND subscription_status = 'Cancelado'
+    ORDER BY
+      1 ASC)
+  SELECT
+    ex_ass_lg.globo_id,
+    'ex-assinante lionsgate' AS base
+  FROM
+    ex_ass_lg
+  INNER JOIN
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} b
+  ON
+    ex_ass_lg.globo_id = b.globo_id
+  CROSS JOIN
+    UNNEST(b.info) AS info
+  WHERE
+    info.mais_canais = FALSE
+    AND LOWER(Produto_Contratado) NOT LIKE "%lionsgate%"),
+  --Ex-assinantes de produtos com discovery
+  ex_assinante_discovery AS (
+  WITH
+    ex_ass_dcv AS (
+    SELECT
+      DISTINCT globo_id
+    FROM
+      ${ref("sales_gold", "asset_gold")}
+    WHERE
+      LOWER(asset_name) LIKE '%discovery%'
+      AND subscription_status = 'Cancelado'
+    ORDER BY
+      1 ASC)
+  SELECT
+    ex_ass_dcv.globo_id,
+    'ex-assinante discovery' AS base
+  FROM
+    ex_ass_dcv
+  INNER JOIN
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} b
+  ON
+    ex_ass_dcv.globo_id = b.globo_id
+  CROSS JOIN
+    UNNEST(b.info) AS info
+  WHERE
+    info.mais_canais = FALSE
+    AND LOWER(Produto_Contratado) NOT LIKE "%discovery%"),
+  --uniao de todos os atuais usuarios assinantes tier 1 que:
+  --consumiram programas vod do subset variedades ou programas ao vivo variados/variedades nos ultimos 180 dias, ou
+  --tentaram dar play nos canais VIVA, Canal Brasil, OFF, Multishow, Modo Viagem ou GNT e levaram tapume nos últimos 30 dias, ou
+  --navegaram em editorias do GSHOW pelo menos 15 vezes nos últimos 15 dias, ou
+  --são ex-assinantes de produtos com lionsgate, ou
+  --são ex-assinantes de produtos com discovery
+  basefinal AS (
+  SELECT
+    DISTINCT globo_id,
+    base
+  FROM
+    uniao_consumo_vod_e_ao_vivo
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    base
+  FROM
+    tier1_tapumevariedades_ultimos30d
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    base
+  FROM
+    acesso_gshow_ultimos15d
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    base
+  FROM
+    ex_assinante_lionsgate
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    base
+  FROM
+    ex_assinante_discovery ),
+  basefinal_2 AS (
+  SELECT
+    *
+  FROM
+    basefinal
+  ORDER BY
+    1,
+    2 ),
+  basefinal_3 AS (
+  SELECT
+    DISTINCT globo_id,
+    ARRAY_TO_STRING(ARRAY_AGG(base),', ') AS bases
+  FROM
+    basefinal_2
+  GROUP BY
+    1)
+SELECT
+  DISTINCT 'named_user' AS identifier_type,
+  d.globo_id
+FROM
+  basefinal_3 d
+INNER JOIN
+  ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON
+  d.globo_id = e.globo_id
+WHERE
+  e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = FALSE
+  --select distinct count(distinct globo_id) as gid, bases
+  --from oi
+  --group by rollup(2)
+  --order by 2 asc

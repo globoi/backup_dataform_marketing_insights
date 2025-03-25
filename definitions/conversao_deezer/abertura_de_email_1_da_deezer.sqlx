@@ -1,0 +1,106 @@
+config {
+  type: 'table',
+  tags: [''],
+  name: 'abertura_de_email_1_da_deezer',
+  schema: 'conversao_deezer',
+  description: '',
+  columns: {
+  }
+}
+
+WITH email_send AS (
+
+  SELECT distinct globo_id,
+                  ActivityOrEmailName,
+                  send_date,
+                  was_opened,
+                  was_clicked,
+                  open_date,
+                  click_date
+
+  FROM ${ref("mkt_derived", "email_send")} 
+  WHERE send_date >= timestamp("2021-04-15 12:00:00", "America/Sao_Paulo")
+  AND lower(ActivityOrEmailName) like "%deezer%"
+  AND date >= "2020-01-01"
+),
+
+email_send_pivoted AS (
+
+  SELECT * FROM (
+    SELECT 
+      globo_id,
+      send_date,
+      open_date,
+      click_date,
+      ActivityOrEmailName
+    FROM email_send
+  )
+  PIVOT(
+    MIN(send_date) as min_send_date,
+    MIN(open_date) as min_open_date,
+    MIN(click_date) as min_click_date
+  -- FOR ActivityOrEmailName  IN ("Jornada_A_AbandonoAddonDeezer_Carrinhoabandonado_geral_1", "Jornada_A_AbandonoAddonDeezer_Carrinhoabandonado_geral_1_REPIQUE")
+  FOR ActivityOrEmailName  IN ("Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1",
+                               "Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1",
+                               "Campanha_E_Deezer_1",
+                               "Campanha_E_Deezer_1_REPIQUE",
+                               "Campanha_E_Deezer_1_REPIQUE2 - 20210423_125701",
+                               "Campanha_E_Deezer_1_REPIQUE3",
+                               "Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1",
+                               "Jornada_E_RetencaoDeezerNovosEntrantes_1",
+                               "Jornada_E_RetencaoDeezerNovosEntrantes_2"
+)
+
+  
+  )
+),
+ join_base_deezer AS (
+  SELECT email_send_pivoted.*, base_deezer.MusicLover, base_deezer.BigBrotherBrasil, base_deezer.PropensosChurn
+    FROM email_send_pivoted
+ LEFT JOIN ${ref("raw", "base_deezer_202104")} as base_deezer
+ ON(globo_id = globoid)
+)
+
+
+select
+
+globo_id,
+min_send_date_Jornada_E_RetencaoDeezerNovosEntrantes_2   as Jornada_E_RetencaoDeezerNovosEntrantes_2_MIN_of_send_date,
+min_open_date_Jornada_E_RetencaoDeezerNovosEntrantes_2 as Jornada_E_RetencaoDeezerNovosEntrantes_2_MIN_of_open_date,
+min_click_date_Jornada_E_RetencaoDeezerNovosEntrantes_2 as Jornada_E_RetencaoDeezerNovosEntrantes_2_MIN_of_click_date,
+
+min_send_date_Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1_MIN_of_send_date,
+min_open_date_Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1_MIN_of_open_date,
+min_click_date_Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezerMusica_ConversaoDireta_Deezer_1_MIN_of_click_date,
+
+min_send_date_Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1_MIN_of_send_date,
+min_open_date_Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1_MIN_of_open_date,
+min_click_date_Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1 as Campanha_A_GloboplayEDeezer_ConversaoDireta_Deezer_1_MIN_of_click_date,
+
+min_send_date_Campanha_E_Deezer_1 as Campanha_E_Deezer_1_send_date,
+min_open_date_Campanha_E_Deezer_1 as Campanha_E_Deezer_1_open_date,
+min_click_date_Campanha_E_Deezer_1 as Campanha_E_Deezer_1_click_date,
+
+min_send_date_Campanha_E_Deezer_1_REPIQUE as Campanha_E_Deezer_1_REPIQUE_send_date,
+min_open_date_Campanha_E_Deezer_1_REPIQUE as Campanha_E_Deezer_1_REPIQUE_open_date,
+min_click_date_Campanha_E_Deezer_1_REPIQUE as Campanha_E_Deezer_1_REPIQUE_click_date,
+
+`min_send_date_Campanha_E_Deezer_1_REPIQUE2 - 20210423_125701` as Campanha_E_Deezer_1_REPIQUE2_20210423_125701_MIN_of_send_date,
+`min_open_date_Campanha_E_Deezer_1_REPIQUE2 - 20210423_125701` as Campanha_E_Deezer_1_REPIQUE2_20210423_125701_MIN_of_open_date,
+`min_click_date_Campanha_E_Deezer_1_REPIQUE2 - 20210423_125701` as Campanha_E_Deezer_1_REPIQUE2_20210423_125701_MIN_of_click_date,
+
+min_send_date_Campanha_E_Deezer_1_REPIQUE3 as Campanha_E_Deezer_1_REPIQUE3_MIN_of_send_date,
+min_open_date_Campanha_E_Deezer_1_REPIQUE3 as Campanha_E_Deezer_1_REPIQUE3_MIN_of_open_date,
+min_click_date_Campanha_E_Deezer_1_REPIQUE3 as Campanha_E_Deezer_1_REPIQUE3_MIN_of_click_date,
+
+min_send_date_Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1 as Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1_MIN_of_send_date,
+min_open_date_Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1 as Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1_MIN_of_open_date,
+min_click_date_Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1 as Jornada_A_JornadaAbandonoCompraAddonDeezer_Upsell_Deezer_1_MIN_of_click_date,
+
+min_send_date_Jornada_E_RetencaoDeezerNovosEntrantes_1 as Jornada_E_RetencaoDeezerNovosEntrantes_1_MIN_of_send_date,
+min_open_date_Jornada_E_RetencaoDeezerNovosEntrantes_1 as Jornada_E_RetencaoDeezerNovosEntrantes_1_MIN_of_open_date,
+min_click_date_Jornada_E_RetencaoDeezerNovosEntrantes_1 as Jornada_E_RetencaoDeezerNovosEntrantes_1_MIN_of_click_date,
+MusicLover,
+BigBrotherBrasil,
+PropensosChurn
+ from join_base_deezer

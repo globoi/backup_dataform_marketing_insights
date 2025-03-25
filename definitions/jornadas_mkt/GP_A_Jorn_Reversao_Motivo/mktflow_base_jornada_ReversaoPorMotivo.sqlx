@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  name: 'mktflow_GP_A_ReversaoPorMotivo',
+  schema: 'jornadas_mkt',
+  tags: [   'GP_A_ReversaoPorMotivo',
+            'schedule_tag=jornadas_mkt_GP_A_ReversaoPorMotivo',
+            'schedule_cron: 0 08 * * *'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT *
+
+FROM ${ref("usuarios", "base_cancelamento_new")} 
+-- gglobo-mkt-ins-hdg-prd.usuarios.base_cancelamento_new 
+
+WHERE DATE(dt_hr_cancelamento_final_ciclo
+) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) AND CURRENT_DATE

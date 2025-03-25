@@ -1,0 +1,68 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=experimentos_hs_produto_base_telecine_grupos_semana'],
+  name: 'hs_produto_base_telecine_grupos_semana',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+
+-- Base atualização Premiere
+-- Remover quem converteu (Globoplay ou Telecine) quem cancelou Premiere
+
+-- CREATE OR REPLACE TABLE 
+-- `gglobo-mkt-ins-hdg-prd.experimentos.hs_produto_base_premiere_grupos_semana` AS
+
+-- `gglobo-mkt-ins-hdg-prd.usuarios.base_ativa_pagante_com_trial`
+-- ${ref("usuarios", "base_ativa_pagante_com_trial")}
+
+-- `gglobo-mkt-ins-hdg-prd.experimentos.hs_produto_base_premiere_grupos_ini`
+-- ${ref("experimentos", "hs_produto_base_premiere_grupos_ini")}
+
+-- `gglobo-foundation-psd-hdg-prd.sales_enriched.telecine_base_ativa_pagante`
+-- ${ref("sales_enriched", "telecine_base_ativa_pagante")}
+
+-- `estrutura-esportes.Time_Inteligencia.CRM_BaseAtiva_Premiere`
+-- ${ref("Time_Inteligencia", "CRM_BaseAtiva_Premiere")}
+
+
+WITH
+  base_base AS (
+    SELECT *
+    FROM ${ref("experimentos", "hs_produto_base_telecine_grupos_ini")}
+  ),
+  base_globoplay AS (
+    SELECT DISTINCT globo_id
+    FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")}
+  ),
+  base_telecine AS (
+    SELECT 
+      globo_id
+    FROM
+      ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) as i
+    WHERE
+      telecine
+  ),
+  base_premiere AS (
+    SELECT DISTINCT globoid as globo_id
+    FROM ${ref("Time_Inteligencia", "CRM_BaseAtiva_Premiere")}
+    WHERE Dia = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+  ),
+  
+  base_atualizada AS (
+  SELECT base.globo_id, base.grupo_n
+  FROM base_base AS base
+  LEFT JOIN base_globoplay  AS base_gplay ON base.globo_id = base_gplay.globo_id
+  LEFT JOIN base_telecine   AS base_tlc   ON base.globo_id = base_tlc.globo_id
+  LEFT JOIN base_premiere   AS base_pmr   ON base.globo_id = base_pmr.globo_id
+  WHERE
+        base_gplay.globo_id IS NULL     -- Manter quem não assinou Globoplay / Tirar quem assinou Globoplay
+    AND base_pmr.globo_id   IS NULL     -- Manter quem não assinou Premiere / Tirar quem assinou Premiere
+    AND base_tlc.globo_id   IS NOT NULL -- Manter quem ficou no Telecine / Tirar quem cancelou Telecine
+  )
+
+  SELECT *
+  FROM base_atualizada
+  

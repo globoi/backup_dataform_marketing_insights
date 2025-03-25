@@ -1,0 +1,56 @@
+config {
+  type: "table",
+  name: "consumo_retro_2023",
+  schema: "retrospectiva_2023"
+}
+
+WITH ativos AS (
+  SELECT
+    DISTINCT(globo_id),
+    'Ativo' AS status_assinatura
+  FROM
+    ${ref('usuarios', 'base_ativa_pagante_com_trial_new')}
+),
+assinantes AS (
+  SELECT
+    DISTINCT(globo_id),
+    assinatura_gplay,
+    COALESCE(status_assinatura, 'Cancelado') AS status_assinatura,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        assinatura_gplay DESC
+    ) AS ass
+  FROM
+    ${ref('usuarios', 'base_ativa_incremental_new')}
+    LEFT JOIN ativos USING(globo_id)
+  WHERE
+    EXTRACT(
+      YEAR
+      FROM
+        dt_proc
+    ) >= 2023 QUALIFY ass = 1
+  ORDER BY
+    4 DESC
+)
+SELECT
+  distinct userid AS globo_id,
+  status_assinatura,
+  assinatura_gplay,
+  mediaid,
+  date,
+  timestamp,
+  hours_watched,
+  program_title,
+  program_subset,
+  program_id,
+  is_live
+FROM
+  ${ref('consumo_enriched', 'impression')} as i
+  inner join assinantes as a on a.globo_id = i.userid
+WHERE
+  EXTRACT(
+    YEAR
+    FROM
+      date
+  ) >= 2023

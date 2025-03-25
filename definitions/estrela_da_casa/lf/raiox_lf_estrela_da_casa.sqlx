@@ -1,0 +1,634 @@
+config {
+    type: 'table',
+    schema: 'estrela_da_casa',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "estrela_da_casa",
+            owner: "martech"
+
+        }
+    },
+    description: 'Tabela com os LFs que assistiram algum conteúdo relacionado ao programa Estrela da Casa. A tabela é atualizada diariamente empilhando o consumo do usuário na semana.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        tipo_usuario: 'Classificação do usuário em Logado Free/Ex-Assinante.',
+        semana: 'Semana em que o usuário assistiu o programa.',
+        frequencia: 'Quantidade de dias em que o usuário assistiu o programa na semana.',
+        horas_episode: 'Quantidade de horas em íntegra que o usuário assistiu na semana.',
+        qtd_midias_episode: 'Quantidade de mídias de íntegras dos programas relacionados ao Estrela da Casa, que o usuário assistiu na semana.',
+        freq_episode: 'Quantidade de dias que o usuário consumiu em íntegras na semana.',
+        horas_trecho: 'Quantidade de horas em trechos, extras, trailers e teasers que o assinante assistiu na semana.',
+        qtd_midias_trecho: 'Quantidade de mídias de trechos, extras, trailers e teasers dos programas relacionados ao Estrela da Casa, que o assinante assistiu na semana.',
+        freq_trecho: 'Quantidade de dias que o assinante consumiu em trechos, extras, trailers e teasers na semana.',
+        total_horas_simulcast: 'Total de horas em que o usuário consumiu os programas relacionados ao Estrela da Casa ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+        frequencia_simulcast: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao Estrela da Casa ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+        total_horas: 'Total de horas que o usuário consumiu os programas relacionados ao Estrela da Casa. Exceto simulcast.',
+        cluster: 'Cluster em que consideramos o total de horas assistidas em SIMULCAST para classificar o usuário.',
+        share: 'Horas consumidas em Estrela da Casa sob todo o consumo dos usuários inclusive o Estrela da Casa',
+        cluster_share: 'Porcentagem de consumo do usuário sob o Estrela da Casa.',
+        horas_mais_canais: 'Total de horas consumidas pelo usuário nos conteúdos de mais canais.',
+        qtd_midias_mais_canais: 'Total de mídias consumidas pelo usuário nos conteúdos de mais canais.',
+        freq_mais_canais: 'Total de dias consumidos pelo usuário nos conteúdos de mais canais.',
+        qtd_programas_mais_canais: 'Total de programas consumidos pelo usuário nos conteúdos de mais canais.',
+        horas_novela: 'Total de horas consumidas pelo usuário em novelas.',
+        qtd_midias_novela: 'Total de mídias consumidas pelo usuário em novelas.',
+        freq_novela: 'Total de dias consumidos pelo usuário em novelas.',
+        qtd_programas_novela: 'Total de programas consumidos pelo usuário em novelas.',
+        horas_series: 'Total de horas consumidas pelo usuário em séries.',
+        qtd_midias_series: 'Total de mídias consumidas pelo usuário em séries.',
+        freq_series: 'Total de dias consumidos pelo usuário em séries.',
+        qtd_programas_series: 'Total de programas consumidos pelo usuário em séries.',
+        horas_filmes: 'Total de horas consumidas pelo usuário em filmes.',
+        qtd_midias_filmes: 'Total de mídias consumidas pelo usuário em filmes.',
+        freq_filmes: 'Total de dias consumidos pelo usuário em filmes.',
+        qtd_programas_filmes: 'Total de programas consumidos pelo usuário em filmes.',
+        horas_ao_vivo_globo: 'Total de horas consumidas pelo usuário no ao vivo da globo (FONTE HORIZON). Foram desconsideradas as horas em Estrela da Casa ao vivo na Tv Globo (SIMULCAST FONTE GA).',
+        freq_ao_vivo_globo: 'Total de dias consumidos pelo usuário no ao vivo da globo (FONTE HORIZON). Foram desconsideradas as horas em Estrela da Casa ao vivo na Tv Globo (SIMULCAST FONTE GA).',
+        horas_outros_conteudos: 'Total de horas consumidas pelo usuário em outros tipos de conteúdos.',
+        qtd_midias_outros_conteudos: 'Total de mídias consumidas pelo usuário em outros tipos de conteúdos.',
+        freq_outros_conteudos: 'Total de dias consumidos pelo usuário em outros tipos de conteúdos.',
+        qtd_programas_outros_conteudos: 'Total de programas consumidos pelo usuário em outros tipos de conteúdos.',
+        assistiu_click_estrela_da_casa: 'Flag se o usuário assistiu ou não ao programa Click Estrela da Casa.',
+        assistiu_estrela_day: 'Flag se o usuário assistiu ou não ao programa Estrela Day.',
+        perfil_consumo: 'Subset mais assistido pelo usuário na semana desconsiderando o consumo em Estrela da Casa.'
+    }
+
+}
+
+WITH
+  conteudo AS (
+  SELECT
+    id AS mediaid,
+    kind,
+    service_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    program_id IN ( 27663,
+      27721,
+      27758,
+      27766 ) ),
+  base AS (
+  SELECT
+    b.globo_id,
+    tipo_usuario,
+    mediaid,
+    program_id,
+    hours_watched,
+    DATE_TRUNC(date, WEEK(MONDAY)) AS semana,
+    COUNT(DISTINCT date) OVER(PARTITION BY b.globo_id, DATE_TRUNC(date, WEEK(MONDAY)) ) AS frequencia_total,
+    date,
+    kind,
+    service_id
+  FROM
+    ${ref("consumo_enriched", "all_impression")} AS a
+  INNER JOIN
+    conteudo
+  USING
+    (mediaid)
+  INNER JOIN
+    ${ref("estrela_da_casa", "usuarios")} AS b
+  ON
+    b.globo_id = a.userid
+  WHERE
+    date >= '2024-08-13'
+    AND ( program_id IN ( 27663,
+        27721,
+        27758,
+        27766 )
+      AND EXTRACT( YEAR
+      FROM
+        date ) = 2024 ) ),
+  base1 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      tipo_usuario,
+      semana,
+      frequencia_total,
+      mediaid,
+      hours_watched,
+      date,
+      kind
+    FROM
+      base ) PIVOT( SUM(hours_watched) horas,
+      COUNT(DISTINCT mediaid) qtd_midias,
+      COUNT(DISTINCT date) freq FOR kind IN ( 'episode',
+        'excerpt',
+        'extra',
+        'teaser',
+        'trailer' ) ) ),
+  base2 AS(
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    frequencia_total,
+    CASE
+      WHEN horas_episode IS NULL THEN 0
+      ELSE horas_episode
+  END
+    AS horas_episode,
+    qtd_midias_episode,
+    freq_episode,
+    CASE
+      WHEN horas_excerpt IS NULL THEN 0
+      ELSE horas_excerpt
+  END
+    AS horas_excerpt,
+    qtd_midias_excerpt,
+    freq_excerpt,
+    CASE
+      WHEN horas_extra IS NULL THEN 0
+      ELSE horas_extra
+  END
+    AS horas_extra,
+    qtd_midias_extra,
+    freq_extra,
+    CASE
+      WHEN horas_teaser IS NULL THEN 0
+      ELSE horas_teaser
+  END
+    AS horas_teaser,
+    qtd_midias_teaser,
+    freq_teaser,
+    CASE
+      WHEN horas_trailer IS NULL THEN 0
+      ELSE horas_trailer
+  END
+    AS horas_trailer,
+    qtd_midias_trailer,
+    freq_trailer
+  FROM
+    base1 ),
+  base3 AS (
+  SELECT
+    DISTINCT globo_id,
+    semana,
+    SUM(frequencia_simulcast) AS frequencia_simulcast,
+    SUM(total_horas_simulcast) AS total_horas_simulcast
+  FROM
+    ${ref('estrela_da_casa', 'consumo_simulcast_estrela_da_casa')}
+  GROUP BY
+    1,
+    2
+  HAVING
+    total_horas_simulcast >= 0.084 ),
+  base4 AS (
+  SELECT
+    * EXCEPT(total_horas_simulcast),
+    CASE
+      WHEN total_horas_simulcast IS NULL THEN 0
+      ELSE total_horas_simulcast
+  END
+    AS total_horas_simulcast
+  FROM
+    base2
+  LEFT JOIN
+    base3
+  USING
+    (globo_id,
+      semana) ),
+  base5 AS (
+  SELECT
+    *,
+    ( SUM( horas_episode + horas_excerpt + horas_extra + horas_teaser + horas_trailer ) OVER (PARTITION BY globo_id, semana) ) AS total_horas,
+    (SUM(horas_excerpt + horas_extra+horas_teaser + horas_trailer) OVER (PARTITION BY globo_id, semana)) AS horas_trecho,
+    (SUM(qtd_midias_excerpt+qtd_midias_extra+qtd_midias_teaser+qtd_midias_trailer) OVER (PARTITION BY globo_id, semana)) AS qtd_midias_trecho,
+    (SUM(freq_excerpt+freq_extra+freq_teaser+freq_trailer) OVER (PARTITION BY globo_id, semana)) AS freq_trecho
+  FROM
+    base4
+  GROUP BY
+    ALL ),
+  base6 AS (
+  SELECT
+    *
+  FROM
+    base5 ),
+  impression AS (
+  SELECT
+    userid AS globo_id,
+    mediaid,
+    program_id,
+    date,
+    hours_watched,
+    DATE_TRUNC(date, WEEK(MONDAY)) AS semana,
+    program_subset,
+    CASE
+      WHEN service_id = 6807 THEN 'mais_canais'
+      WHEN program_subset = 'novelas' THEN 'novela'
+      WHEN program_subset = 'series' THEN 'series'
+      WHEN program_subset IN('filmes',
+      'movies') THEN 'filmes'
+      WHEN program_id = 9095 THEN 'ao_vivo_globo'
+      ELSE 'outros_conteudos'
+  END
+    AS grupo
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  LEFT JOIN
+    conteudo
+  USING
+    (mediaid)
+  WHERE
+    date BETWEEN '2024-08-13'
+    AND '2024-10-24'
+    AND program_id NOT IN ( 27663,
+      27721,
+      27758,
+      27766 ) ),
+  base_geral AS (
+  SELECT
+    DISTINCT globo_id,
+    tipo_usuario
+  FROM
+    base5 ),
+  ai AS (
+  SELECT
+    *
+  FROM
+    base_geral
+  LEFT JOIN
+    impression
+  USING
+    (globo_id) ),
+  ai2 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      DISTINCT globo_id,
+      tipo_usuario,
+      semana,
+      hours_watched,
+      program_id,
+      mediaid,
+      date,
+      grupo
+    FROM
+      ai ) PIVOT( SUM(hours_watched) horas,
+      COUNT(DISTINCT mediaid) qtd_midias,
+      COUNT(DISTINCT date) freq,
+      COUNT(DISTINCT program_id) qtd_programas FOR grupo IN ( 'mais_canais',
+        'novela',
+        'series',
+        'filmes',
+        'ao_vivo_globo',
+        'outros_conteudos' ) ) ),
+  consulta AS (
+  SELECT
+    * EXCEPT ( horas_mais_canais,
+      horas_novela,
+      horas_series,
+      horas_filmes,
+      horas_ao_vivo_globo,
+      horas_outros_conteudos ),
+    CASE
+      WHEN horas_mais_canais IS NULL THEN 0
+      ELSE horas_mais_canais
+  END
+    AS horas_mais_canais,
+    CASE
+      WHEN horas_novela IS NULL THEN 0
+      ELSE horas_novela
+  END
+    AS horas_novela,
+    CASE
+      WHEN horas_series IS NULL THEN 0
+      ELSE horas_series
+  END
+    AS horas_series,
+    CASE
+      WHEN horas_filmes IS NULL THEN 0
+      ELSE horas_filmes
+  END
+    AS horas_filmes,
+    CASE
+      WHEN horas_ao_vivo_globo IS NULL THEN 0
+      ELSE horas_ao_vivo_globo
+  END
+    AS horas_ao_vivo_globo,
+    CASE
+      WHEN horas_outros_conteudos IS NULL THEN 0
+      ELSE horas_outros_conteudos
+  END
+    AS horas_outros_conteudos
+  FROM
+    ai2 ),
+  consulta2 AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  FROM
+    consulta ),
+  consulta3 AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    CASE
+      WHEN freq_mais_canais >= 8 THEN 7
+      ELSE freq_mais_canais
+  END
+    AS freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    CASE
+      WHEN freq_novela >= 8 THEN 7
+      ELSE freq_novela
+  END
+    AS freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    CASE
+      WHEN freq_series >= 8 THEN 7
+      ELSE freq_series
+  END
+    AS freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    CASE
+      WHEN freq_filmes >= 8 THEN 7
+      ELSE freq_filmes
+  END
+    AS freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    CASE
+      WHEN freq_ao_vivo_globo >= 8 THEN 7
+      ELSE freq_ao_vivo_globo
+  END
+    AS freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    CASE
+      WHEN freq_outros_conteudos >= 8 THEN 7
+      ELSE freq_outros_conteudos
+  END
+    AS freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  FROM
+    consulta2 ),
+  basebbb AS (
+  SELECT
+    *
+  FROM
+    base6
+  LEFT JOIN
+    consulta3
+  USING
+    (globo_id,
+      tipo_usuario,
+      semana) ),
+  Click_estrela_da_casa AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    DATE_TRUNC(date, WEEK(MONDAY)) AS semana,
+    TRUE AS assistiu_click_estrela_da_casa
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  WHERE
+    date >= '2024-08-13'
+    AND program_id = 27758 ),
+  Estrela_Day AS (
+  SELECT
+    DISTINCT userId AS globo_id,
+    TRUE AS assistiu_estrela_day
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  WHERE
+    date = '2024-08-08'
+    AND mediaid = 11265582 ),
+  basebbb3 AS (
+  SELECT
+    DISTINCT globo_id,
+    tipo_usuario,
+    semana,
+    frequencia_total AS frequencia,
+    IFNULL(horas_episode,0) AS horas_episode,
+    IFNULL(qtd_midias_episode,0) AS qtd_midias_episode,
+    IFNULL(freq_episode,0) AS freq_episode,
+    IFNULL(horas_trecho,0) AS horas_trecho,
+    IFNULL(qtd_midias_trecho,0) AS qtd_midias_trecho,
+    IFNULL(freq_trecho,0) AS freq_trecho,
+    total_horas_simulcast,
+    frequencia_simulcast,
+    total_horas,
+    IFNULL(horas_mais_canais,0) AS horas_mais_canais,
+    IFNULL(qtd_midias_mais_canais,0) AS qtd_midias_mais_canais,
+    IFNULL(freq_mais_canais,0) AS freq_mais_canais,
+    IFNULL(qtd_programas_mais_canais,0) AS qtd_programas_mais_canais,
+    IFNULL(horas_novela,0) AS horas_novela,
+    IFNULL(qtd_midias_novela,0) AS qtd_midias_novela,
+    IFNULL(freq_novela,0) AS freq_novela,
+    IFNULL(qtd_programas_novela,0) AS qtd_programas_novela,
+    IFNULL(horas_series,0) AS horas_series,
+    IFNULL(qtd_midias_series,0)AS qtd_midias_series,
+    IFNULL(freq_series,0) AS freq_series,
+    IFNULL(qtd_programas_series,0) AS qtd_programas_series,
+    IFNULL(horas_filmes,0) AS horas_filmes,
+    IFNULL(qtd_midias_filmes,0) AS qtd_midias_filmes,
+    IFNULL(freq_filmes,0) AS freq_filmes,
+    IFNULL(qtd_programas_filmes,0) AS qtd_programas_filmes,
+    IFNULL(horas_ao_vivo_globo,0) AS horas_ao_vivo_globo,
+    IFNULL(freq_ao_vivo_globo,0) AS freq_ao_vivo_globo,
+    IFNULL(horas_outros_conteudos,0) AS horas_outros_conteudos,
+    IFNULL(qtd_midias_outros_conteudos,0) AS qtd_midias_outros_conteudos,
+    IFNULL(freq_outros_conteudos,0) AS freq_outros_conteudos,
+    IFNULL(qtd_programas_outros_conteudos,0) AS qtd_programas_outros_conteudos,
+    CASE
+      WHEN assistiu_click_estrela_da_casa IS NULL THEN FALSE
+      ELSE assistiu_click_estrela_da_casa
+  END
+    AS assistiu_click_estrela_da_casa,
+    CASE
+      WHEN assistiu_estrela_day IS NULL THEN FALSE
+      ELSE assistiu_estrela_day
+  END
+    AS assistiu_estrela_day
+  FROM
+    basebbb
+  LEFT JOIN
+    Click_estrela_da_casa
+  USING
+    (globo_id,
+      semana)
+  LEFT JOIN
+    Estrela_Day
+  USING
+    (globo_id) ),
+  final AS (
+  SELECT
+    * EXCEPT(horas_ao_vivo_globo),
+    CASE
+      WHEN (horas_ao_vivo_globo - total_horas_simulcast) < 0 THEN 0
+      ELSE (horas_ao_vivo_globo - total_horas_simulcast)
+  END
+    AS horas_ao_vivo_globo,
+    CASE
+      WHEN ( (horas_novela > horas_outros_conteudos)
+      AND (horas_novela > horas_series)
+      AND (horas_novela > horas_mais_canais)
+      AND (horas_novela > horas_ao_vivo_globo) and (horas_novela > horas_filmes)) THEN 'Novelas'
+      WHEN ( (horas_series > horas_outros_conteudos) AND (horas_series > horas_mais_canais) AND (horas_series > horas_ao_vivo_globo) and 
+      (horas_series > horas_filmes) and (horas_series > horas_novela)
+       ) THEN 'Series'
+      WHEN ( (horas_mais_canais > horas_outros_conteudos)
+      AND (horas_mais_canais > horas_ao_vivo_globo)   
+      and (horas_mais_canais > horas_filmes) and (horas_mais_canais > horas_novela) and (horas_mais_canais > horas_series)      
+       ) THEN 'Mais Canais'
+      WHEN ((horas_ao_vivo_globo > horas_outros_conteudos) and (horas_ao_vivo_globo > horas_filmes) and (horas_ao_vivo_globo > horas_novela) and (horas_ao_vivo_globo > horas_series) and (horas_ao_vivo_globo > horas_mais_canais) )THEN 'Ao Vivo Globo'
+            WHEN ( (horas_filmes > horas_novela) AND (horas_filmes > horas_series) AND (horas_filmes > horas_mais_canais) AND (horas_filmes > horas_outros_conteudos) AND (horas_filmes > horas_ao_vivo_globo) ) THEN 'Filmes'
+      ELSE 'Outros Conteudos'
+  END
+    AS perfil_consumo
+  FROM
+    basebbb3
+  ORDER BY
+    globo_id,
+    semana ASC ),
+  basebbb2 AS (
+  SELECT
+    * EXCEPT(frequencia_simulcast),
+    CASE
+      WHEN frequencia_simulcast IS NULL THEN 0
+      ELSE frequencia_simulcast
+  END
+    AS frequencia_simulcast,
+    CASE
+      WHEN total_horas_simulcast>=7 THEN '4. Heavy User'
+      WHEN total_horas_simulcast BETWEEN 0.05
+    AND 1 THEN '1. Light User'
+      WHEN total_horas_simulcast BETWEEN 1 AND 4 THEN '2. Mid-Light User'
+      WHEN total_horas_simulcast BETWEEN 4
+    AND 6 THEN '3. Mid-Heavy User'
+      ELSE '0. No Live'
+  END
+    AS CLUSTER,
+    SAFE_DIVIDE( total_horas,( horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas ) ) AS share,
+    CASE
+      WHEN SAFE_DIVIDE( total_horas,( horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas ) ) <= 0.5 THEN '00%-50%'
+      WHEN SAFE_DIVIDE( total_horas,( horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas ) ) <= 0.8 THEN '51%-80%'
+      ELSE '81%-100%'
+  END
+    AS cluster_share
+  FROM
+    final ),
+  lf AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    frequencia,
+    IFNULL(horas_episode,0) AS horas_episode,
+    IFNULL(qtd_midias_episode,0) AS qtd_midias_episode,
+    IFNULL(freq_episode,0) AS freq_episode,
+    IFNULL(horas_trecho,0) AS horas_trecho,
+    IFNULL(qtd_midias_trecho,0) AS qtd_midias_trecho,
+    IFNULL(freq_trecho,0) AS freq_trecho,
+    total_horas_simulcast,
+    frequencia_simulcast,
+    total_horas,
+    CLUSTER AS cluster,
+    share,
+    cluster_share,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos,
+    assistiu_click_estrela_da_casa,
+    assistiu_estrela_day,
+    perfil_consumo
+  FROM
+    basebbb2 AS f
+  ORDER BY
+    globo_id,
+    semana ASC ),
+  base_perfil AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, semana ORDER BY globo_id, semana ) AS rm,
+  FROM
+    lf
+  QUALIFY
+    rm = 1 ),
+  baself AS (
+  SELECT
+    * EXCEPT (rm)
+  FROM
+    base_perfil ),
+  tabela AS (
+  SELECT
+    *
+  FROM
+    baself ),
+  tabela2 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY globo_id, CLUSTER ORDER BY globo_id DESC ) dup
+  FROM
+    tabela ),
+  tabela_lf AS (
+  SELECT
+    *,
+    RANK() OVER (PARTITION BY globo_id, semana ORDER BY globo_id, semana, CLUSTER ASC ) rm
+  FROM
+    tabela2
+  WHERE
+    dup = 1
+  QUALIFY
+    rm = 1 )
+SELECT
+  * EXCEPT(rm,
+    dup)
+FROM
+  tabela_lf

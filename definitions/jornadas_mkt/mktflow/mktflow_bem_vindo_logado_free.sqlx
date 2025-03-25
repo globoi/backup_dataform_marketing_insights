@@ -1,0 +1,33 @@
+config {
+    type: "table",
+    name: "mktflow_bem_vindo_logado_free",
+    schema: "jornadas_mkt",
+    tags: ["mktflow_bem_vindo_logado_free",
+        'schedule_tag=jornadas_mkt_mktflow_bem_vindo_logado_free',
+        "schedule_cron=* 13 * * *"
+    ],
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+SELECT
+  DISTINCT f.globo_id,
+  CASE
+    WHEN fu.GP_internacional_ind = 'globo-play-us' THEN 'US'
+    WHEN fu.GP_internacional_ind = 'globo-play-pt' THEN 'PT'
+    WHEN fu.GP_internacional_ind = 'globo-play-eu' THEN 'EU'
+    ELSE 'Nacional'
+END
+  AS GP_internacional_ind,
+  DATE(f.dt_free_inicio, ('America/Sao_Paulo')) AS data_inicio_logado_free
+FROM
+  ${ref('usuarios', 'free_users_all')} AS f
+JOIN
+  ${ref('usuarios', 'Free users')} AS fu
+ON
+  f.globo_id = fu.globo_id
+WHERE
+  DATE(f.dt_free_inicio, ('America/Sao_Paulo')) >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 7 DAY)

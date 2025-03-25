@@ -1,0 +1,131 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_novela'],
+  name: 'mktflow_assinante_tier1_cluster_novela',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "09h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+
+------------------------------------------------VERSÃO 2----------------------------------------------------------
+
+--macro cluster tier 1 novela
+
+--assinantes tier 1 que consumiram novelas vod ou novelas ao vivo nos ultimos 180 dias.
+
+
+with base_ativa_pagante_com_trial_new_unnest AS (
+    SELECT globo_id FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ,
+    UNNEST(info) i
+    WHERE NOT mais_canais
+),
+
+ todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.program.metadata_scheme
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_novela as (
+SELECT *
+FROM todos_os_generos
+WHERE metadata_scheme in ('soap_opera')
+),
+
+consumo_em_genero_novela as (
+SELECT distinct a.userId as globo_id
+FROM  ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_novela b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_novela as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND genero_programa in ('NOVELA')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo novelas' as base
+FROM consumo_em_genero_novela
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo novelas' as base
+FROM consumo_em_programas_ao_vivo_novela),
+
+--assinantes tier 1 que navegaram na editoria de Novelas do GSHOW pelo menos 5 vezes nos últimos 15 dias
+
+acesso_gshow_ultimos15d as (
+with acesso as (
+SELECT
+  globoId as globo_id
+FROM ${ref("foundation_gshow", "foundation_gshow_sessions")} w,
+UNNEST (w.hits) h
+WHERE
+  data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+  AND h.provider = "cadun"
+  AND h.editoriaN1 = "Novelas"
+  AND globoId is not null),
+
+pelo_menos_15_acessos as (
+SELECT globo_id, COUNT(*) as quantidade
+FROM acesso
+GROUP BY globo_id
+HAVING COUNT(*) >= 5)
+
+SELECT distinct a.globo_id, 'acesso GSHOW' as base
+FROM pelo_menos_15_acessos a
+INNER JOIN base_ativa_pagante_com_trial_new_unnest b 
+on a.globo_id = b.globo_id
+and a.globo_id is not null
+),
+
+--uniao de todos os atuais usuarios assinantes tier 1 que:
+--consumiram novelas vod ou novelas ao vivo nos ultimos 180 dias., ou
+--navegaram na editoria de Novelas do GSHOW pelo menos 5 vezes nos últimos 15 dias
+
+basefinal as (
+SELECT distinct globo_id, base
+FROM uniao_consumo_vod_e_ao_vivo
+union distinct
+SELECT distinct globo_id, base
+FROM acesso_gshow_ultimos15d
+),
+
+basefinal_2 as (
+select *
+from basefinal
+order by 1,2
+),
+
+basefinal_3 as (
+select distinct globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+from basefinal_2
+group by 1)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal_3 d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false
+ORDER BY 2 ASC
+
+
+--select distinct count(distinct globo_id) as gid, bases 
+--from oi
+--group by rollup(2)
+--order by 2 asc

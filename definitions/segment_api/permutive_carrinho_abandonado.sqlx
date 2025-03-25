@@ -1,0 +1,17 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_carrinho_abandonado'],
+  name: 'permutive_carrinho_abandonado',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  DISTINCT a.globoid as user_id
+  FROM ${ref("share_export","carrinho_abandonado")} AS a
+  INNER JOIN ${ref("comunicacao","ultima_comunicacao_geral")} AS b 
+  ON a.globoid = b.globo_id
+  WHERE b.tipo_cadastro = 'Logado Free'
+  AND a.nome_produto = 'Globoplay'

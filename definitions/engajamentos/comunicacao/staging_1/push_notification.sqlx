@@ -1,0 +1,90 @@
+config {
+  type: "table",
+  name: "push_notification",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_1",'schedule_tag=comunicacao_push_notification']
+}
+WITH urban_push_campaign AS (
+  SELECT
+   push_id,
+   product,
+   device_types,
+   alert,
+   alert_title,
+   action_type,
+   DATE(push_occurred, "America/Sao_Paulo") AS data,
+   total_unique_devices_sent,
+   total_unique_users_sent,
+   sent_android,
+   sent_ios,
+   push_opens_all,
+   push_opens_android,
+   push_opens_ios,
+   unique_globo_id_push_opens,
+   push_opens_within_12h,
+   push_opens_within_12h_android,
+   push_opens_within_12h_ios,
+   total_unique_optout,
+   total_unique_optout_android,
+   total_unique_optout_ios
+  FROM ${ref("derived", "urban_push_campaign")}
+),
+
+urban_push_impressions_window AS (
+  SELECT
+    push_id,
+    product,
+    content_id,
+    program_id,
+    program_title,
+    hours_diff,
+    total_watched_users,
+    total_watched_qty,
+    total_watched_hours,
+    program_watched_users,
+    program_watched_qty,
+    program_watched_hours,
+    media_watched_users,
+    media_watched_qty,
+    media_watched_hours
+  FROM ${ref("mkt_derived", "urban_push_impressions_window")}
+)
+
+SELECT
+  push_id,
+  product,
+  device_types,
+  alert,
+  alert_title,
+  action_type,
+  data,
+  total_unique_devices_sent,
+  total_unique_users_sent,
+  sent_android,
+  sent_ios,
+  push_opens_all,
+  push_opens_android,
+  push_opens_ios,
+  unique_globo_id_push_opens,
+  push_opens_within_12h,
+  push_opens_within_12h_android,
+  push_opens_within_12h_ios,
+  total_unique_optout,
+  total_unique_optout_android,
+  total_unique_optout_ios,
+  content_id,
+  program_id,
+  program_title,
+  hours_diff,
+  total_watched_users,
+  total_watched_qty,
+  total_watched_hours,
+  program_watched_users,
+  program_watched_qty,
+  program_watched_hours,
+  media_watched_users,
+  media_watched_qty,
+  media_watched_hours
+FROM 
+  urban_push_campaign 
+  LEFT JOIN urban_push_impressions_window USING (push_id, product)

@@ -1,0 +1,26 @@
+config {
+  type: "table",
+  name: "mktflow_Lst_Rec_ExAssi_T5_Pivoted",
+  schema: "trilho",
+  tags: ['trilho_rec', 'schedule_tag=trilho_mktflow_Lst_Rec_ExAssi_T5_Pivoted']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT * FROM (
+    SELECT
+        globo_id,
+        title_id,
+        rank_final,
+        personalizado,
+        ROW_NUMBER() OVER(PARTITION BY globo_id, rank_final) AS line
+    FROM
+        ${ref("trilho", "Lst_Rec_ExAssi_Rank_Conteudos_Por_Genero_T5")}
+        )
+    PIVOT (
+        MAX(IF(line = 1, title_id, NULL)) rank
+        FOR rank_final IN (1,2,3,4,5)
+        )

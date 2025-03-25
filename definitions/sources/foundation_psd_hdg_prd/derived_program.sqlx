@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "program",
+    schema: "conteudo_derived",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

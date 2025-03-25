@@ -1,0 +1,11 @@
+config {
+  type: "table",
+  schema: "xuxaverso"
+}
+
+with base as (SELECT
+globoid,ar.bloco
+FROM ${ref('simulcast','consumo_ibope')} c, unnest(c.ar_minutos_assistidos) ar
+WHERE data_consumo = "2023-07-23" and lower(programa) like '%domingao%'
+and ar.bloco.bloco='CONVIDADO')
+select distinct globoid as globo_id,true as assistiu_domingao_simulcast from base

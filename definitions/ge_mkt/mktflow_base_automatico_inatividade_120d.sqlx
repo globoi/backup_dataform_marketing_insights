@@ -1,0 +1,25 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_automatica_inativide_120d', 'schedule_cron=0 1 * * *'],
+    name: 'mktflow_base_automatica_inativide_120d',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+
+SELECT distinct globoId
+FROM ${ref('foundation_ge', 'foundation_ge_sessions_v3')}, unnest(hits) as h 
+ -- `gglobo-prodservdig-hdg-prd.foundation_ge.foundation_ge_sessions_v3`, unnest(hits) as h
+WHERE data BETWEEN DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 60 DAY)
+AND DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+and h.pagePath LIKE '%ge.globo.com/'
+and h.provider = 'cadun'
+and globoId is not null

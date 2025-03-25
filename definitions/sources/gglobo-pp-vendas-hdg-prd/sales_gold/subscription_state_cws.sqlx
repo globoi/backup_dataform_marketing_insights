@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-pp-vendas-hdg-prd",
+  schema: "sales_gold",
+  name: "subscription_state_cws",
+  description: ""
+}

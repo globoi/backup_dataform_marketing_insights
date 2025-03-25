@@ -1,0 +1,24 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech"    }
+  },
+  description: 'Tabela com os LFs do raiox_bbb_24_lf e a últimna semana em que aparecem no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    max_semana: 'Última semana em que o usuário apareceu no raiox_bbb_24_lf.'
+  }
+
+}
+
+with max_semana as (
+select distinct globo_id, max(semana) as max_semana from ${ref("bbb_24", "raiox_bbb_24_lf")}
+where globo_id is not null
+group by 1
+)
+select * from max_semana

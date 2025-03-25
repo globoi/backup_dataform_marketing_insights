@@ -1,0 +1,18 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_hi_tpb_v2_grupo2'],
+  name: 'hi_tpb_v2_grupo2',
+  schema: 'segment_api'
+}
+
+-- ${ref("segment_api", "hi_tpb_v2_grupo1")}
+-- `gglobo-mkt-ins-hdg-prd.segment_api.hi_tpb_v2_grupo2`
+
+-- gglobo-mkt-ins-hdg-prd.experimentos.hi_tpb_v2_grupos
+
+SELECT a.globo_id AS user_id 
+FROM ${ref("experimentos", "hi_tpb_v2_grupos")} AS a
+INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS b ON a.globo_id = b.globo_id
+WHERE grupo_n = 2
+
+

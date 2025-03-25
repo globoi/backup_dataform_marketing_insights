@@ -1,0 +1,7 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-vendas-hdg-prd", 
+    schema: "catalog_gold", 
+    name: "product_services", 
+    description: ""
+    }

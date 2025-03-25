@@ -1,0 +1,67 @@
+config {
+  type: "table",
+  name: "mktflow_CanceladosVol",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_S_PesquisaCancelados",'schedule_tag=jornadas_mkt_mktflow_CanceladosVol']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+
+SELECT globo_id, AssetId,name as AssetName, subscription_status,
+CAST(dt_hr_cancelamento_final_ciclo AS DATE) as dt_cancelamento_final_ciclo,
+CAST(data_hora_cancelamento AS DATE) as data_cancelamento,
+motivo_cancelamento
+FROM ${ref("usuarios", "base_cancelamento_new")}
+WHERE DATE(dt_hr_cancelamento_final_ciclo) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) AND CURRENT_DATE()
+AND subscription_status not like 'Suspenso'
+AND assinatura_internacional = false
+AND name IN ( 
+    'Globoplay Básico e discovery+',  
+    'Globoplay Básico e LIONSGATE+',  
+    'Globoplay Padrão com Anúncios',  
+    'Globoplay Padrão e Disney+ Premium',  
+    'Globoplay Padrão com Anúncios e Combate',  
+    'Globoplay Básico e Disney+ Premium',  
+    'Globoplay Básico e FlaTV+',
+    'Globoplay Padrão e Premiere',  
+    'Globoplay Padrão com Anúncios e FlaTV+',  
+    'Globoplay Básico e Premiere',    
+    'Globoplay Básico e Disney+',  
+    'Globoplay Padrão e FlaTV+',  
+    'Globoplay Padrão',  
+    'Globoplay Padrão com Anúncios e Disney+ Padrão',  
+    'Globoplay Básico e Disney+ e Star+',  
+    'Globoplay Padrão e Telecine',  
+    'Globoplay Básico e Star+',  
+    'Globoplay Básico',  
+    'Globoplay Padrão com Anúncios e Disney+ Premium',  
+    'Globoplay Básico e Combate',   
+    'Globoplay Padrão e Combate',   
+    'Globoplay Básico e Disney+ Padrão',
+    'Globoplay Premium e Telecine',  
+    'Globoplay Premium e FlaTV+',  
+    'Globoplay Premium e Disney+ Premium',  
+    'Globoplay Premium e Star+',  
+    'Globoplay Premium e Disney+ Padrão',  
+    'Globoplay Premium e Disney+',  
+    'Globoplay Premium e Disney+ e Star+',  
+    'Globoplay Premium e Combate',  
+    'Globoplay Premium'  )
+
+AND motivo_cancelamento IN (  
+    'Praticamente não uso',  
+    'Outros',  
+    'Não gostei do produto',  
+    'Não uso porque não tenho tempo',  
+    'Não tenho tempo para usar',  
+    'Cancelamento 7 dias - CDC',  
+    'Solicitação do Cliente',  
+    'Tive problemas técnicos',  
+    'Não definido',    
+    'Loja'
+)    

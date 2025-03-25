@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "xuxaverso",
+  name: "conteudos_gplay_excel",
+  description: ""
+}

@@ -1,0 +1,44 @@
+config {
+  type: 'table',
+  name: 'genero_program_tratada',
+  schema: 'jornadas_mkt',
+  tags: [],
+  description: ''
+}
+
+SELECT 
+  genero,
+  program_id,
+  program_title,
+  CASE
+    WHEN genero IN ('Viagem','Religião','Personalidade','Comportamento','Interesse Humano','Diversidade e Identidade','Espiritualidade') THEN 'Pessoas e Lugares'
+    WHEN genero IN ('Arquitetura','Artes e Cultura','Artes Plásticas','Design e Arquitetura') THEN 'Artes'
+    WHEN genero IN ('Esporte Caratê','Boxe','Lutas','MMA') THEN 'Esporte'
+    WHEN genero IN ('Moda e Beleza','Casa e Decoração') THEN 'Estilo de Vida'
+    WHEN genero IN ('Cinema','Cinema & Fotografia','Óperas e Concertos') THEN 'Danças e Espetáculos'
+    WHEN genero IN ('Biografias','Família real') THEN 'Biografia'
+    WHEN genero IN ('Questões sociais','Feminismo','Questões Raciais') THEN 'Questões Sociais' 
+    WHEN genero IN ('Alimentação','Gastronomia') THEN 'Culinária'
+    WHEN genero IN ('História e Política','Guerra') THEN 'História'
+    WHEN genero IN ('Policial','Jurídico','Crime') THEN 'Investigação'
+    WHEN genero IN ('Saúde','Saúde Mental') THEN 'Saúde e Bem-estar'
+    WHEN genero IN ('Documentários Musicais','Série Documental') THEN 'Documentário' 
+    WHEN genero IN ('Esportes de Inverno','Skate','Snowboard','Surfe') THEN 'Esportes Radicais'
+    WHEN genero IN ('Sobrenatural') THEN 'Fantasia'
+    WHEN genero IN ('Ciência e Tecnologia','Tecnologia','Meio ambiente','Ciências') THEN 'Ciência'
+    WHEN genero IN ('Mistério','Thriller/Suspense') THEN 'Suspense'
+    WHEN genero IN ('Cult') THEN 'Cultural'
+    WHEN genero IN ('Educativo') THEN 'Educação'
+    WHEN genero IN ('Entretenimento') THEN 'Variedades'
+    WHEN genero IN ('Entrevistas e Reflexões') THEN 'Entrevista'
+    WHEN genero IN ('Ficção-Científica') THEN 'Ficção Científica'
+    WHEN genero IN ('Humor') THEN 'Comédia' 
+    WHEN genero IN ('Jornalismo/Current Affairs') THEN 'Jornalismo' 
+    WHEN genero IN ('Musical') THEN 'Música'
+    WHEN genero IN ('Terror/Horror') THEN 'Terror'
+    WHEN genero IN ('Western') THEN 'Faroeste'
+    ELSE genero
+  END AS genero_tratado
+FROM ${ref("jornadas_mkt", "genero_todas_combinacoes")}
+
+

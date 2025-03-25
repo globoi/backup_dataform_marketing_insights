@@ -1,0 +1,18 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=segment_api_permutive_gp_app_lf'],
+    name: 'permutive_gp_app_lf',
+    schema: 'segment_api',
+    description: 'base de globoids para usuários logados free que não entraram do app a mais de 30 dias',
+    columns: {}
+}
+
+
+SELECT distinct a.globo_id AS user_id
+--FROM `gglobo-mkt-ins-hdg-prd.usuarios.assinantes_e_logados_free` AS a
+FROM ${ref("usuarios", "assinantes_e_logados_free")} AS a
+--INNER JOIN `gglobo-mkt-ins-hdg-prd.comunicacao.base_ultima_abertura_app` AS b 
+INNER JOIN  ${ref("comunicacao", "base_ultima_abertura_app")} AS b 
+ON a.globo_id = b.globo_id
+WHERE a.tipo_usuario = "Logado Free"
+AND (b.Data_Abertura < current_date() - 30  OR b.Data_Abertura IS NULL)

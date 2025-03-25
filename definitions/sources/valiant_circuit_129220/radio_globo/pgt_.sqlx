@@ -1,0 +1,6 @@
+config { 
+    type: "declaration", 
+    database: "valiant-circuit-129220", 
+    schema: "radio_globo", 
+    name: "pgt_*", 
+    description: ""}

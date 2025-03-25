@@ -1,0 +1,52 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_base_reeducation",
+        "schedule_cron=0 9 * * *"
+    ],
+    name: 'mktflow_base_reeducation',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {}
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+with 
+
+consumo_7_dias as (
+  select ba.globo_id, sum(imp.hours_watched) as consumo
+  from `gglobo-mkt-ins-hdg-prd.usuarios.base_ativa_pagante_com_trial_new` as ba,
+  unnest(ba.info) as info
+  join `gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` as imp
+    on imp.userId = ba.globo_id
+  where imp.date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 7 DAY)
+    and cast(info.data_hora_compra as date) >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 90 DAY)
+  group by 1
+),
+
+consumo_particionado as (
+  SELECT
+    *,
+    NTILE(2) OVER (PARTITION BY CAST(consumo AS BIGNUMERIC) ORDER BY consumo DESC) AS tipo_consumo
+  FROM consumo_7_dias
+)
+
+
+select 
+  distinct
+  uc.globo_id, 
+  case 
+    when tipo_consumo = 1 then true
+    when tipo_consumo = 2 then false 
+    else false 
+  end as consumiu_acima_media,
+  uc.push_flag_aberto_30D as push_aberto_30D
+from consumo_particionado as cons
+join `gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral` as uc
+  on cons.globo_id = uc.globo_id
+

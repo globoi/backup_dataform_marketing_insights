@@ -1,0 +1,72 @@
+config {
+  type: "table",
+  schema: "pesquisa_infantil"
+}
+
+WITH perfil_assinantes_base AS (
+  SELECT 
+    *
+  FROM
+    ${ref("usuarios", "perfil_assinantes_ativo_reduzido")}
+  WHERE
+    age BETWEEN 25 AND 50
+    AND data_hora_compra <= "2020-12-01 00:00:00-03"
+),
+
+nao_consumiram_infantil AS (
+  SELECT
+    globo_id,
+    id_asset,
+    SUM(horas) AS sum_of_horas
+  FROM
+    perfil_assinantes_base
+  WHERE
+    LOWER(program_subset) IN ("kids", "infantil")
+  GROUP BY 
+    globo_id,
+    id_asset
+),
+
+base_nao_consumidora_infantil1 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    SUM(horas) AS sum_of_horas
+  FROM
+    perfil_assinantes_base
+  GROUP BY
+    globo_id,
+    id_asset
+),
+
+base_nao_consumidora_infantil AS (
+  SELECT
+    bnci.globo_id,
+    'Sem Consumo' AS Flag_Infantil
+  FROM
+    base_nao_consumidora_infantil1 bnci
+    LEFT JOIN nao_consumiram_infantil nci USING (globo_id)
+  WHERE
+    (nci.globo_id IS NULL OR nci.globo_id = "")
+    AND bnci.sum_of_horas >= 15
+),
+
+base_consumidores_infantil AS (
+  SELECT
+    globo_id,
+    "Com Consumo" AS Flag_Infantil
+  FROM
+    nao_consumiram_infantil
+  WHERE
+    sum_of_horas >= 5
+)
+
+SELECT 
+  *
+FROM
+  base_consumidores_infantil
+UNION ALL
+SELECT 
+  *
+FROM
+  base_nao_consumidora_infantil

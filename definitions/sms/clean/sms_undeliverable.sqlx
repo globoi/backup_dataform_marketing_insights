@@ -1,0 +1,45 @@
+config {
+    type: "table",
+    schema: "sms",
+    name: "sms_undeliverable",
+    tags: ["sms_clean",
+        "schedule_tag=sms_sms_undeliverable",
+        "schedule_cron=0 10 * * *",
+        "schedule_retry=3"
+    ],
+    bigquery: {
+        labels: {
+            tier: "clean",
+            source: "mktcloud",
+            schedule: "diario",
+            tags: "sms_clean",
+            dag: "mkt_ins_sms_sms_undeliverable"
+        }
+    },
+    description: 'Tabela que contém informações sobre as falhas nas entregas de mensagens SMS para os usuários.',
+    columns: {
+        mobile_hash: "Número de celular do usuário hasheado.",
+        undeliverable: "Indica que o número está retido e que o Mobile_Connect interrompeu o envio de mensagens ao usuário.",
+        bounce_count: "Número de mensagens SMS devolvidas para o usuário.",
+        first_bounce_date: "A data em que ocorreu a primeira rejeição.",
+        hold_date: "A data em que o Mobile_Connect interrompeu o envio de mensagens ao usuário."
+
+    }
+}
+
+WITH
+  uns AS (
+  SELECT
+    DISTINCT NULLIF(_mobile_hash_, "") AS mobile_hash,
+    undeliverable,
+    bounce_count,
+    SAFE.PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S',first_bounce_date) AS first_bounce_date,
+    SAFE.PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S',hold_date) AS hold_date
+  FROM
+    ${ref('raw', 'sms_undeliverable_raw')})
+SELECT
+  *
+FROM
+  uns
+WHERE
+  mobile_hash IS NOT NULL

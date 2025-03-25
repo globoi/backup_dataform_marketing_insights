@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+  name: 'Max_Semana_Assinante',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com a flag assinou_2023 e a últimna semana em que os assinantes aparecem no cluster.',
+  columns: {
+    assinou_2023: 'Flag se a assinatura foi no ano de 2023.',
+    max_semana: 'Última semana em que o assinante apareceu no Raiox_BBB_23_Assinantes.'
+  }
+
+}
+
+with max_semana as (
+select assinou_2023, max(semana) as max_semana from ${ref("bbb_23", "Raiox_BBB_23_Assinantes")}
+where assinou_2023 is not null
+group by 1
+)
+select * from max_semana

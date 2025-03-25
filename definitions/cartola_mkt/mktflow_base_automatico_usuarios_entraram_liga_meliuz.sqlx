@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_usuarios_entraram_liga_meliuz', 'schedule_cron=0 13 * * *'],
+    name: 'mktflow_base_automatica_usuarios_entraram_liga_meliuz',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT GLOBO_ID AS globo_id,
+  FORMAT_DATE('%D %R %p', DATETIME(transacao_dt, 'America/Sao_Paulo')) AS transacao_dt
+FROM
+  `gglobo-cartola-hdg-prd.marketing.meliuz`

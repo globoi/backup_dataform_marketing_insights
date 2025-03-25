@@ -1,0 +1,31 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=jornadas_mkt_mktflow_novos_assinantes_elegiveis_nft'],
+  name: 'mktflow_novos_assinantes_elegiveis_nft',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+  globo_id
+FROM
+  ${ref("sales_gold", "customer_events")} e
+LEFT JOIN 
+  ${ref("sales_gold", "subscription_details")} sd ON e.object_id = sd.id 
+LEFT JOIN 
+  ${ref("sales_gold", "partner_details")} pt ON e.object_id = pt.partner_token
+LEFT JOIN 
+  ${ref("sales_gold", "product_details")} pd ON sd.product_id = pd.id OR pt.product_id = pd.id
+WHERE 1=1
+  AND e.event = 'subscription'
+  AND LOWER(pd.name) LIKE '%globoplay%'
+  AND e.event_at BETWEEN '2023-06-30' AND DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+  AND origin_id in ('91968', '92005', '92006', '92007', '92008', '92059', '92060')
+

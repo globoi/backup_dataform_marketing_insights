@@ -1,0 +1,23 @@
+config {
+
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_usuarios_cadastrados_ano_atual', 'schedule_cron=0 9 * * *'],
+    name: 'mktflow_base_automatica_ex_usuarios_cadastrados_ano_atual',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT globo_id
+FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.d_account`
+    ${ref("analytics", "d_account")}
+WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE())

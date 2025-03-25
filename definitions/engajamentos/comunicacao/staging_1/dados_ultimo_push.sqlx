@@ -1,0 +1,81 @@
+config {
+  type: "table",
+  name: "dados_ultimo_push",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_1",'schedule_tag=comunicacao_dados_ultimo_push'],
+}
+
+WITH qtd_pushs_30d AS (
+  SELECT
+    globo_id,
+    COUNT(push_id) AS Qtd_Pushs_30D,
+    COUNT(DISTINCT device_id) AS Qtd_Devices_30D,
+    COUNT(DISTINCT push_id) AS Qtd_Pushs_Distintos_30D
+  FROM ${ref("clean", "urban_push_sent_event")}
+  WHERE table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+    AND product = 'globoplay'
+  GROUP BY globo_id
+),
+
+consumo_30d AS (
+  SELECT 
+  userid,
+  SUM(hours_watched) AS Horas_30D,
+  COUNT(DISTINCT program_id) AS Programas_Distintos_30D
+  FROM ${ref("consumo_enriched", "impression")}
+  WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+  GROUP BY userid
+),
+
+qtd_pushs_abertos_30d AS (
+  SELECT
+  globo_id,
+  COUNT(push_id) AS Qtd_Pushs_Abertos_30D,
+  COUNT(DISTINCT device_id) AS Qtd_Devices_Abertos_30D,
+  COUNT(DISTINCT push_id) AS Qtd_Pushs_Abertos_Distintos_30D
+  FROM ${ref("clean", "urban_app_open_event")}
+  WHERE table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+    AND push_id IS NOT NULL
+    AND product = 'globoplay'
+  GROUP BY globo_id
+)
+
+SELECT
+    d.globo_id,
+    d.max_date_time_send AS Data_Recebimento,
+    d.push_id AS Push_id_recebido,
+    e.alert AS Push_Descricao_recebido,
+    e.ios_alert_title AS Push_Titulo_Recebido,
+    f.max_open_date AS Data_Abertura,
+    d.push_id AS Push_id_aberto,
+    g.alert AS Push_Descricao_aberto,
+    g.ios_alert_title AS Push_Titulo_Aberto,
+    j.Qtd_Pushs_30D AS Qtd_Pushs_30D,
+    j.Qtd_Pushs_Distintos_30D AS Qtd_Pushs_Distintos_30D,
+    j.Qtd_Devices_30D,
+    y.Horas_30D,
+    y.Programas_Distintos_30D,
+    l.Qtd_Pushs_Abertos_30D,
+    l.Qtd_Pushs_Abertos_Distintos_30D,
+    l.Qtd_Devices_Abertos_30D,
+    CASE
+     WHEN f.max_open_date IS NULL THEN '0. Nunca Abriu um Push'
+     WHEN l.Qtd_Pushs_Abertos_30D IS NULL THEN '1. Abriu Há Mais de 1 mês'
+     WHEN l.Qtd_Pushs_Abertos_30D = 0 THEN '1. Abriu Há Mais de 1 mês'
+     WHEN l.Qtd_Pushs_Abertos_30D > 0 THEN '2. Abriu Nesse Mês'
+     ELSE 'Outros'
+    END AS Perfil_Uso_Push
+
+    FROM ${ref("mkt_derived", "last_sent_push")} AS d
+    LEFT JOIN ${ref("derived", "urban_push_campaign")} AS e ON d.push_id = e.push_id
+    LEFT JOIN ${ref("mkt_derived", "last_open_push")} AS f ON d.globo_id = f.globo_id
+    LEFT JOIN ${ref("derived", "urban_push_campaign")} AS g ON f.push_id = g.push_id
+    LEFT JOIN qtd_pushs_30d AS j ON d.globo_id = j.globo_id
+    LEFT JOIN consumo_30d AS y ON d.globo_id = y.userid
+    LEFT JOIN qtd_pushs_abertos_30d AS l ON l.globo_id = y.userid
+
+WHERE
+  d.product = 'globoplay'
+  AND f.product = 'globoplay'
+  AND e.product = 'globoplay'
+  AND g.product = 'globoplay'

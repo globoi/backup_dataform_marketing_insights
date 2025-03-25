@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-int-assinaturas-hdg-prd",
+  schema: "share_export",
+  name: "carrinho_abandonado",
+  description: ""
+}

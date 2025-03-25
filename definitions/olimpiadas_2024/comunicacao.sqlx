@@ -1,0 +1,456 @@
+config {
+    type: 'table',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "olimpiadas_2024",
+            owner: "martech",
+            horario: "10h45min"
+        }
+    },
+    name: 'comunicacao',
+    schema: 'olimpiadas_2024',
+    description: 'Tabela com os usuários do raiox_olimpiadas_2024 e as flags de comunicação.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        whatsapp_optin_status: 'Identifica se o usuário tem optin no whatsapp.',
+        gplay_push_perfil_uso: 'Identifica o grupo do usuário referente ao engajamento com push gplay.',
+        gplay_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do gplay nos últimos 30 dias.',
+        gplay_push_flag_aberto_30D: 'Identifica se o usuário abriu push do gplay nos últimos 30 dias.',
+        gplay_push_optout_status: 'Identifica se o usuário possui o push ativo ou se deu optout.',
+        gplay_email_perfil_30D: 'Identifica o grupo do usuário referente ao engajamento com e-mail gplay.',
+        gplay_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do gplay nos últimos 30 dias.',
+        gplay_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do gplay nos últimos 30 dias.',
+        gplay_appopen_flag_30D: 'Identifica se o usuário abriu o app do gplay nos últimos 30 dias.',
+        gplay_acesso_flag_30D: 'Identifica se o usuário acessou o gplay nos últimos 30 dias.',
+        ge_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do ge nos últimos 30 dias.',
+        ge_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do ge nos últimos 30 dias.',
+        cartola_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do cartola nos últimos 30 dias.',
+        cartola_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do cartola nos últimos 30 dias.',
+        combate_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do combate nos últimos 30 dias.',
+        combate_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do combate nos últimos 30 dias.',
+        familiag_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail de familiag nos últimos 30 dias.',
+        familiag_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail de familiag nos últimos 30 dias.',
+        globoorg_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail de globoorg nos últimos 30 dias.',
+        globoorg_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail de globoorg nos últimos 30 dias.',
+        gshow_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do gshow nos últimos 30 dias.',
+        gshow_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do gshow nos últimos 30 dias.',
+        premiere_email_flag_enviado_30D: 'Identifica se o usuário recebeu e-mail do premiere nos últimos 30 dias.',
+        premiere_email_flag_aberto_30D: 'Identifica se o usuário abriu e-mail do premiere nos últimos 30 dias.',
+        premiere_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do premiere nos últimos 30 dias.',
+        premiere_push_flag_aberto_30D: 'Identifica se o usuário abriu push do premiere nos últimos 30 dias.',
+        combate_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do combate nos últimos 30 dias.',
+        combate_push_flag_aberto_30D: 'Identifica se o usuário abriu push do combate nos últimos 30 dias.',
+        ge_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do ge nos últimos 30 dias.',
+        ge_push_flag_aberto_30D: 'Identifica se o usuário abriu push do ge nos últimos 30 dias.',
+        gshow_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do gshow nos últimos 30 dias.',
+        gshow_push_flag_aberto_30D: 'Identifica se o usuário abriu push do gshow nos últimos 30 dias.',
+        cartola_express_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do cartola express nos últimos 30 dias.',
+        cartola_express_push_flag_aberto_30D: 'Identifica se o usuário abriu push do cartola express nos últimos 30 dias.',
+        cartola_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do cartola nos últimos 30 dias.',
+        cartola_push_flag_aberto_30D: 'Identifica se o usuário abriu push do cartola nos últimos 30 dias.',
+        g1_push_flag_enviado_30D: 'Identifica se o usuário recebeu push do g1 nos últimos 30 dias.',
+        g1_push_flag_aberto_30D: 'Identifica se o usuário abriu push do g1 nos últimos 30 dias.'
+
+    },
+}
+
+WITH
+  comunicacao_gplay AS (
+  SELECT
+    DISTINCT globo_id,
+    whatsapp_optin_status,
+    push_perfil_uso,
+    push_flag_enviado_30D,
+    push_flag_aberto_30D,
+    push_optout_status,
+    email_perfil_30D,
+    email_flag_enviado_30D,
+    email_flag_aberto_30D,
+    appopen_flag_30D,
+    acesso_flag_30D
+  FROM
+    ${ref('comunicacao', 'ultima_comunicacao_geral_staging_1')}),
+  cartola AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS cartola_email_qtd_enviado_30D,
+    MAX(send_date) AS cartola_email_ultimo_data_enviado,
+    MAX(click_date) AS cartola_email_ultimo_data_click,
+    MAX(open_date) AS cartola_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS cartola_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_cartola_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  cartola2 AS (
+  SELECT
+    *,
+  IF
+    (cartola_email_qtd_enviado_30D > 0, TRUE, FALSE) AS cartola_email_flag_enviado_30D,
+  IF
+    (cartola_email_qtd_aberto_30D > 0, TRUE, FALSE) AS cartola_email_flag_aberto_30D
+  FROM
+    cartola),
+  cartola3 AS (
+  SELECT
+    DISTINCT globo_id,
+    cartola_email_flag_enviado_30D,
+    cartola_email_flag_aberto_30D
+  FROM
+    cartola2),
+  combate AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS combate_email_qtd_enviado_30D,
+    MAX(send_date) AS combate_email_ultimo_data_enviado,
+    MAX(click_date) AS combate_email_ultimo_data_click,
+    MAX(open_date) AS combate_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS combate_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_combate_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  combate2 AS (
+  SELECT
+    *,
+  IF
+    (combate_email_qtd_enviado_30D > 0, TRUE, FALSE) AS combate_email_flag_enviado_30D,
+  IF
+    (combate_email_qtd_aberto_30D > 0, TRUE, FALSE) AS combate_email_flag_aberto_30D
+  FROM
+    combate),
+  combate3 AS (
+  SELECT
+    DISTINCT globo_id,
+    combate_email_flag_enviado_30D,
+    combate_email_flag_aberto_30D
+  FROM
+    combate2),
+  familiag AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS familiag_email_qtd_enviado_30D,
+    MAX(send_date) AS familiag_email_ultimo_data_enviado,
+    MAX(click_date) AS familiag_email_ultimo_data_click,
+    MAX(open_date) AS familiag_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS familiag_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_familiag_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  familiag2 AS (
+  SELECT
+    *,
+  IF
+    (familiag_email_qtd_enviado_30D > 0, TRUE, FALSE) AS familiag_email_flag_enviado_30D,
+  IF
+    (familiag_email_qtd_aberto_30D > 0, TRUE, FALSE) AS familiag_email_flag_aberto_30D
+  FROM
+    familiag),
+  familiag3 AS (
+  SELECT
+    DISTINCT globo_id,
+    familiag_email_flag_enviado_30D,
+    familiag_email_flag_aberto_30D
+  FROM
+    familiag2),
+  ge AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS ge_email_qtd_enviado_30D,
+    MAX(send_date) AS ge_email_ultimo_data_enviado,
+    MAX(click_date) AS ge_email_ultimo_data_click,
+    MAX(open_date) AS ge_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS ge_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_ge_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  ge2 AS (
+  SELECT
+    *,
+  IF
+    (ge_email_qtd_enviado_30D > 0, TRUE, FALSE) AS ge_email_flag_enviado_30D,
+  IF
+    (ge_email_qtd_aberto_30D > 0, TRUE, FALSE) AS ge_email_flag_aberto_30D
+  FROM
+    ge),
+  ge3 AS (
+  SELECT
+    DISTINCT globo_id,
+    ge_email_flag_enviado_30D,
+    ge_email_flag_aberto_30D
+  FROM
+    ge2),
+  globoorg AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS globoorg_email_qtd_enviado_30D,
+    MAX(send_date) AS globoorg_email_ultimo_data_enviado,
+    MAX(click_date) AS globoorg_email_ultimo_data_click,
+    MAX(open_date) AS globoorg_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS globoorg_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_globoorg_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  globoorg2 AS (
+  SELECT
+    *,
+  IF
+    (globoorg_email_qtd_enviado_30D > 0, TRUE, FALSE) AS globoorg_email_flag_enviado_30D,
+  IF
+    (globoorg_email_qtd_aberto_30D > 0, TRUE, FALSE) AS globoorg_email_flag_aberto_30D
+  FROM
+    globoorg),
+  globoorg3 AS (
+  SELECT
+    DISTINCT globo_id,
+    globoorg_email_flag_enviado_30D,
+    globoorg_email_flag_aberto_30D
+  FROM
+    globoorg2),
+  gshow AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS gshow_email_qtd_enviado_30D,
+    MAX(send_date) AS gshow_email_ultimo_data_enviado,
+    MAX(click_date) AS gshow_email_ultimo_data_click,
+    MAX(open_date) AS gshow_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS gshow_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_gshow_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  gshow2 AS (
+  SELECT
+    *,
+  IF
+    (gshow_email_qtd_enviado_30D > 0, TRUE, FALSE) AS gshow_email_flag_enviado_30D,
+  IF
+    (gshow_email_qtd_aberto_30D > 0, TRUE, FALSE) AS gshow_email_flag_aberto_30D
+  FROM
+    gshow),
+  gshow3 AS (
+  SELECT
+    DISTINCT globo_id,
+    gshow_email_flag_enviado_30D,
+    gshow_email_flag_aberto_30D
+  FROM
+    gshow2),
+  premiere AS (
+  SELECT
+    globo_id,
+    COUNT(globo_id) AS premiere_email_qtd_enviado_30D,
+    MAX(send_date) AS premiere_email_ultimo_data_enviado,
+    MAX(click_date) AS premiere_email_ultimo_data_click,
+    MAX(open_date) AS premiere_email_ultimo_data_aberto,
+    SUM(
+    IF
+      (was_opened, 1, 0)) AS premiere_email_qtd_aberto_30D
+  FROM
+    ${ref('mktcloud_premiere_enriched', 'email_send')}
+  WHERE
+    date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+  GROUP BY
+    globo_id),
+  premiere2 AS (
+  SELECT
+    *,
+  IF
+    (premiere_email_qtd_enviado_30D > 0, TRUE, FALSE) AS premiere_email_flag_enviado_30D,
+  IF
+    (premiere_email_qtd_aberto_30D > 0, TRUE, FALSE) AS premiere_email_flag_aberto_30D
+  FROM
+    premiere),
+  premiere3 AS (
+  SELECT
+    DISTINCT globo_id,
+    premiere_email_flag_enviado_30D,
+    premiere_email_flag_aberto_30D
+  FROM
+    premiere2),
+  qtd_pushs_30d AS (
+  SELECT
+    DISTINCT globo_id,
+    push_id,
+    product
+  FROM
+    ${ref('clean', 'urban_push_sent_event')}
+  WHERE
+    table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) ),
+  qtd_push_enviado AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      push_id,
+      product
+    FROM
+      qtd_pushs_30d) PIVOT(COUNT(push_id) Qtd_Pushs_30D,
+      COUNT(DISTINCT push_id) Qtd_Pushs_Distintos_30D FOR product IN('premiere',
+        'cartola_express',
+        'combate',
+        'ge',
+        'globoplay',
+        'cartola',
+        'gshow',
+        'g1'))),
+  qtd_pushs_abertos_30d AS (
+  SELECT
+    DISTINCT globo_id,
+    push_id,
+    product
+  FROM
+    ${ref('clean', 'urban_app_open_event')}
+  WHERE
+    table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+    AND push_id IS NOT NULL ),
+  qtd_pushs_abertos AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      push_id,
+      product
+    FROM
+      qtd_pushs_abertos_30d) PIVOT(COUNT(push_id) Qtd_Pushs_Abertos_30D,
+      COUNT(DISTINCT push_id) Qtd_Pushs_Abertos_Distintos_30D FOR product IN('premiere',
+        'cartola_express',
+        'combate',
+        'ge',
+        'globoplay',
+        'cartola',
+        'gshow',
+        'g1'))),
+  pushs AS (
+  SELECT
+    DISTINCT globo_id,
+    COALESCE((Qtd_Pushs_30D_premiere > 0), FALSE) AS premiere_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_premiere > 0), FALSE) AS premiere_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_combate > 0), FALSE) AS combate_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_combate > 0), FALSE) AS combate_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_ge > 0), FALSE) AS ge_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_ge > 0), FALSE) AS ge_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_gshow > 0), FALSE) AS gshow_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_gshow > 0), FALSE) AS gshow_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_cartola_express > 0), FALSE) AS cartola_express_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_cartola_express > 0), FALSE) AS cartola_express_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_cartola > 0), FALSE) AS cartola_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_cartola > 0), FALSE) AS cartola_push_flag_aberto_30D,
+    COALESCE((Qtd_Pushs_30D_g1 > 0), FALSE) AS g1_push_flag_enviado_30D,
+    COALESCE((Qtd_Pushs_Abertos_30D_g1 > 0), FALSE) AS g1_push_flag_aberto_30D
+  FROM
+    qtd_push_enviado
+  LEFT JOIN
+    qtd_pushs_abertos
+  USING
+    (globo_id)
+  WHERE
+    LENGTH(globo_id) - LENGTH(REPLACE(globo_id,'-','')) = 4
+    AND globo_id IS NOT NULL)
+SELECT
+  DISTINCT globo_id,
+  IFNULL(whatsapp_optin_status, FALSE) AS whatsapp_optin_status,
+  push_perfil_uso AS gplay_push_perfil_uso,
+  IFNULL(push_flag_enviado_30D,FALSE) AS gplay_push_flag_enviado_30D,
+  IFNULL(push_flag_aberto_30D,FALSE) AS gplay_push_flag_aberto_30D,
+  push_optout_status AS gplay_push_optout_status,
+  email_perfil_30D AS gplay_email_perfil_30D,
+  IFNULL(email_flag_enviado_30D,FALSE) AS gplay_email_flag_enviado_30D,
+  IFNULL(email_flag_aberto_30D,FALSE) AS gplay_email_flag_aberto_30D,
+  IFNULL(appopen_flag_30D,FALSE) AS gplay_appopen_flag_30D,
+  IFNULL(acesso_flag_30D,FALSE) AS gplay_acesso_flag_30D,
+  IFNULL(ge_email_flag_enviado_30D,FALSE) AS ge_email_flag_enviado_30D,
+  IFNULL(ge_email_flag_aberto_30D,FALSE) AS ge_email_flag_aberto_30D,
+  IFNULL(cartola_email_flag_enviado_30D,FALSE) AS cartola_email_flag_enviado_30D,
+  IFNULL(cartola_email_flag_aberto_30D,FALSE) AS cartola_email_flag_aberto_30D,
+  IFNULL(combate_email_flag_enviado_30D,FALSE) AS combate_email_flag_enviado_30D,
+  IFNULL(combate_email_flag_aberto_30D,FALSE) AS combate_email_flag_aberto_30D,
+  IFNULL(familiag_email_flag_enviado_30D,FALSE) AS familiag_email_flag_enviado_30D,
+  IFNULL(familiag_email_flag_aberto_30D,FALSE) AS familiag_email_flag_aberto_30D,
+  IFNULL(globoorg_email_flag_enviado_30D,FALSE) AS globoorg_email_flag_enviado_30D,
+  IFNULL(globoorg_email_flag_aberto_30D,FALSE) AS globoorg_email_flag_aberto_30D,
+  IFNULL(gshow_email_flag_enviado_30D,FALSE) AS gshow_email_flag_enviado_30D,
+  IFNULL(gshow_email_flag_aberto_30D,FALSE) AS gshow_email_flag_aberto_30D,
+  IFNULL(premiere_email_flag_enviado_30D,FALSE) AS premiere_email_flag_enviado_30D,
+  IFNULL(premiere_email_flag_aberto_30D,FALSE) AS premiere_email_flag_aberto_30D,
+  IFNULL(premiere_push_flag_enviado_30D,FALSE) AS premiere_push_flag_enviado_30D,
+  IFNULL(premiere_push_flag_aberto_30D,FALSE) AS premiere_push_flag_aberto_30D,
+  IFNULL(combate_push_flag_enviado_30D,FALSE) AS combate_push_flag_enviado_30D,
+  IFNULL(combate_push_flag_aberto_30D,FALSE) AS combate_push_flag_aberto_30D,
+  IFNULL(ge_push_flag_enviado_30D,FALSE) AS ge_push_flag_enviado_30D,
+  IFNULL(ge_push_flag_aberto_30D,FALSE) AS ge_push_flag_aberto_30D,
+  IFNULL(gshow_push_flag_enviado_30D,FALSE) AS gshow_push_flag_enviado_30D,
+  IFNULL(gshow_push_flag_aberto_30D,FALSE) AS gshow_push_flag_aberto_30D,
+  IFNULL(cartola_express_push_flag_enviado_30D,FALSE) AS cartola_express_push_flag_enviado_30D,
+  IFNULL(cartola_express_push_flag_aberto_30D,FALSE) AS cartola_express_push_flag_aberto_30D,
+  IFNULL(cartola_push_flag_enviado_30D,FALSE) AS cartola_push_flag_enviado_30D,
+  IFNULL(cartola_push_flag_aberto_30D,FALSE) AS cartola_push_flag_aberto_30D,
+  IFNULL(g1_push_flag_enviado_30D,FALSE) AS g1_push_flag_enviado_30D,
+  IFNULL(g1_push_flag_aberto_30D,FALSE) AS g1_push_flag_aberto_30D
+FROM
+  ${ref('olimpiadas_2024', 'raiox_olimpiadas_2024')}
+LEFT JOIN
+  comunicacao_gplay
+USING
+  (globo_id)
+LEFT JOIN
+  cartola3
+USING
+  (globo_id)
+LEFT JOIN
+  combate3
+USING
+  (globo_id)
+LEFT JOIN
+  familiag3
+USING
+  (globo_id)
+LEFT JOIN
+  ge3
+USING
+  (globo_id)
+LEFT JOIN
+  globoorg3
+USING
+  (globo_id)
+LEFT JOIN
+  gshow3
+USING
+  (globo_id)
+LEFT JOIN
+  premiere3
+USING
+  (globo_id)
+LEFT JOIN
+  pushs
+USING
+  (globo_id)

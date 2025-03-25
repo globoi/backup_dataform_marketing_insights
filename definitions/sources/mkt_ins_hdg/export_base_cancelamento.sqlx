@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "palantir_export",
+  name: "export_base_cancelamento_staging_2",
+  description: ""
+}

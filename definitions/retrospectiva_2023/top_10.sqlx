@@ -1,0 +1,39 @@
+config {
+  type: "table",
+  schema: "retrospectiva_2023"
+
+}
+
+SELECT
+  DISTINCT id AS program_id,
+  title as program_title,
+  media_kit_resource__poster,
+  case
+    when id = 23160 then 'top_1'
+    when id = 23674 then 'top_2'
+    when id = 25489 then 'top_3'
+    when id = 24727 then 'top_4'
+    when id = 23350 then 'top_5'
+    when id = 23253 then 'top_6'
+    when id = 10777 then 'top_7'
+    when id = 24046 then 'top_8'
+    when id = 26189 then 'top_9'
+    when id = 12121 then 'top_10'
+  end as top
+FROM
+  ${ref('conteudo_enriched', 'program')}
+where
+  id in (
+    23160,
+    23674,
+    25489,
+    24727,
+    23350,
+    23253,
+    10777,
+    24046,
+    26189,
+    12121
+  )
+order by
+  4 asc

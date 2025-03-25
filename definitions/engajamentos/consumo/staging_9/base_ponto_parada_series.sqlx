@@ -1,0 +1,104 @@
+config {
+  type: "table",
+  name: "base_ponto_parada_series",
+  schema: "consumo",
+  tags: ['consumo_staging_9',
+    "schedule_tag=consumo_base_ponto_parada_series"
+  ]
+}
+
+WITH Max_Episodio AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    episode_rank,
+    DATE(ultimo_consumo, 'America/Sao_Paulo') AS Data_Ultimo_Consumo,
+    history_sum,
+    horas_consumidas,
+    terminou_episodio,
+    season,
+    season_episode_rank
+  FROM
+    ${ref("consumo", "series_history")}
+  WHERE
+    ultimo_episodio_assistido
+),
+Max_Episodio_Completo AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    episode_rank,
+    DATE(ultimo_consumo, 'America/Sao_Paulo') AS Data_Ultimo_Consumo,
+    history_sum,
+    horas_consumidas,
+    terminou_episodio,
+    season,
+    season_episode_rank
+  FROM
+    ${ref("consumo", "series_history")}
+  WHERE
+    terminou_episodio QUALIFY MAX(ultimo_consumo) OVER (PARTITION BY globo_id, program_id) = ultimo_consumo
+)
+SELECT
+  a.globo_id,
+  a.program_id,
+  a.program_title,
+  a.episode_rank AS Ultimo_Episodio,
+  a.Data_Ultimo_Consumo,
+  a.history_sum AS History_Ultimo_Consumo,
+  a.horas_consumidas AS Horas_Ultimo_Episodio,
+  a.terminou_episodio AS Terminou_Ultimo_Episodio,
+  a.season AS Temporada_Ultimo_Episodio,
+  a.season_episode_rank AS Episodio_Temporada_Ultimo,
+  c.episode_rank AS Ultimo_Episodio_Completo,
+  c.Data_Ultimo_Consumo AS Data_Ultimo_Consumo_Completo,
+  c.history_sum AS History_Ultimo_Consumo_Completo,
+  c.horas_consumidas AS Horas_Ultimo_Episodio_Completo,
+  c.season AS Temporada_Ultimo_Episodio_Completo,
+  c.season_episode_rank AS Episodio_Temporada_Ultimo_Completo,
+  d.Licenciantes,
+  d.Categorizao,
+  DATE_DIFF(CURRENT_DATE(), a.Data_Ultimo_Consumo, DAY) -1 AS Dias_Ultimo_Consumo,
+  b.id_asset,
+  b.tipo_assinante,
+  b.dt_assinatura_comeco,
+  b.tempo_de_base_agrupado,
+  b.canal_compra,
+  b.data_hora_compra,
+  b.produto,
+  b.numero_dependentes,
+  b.gender,
+  b.age,
+  b.address_state,
+  b.first_play,
+  b.first_play_subset,
+  b.ultimo_consumo,
+  b.ultimo_consumo_subset,
+  b.data_ultimo_consumo AS Data_Ultimo_Consumo_Geral,
+  b.Produto_Contratado,
+  b.telefone,
+  b.endereco,
+  b.email_perfil_30D as Perfil_Email,
+  b.push_perfil_uso as Perfil_Uso_Push,
+  b.appopen_flag_30D as Flag_Abriu_App_30D,
+  b.email_flag_aberto_30D as Flag_Abriu_Email_30D,
+  b.push_flag_enviado_30D as Flag_Recebeu_Push_30D
+FROM
+  Max_Episodio a
+  LEFT JOIN (
+    select
+      *
+    from
+      ${ref("comunicacao", "ultima_comunicacao_geral_staging_1")}
+    where
+      tipo_cadastro = 'Assinante'
+  ) AS b ON b.globo_id = a.globo_id
+  LEFT JOIN Max_Episodio_Completo AS c ON (
+    c.globo_id = a.globo_id
+    AND c.program_id = a.program_id
+  )
+  LEFT JOIN ${ref("conteudo", "acervo")} AS d ON d.id = a.program_id
+WHERE
+  DATE_DIFF(CURRENT_DATE(), a.Data_Ultimo_Consumo, DAY) <= 91

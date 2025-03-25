@@ -1,0 +1,37 @@
+config {
+  type: 'table',
+  tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_titulos_liberados_novelas"],
+  name: 'mktflow_titulos_liberados_novelas',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH novelas AS (
+  SELECT 
+  userid, timestamp
+  from ${ref("consumo_enriched", "all_impression")} 
+  WHERE date >= '2023-01-01'
+  AND program_id IN (12989,16888,2534,6969,7608,8143,13016,13765,13457,13766,10003,10409,11225,9620)
+),
+
+join_users AS (
+  SELECT imp.*
+  FROM  novelas imp
+  JOIN
+  ${ref("usuarios","Free users")} as fu
+  ON (imp.userid = fu.globo_id))
+
+SELECT 
+userid AS globo_id,
+CURRENT_DATE() AS dt_proc
+FROM join_users
+QUALIFY ROW_NUMBER() OVER (PARTITION BY userid ORDER BY timestamp ASC) = 1
+

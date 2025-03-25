@@ -1,0 +1,50 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_users_entraram_liga_meliuz_lf_nao_reativou', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_users_entraram_liga_meliuz_lf_nao_reativou',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  FREE_jogaram22 AS (
+  SELECT
+    DISTINCT globo_id
+  FROM (
+    SELECT
+      globo_id,
+      SUM(pro_na_rodada_bln) AS proXfree
+    FROM
+      `gglobo-cartola-hdg-prd.report_staging.report_rodada`
+    WHERE
+      temporada = 2022
+    GROUP BY
+      globo_id )
+  WHERE
+    proXfree = 0 ),
+  reativou23 AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    `gglobo-cartola-hdg-prd.report_staging.report_temporada`
+  WHERE
+    temporada = 2023 )
+SELECT
+  globo_id
+FROM
+  FREE_jogaram22
+WHERE
+  globo_id NOT IN (
+  SELECT
+    *
+  FROM
+    reativou23 )

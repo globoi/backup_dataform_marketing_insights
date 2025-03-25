@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "assinaturas-globo-com",
+  schema: "business_performance",
+  name: "d2c_first_views_gold_d2c_b2b_cws",
+  description: ""
+}

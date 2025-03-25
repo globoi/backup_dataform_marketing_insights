@@ -1,0 +1,28 @@
+config {
+  type: "table",
+  name: "mktflow_base_internacional_desistenciaDeCancelamento",
+  schema: "internacional",
+  tags: ["DesistenciaDeCancelamentoInter",'schedule_tag=internacional_mktflow_base_internacional_desistenciaDeCancelamento']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+
+SELECT a.globo_id, a.oferta_consumo,b.assetId as asset_id,
+    CAST(b.data_hora_cancelamento AS DATE) as dt_cancelamento,
+    CAST(b.dt_hr_cancelamento_final_ciclo AS DATE) as dt_fim_ciclo,
+    b.motivo_cancelamento,
+    b.tipo_cancelamento,
+    b.unsubscription_event_action,
+    b.unsubscribe_description,
+    b.ProductCode,
+
+FROM gglobo-mkt-ins-hdg-prd.internacional.base_ativa_internacional a
+JOIN gglobo-mkt-ins-hdg-prd.usuarios.base_cancelamento_new b ON a.globo_id = b.globo_id
+WHERE a.id_do_item_da_cesta = b.AssetId
+
+AND subscription_status = 'Em Cancelamento'

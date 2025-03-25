@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "last_sent_push",
+    schema: "mkt_derived",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

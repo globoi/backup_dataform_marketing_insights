@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-prodservdig-hdg-prd",
+  schema: "cartola_modelos_staging",
+  name: "predict_2024",
+  description: ""
+}

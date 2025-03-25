@@ -1,0 +1,67 @@
+config {
+  type: "table",
+  name: "base_ultimo_push",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_5",'schedule_tag=comunicacao_base_ultimo_push'],
+}
+
+WITH f AS (
+  SELECT 
+  globo_id,
+  id_asset,
+  tipo_assinante,
+  mais_canais,
+  dt_assinatura_comeco,
+  canal_compra,
+  data_hora_compra,
+  produto,
+  tempo_de_base_agrupado,
+  numero_assinaturas,
+  numero_dependentes,
+  gender,
+  age,
+  address_state,
+  first_play,
+  first_play_subset,
+  data_first_play,
+  ultimo_consumo,
+  ultimo_consumo_subset,
+  data_ultimo_consumo,
+  Produto_Contratado
+  FROM ${ref("usuarios", "dados_usuarios_assinantes")}
+),
+
+g AS (
+  SELECT
+  globo_id,
+  DATE(Data_Recebimento, "America/Sao_Paulo") AS Data_Recebimento,
+  Push_Titulo_Recebido,
+  Push_Descricao_recebido,
+  Data_Abertura,
+  Push_Titulo_Aberto,
+  Push_Descricao_aberto,
+  Qtd_Pushs_30D,
+  Qtd_Devices_30D,
+  Horas_30D,
+  Programas_Distintos_30D,
+  Qtd_Pushs_Abertos_30D,
+  Qtd_Devices_Abertos_30D,
+  CASE
+    WHEN Perfil_Uso_Push IS NULL THEN '0. Nunca Abriu um Push'
+    ELSE Perfil_Uso_Push
+  END AS Perfil_Uso_Push,
+  Data_Recebimento AS Data_Recebimento_Ultimo_Push,
+  Data_Abertura AS Data_Abertura_Ultimo_Push
+  FROM ${ref("comunicacao", "dados_ultimo_push")}
+),
+
+k AS (
+  SELECT
+  globo_id,
+  Data_Abertura AS Data_Ultima_Abertura_App
+  FROM ${ref("comunicacao", "base_ultima_abertura_app")}
+)
+
+SELECT DISTINCT *
+FROM f LEFT JOIN g USING (globo_id)
+LEFT JOIN k USING (globo_id)

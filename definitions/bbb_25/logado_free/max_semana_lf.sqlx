@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_max_semana_lf'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "bbb_25",
+            owner: "martech"
+        }
+    },
+    description: 'Tabela com os LFs do raiox_bbb_25_lf e a última semana em que aparecem no cluster.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        max_semana: 'Última semana em que o usuário apareceu no raiox_bbb_25_lf.'
+    }
+
+}
+
+WITH
+  max_semana AS (
+  SELECT
+    DISTINCT globo_id,
+    MAX(semana) AS max_semana
+  FROM
+    ${ref("bbb_25", "raiox_bbb_25_lf")}
+  WHERE
+    globo_id IS NOT NULL
+  GROUP BY
+    1 )
+SELECT
+  *
+FROM
+  max_semana

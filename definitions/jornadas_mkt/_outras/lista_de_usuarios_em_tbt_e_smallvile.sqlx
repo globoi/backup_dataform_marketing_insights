@@ -1,0 +1,51 @@
+config {
+  type: "incremental",  
+  schema: "jornadas_mkt",
+  name: "lista_de_usuarios_em_",
+  tags: ["jornadas_mkt"],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+WITH
+program AS (
+    SELECT DISTINCT
+        id AS program_id,
+        media_kit_resource__poster,
+        url_for_consumption
+    FROM
+        ${ref("conteudo_enriched","program")}
+    WHERE
+        id = 11093
+        OR id = 11660
+),
+
+base_ponto AS (
+    SELECT
+        globo_id,
+        program_id,
+        program_title,
+        CASE
+            WHEN program_id=11093 THEN 'Algumas temporadas'
+            ELSE 'Programa completo'
+        END AS cenario,
+        CASE
+            WHEN program_id=11093 THEN '1 a 6'
+            ELSE NULL
+        END AS temporadas_expirando,
+        CASE
+            WHEN program_id=11093 THEN '28 de junho de 2021'
+            ELSE '30 de junho de 2021'
+        END AS data_expiraca_conteudo
+    FROM
+        ${ref("consumo", "base_ponto_parada_series")}
+        INNER JOIN program
+        USING(program_id)
+    WHERE
+        program_id = 11093
+        OR program_id = 11660
+        AND Ultimo_Episodio >= 2 
+        AND Dias_Ultimo_Consumo <= 60
+)
+
+SELECT * FROM base_ponto

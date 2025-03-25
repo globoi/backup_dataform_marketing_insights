@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "experimentos",
+  name: "hi_tpb_v2_grupos"
+}
+
+-- gglobo-mkt-ins-hdg-prd.experimentos.hi_tpb_v2_grupos

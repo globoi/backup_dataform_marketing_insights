@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=combate_mkt_mktflow_base_combate_asset_ativo'],
+    name: 'mktflow_base_combate_asset_ativo',
+    schema: 'combate_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "combate_mkt"
+        }
+    }
+}
+select distinct globo_id,state
+from ${ref("sales_gold", "asset_gold")}  `gglobo-foundation-psd-hdg-prd.sales_gold.asset_gold`
+where asset_name like '_o_____'
+and state like 'active%'
+and globo_id is not null
+order by 1 asc

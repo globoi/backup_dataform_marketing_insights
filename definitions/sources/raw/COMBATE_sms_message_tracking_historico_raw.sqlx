@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: 'gglobo-mkt-ins-hdg-prd',
+  schema: "raw",
+  name: "COMBATE_sms_message_tracking_historico_raw",
+  description: "Tabela que contém informações de rastreamento de mensagens enviadas por SMS do Marketing Cloud Mobile Connect. Essa visualização de dados permite a visualização do histórico de envio e recebimento de SMS."
+}

@@ -1,0 +1,58 @@
+config {
+    type: "table",
+    name: "mktflow_base_adimplente_flatv_addon",
+    schema: "jornadas_mkt",
+    tags: ["FlaTv+",
+        'schedule_tag=jornadas_mkt_mktflow_base_adimplente_FlaTV_Addon',
+        "schedule_cron=0 11 * * *"
+        ],
+    bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "jornadas_mkt",
+      owner: "martech" ,
+      mktcloud: "true"
+    }
+  },
+}
+SELECT 
+   globo_id,
+    assetid,
+    asset_name,
+    forma_pagamento,
+    is_globoplay,
+    is_deezer,
+    is_disney,
+    is_discovery,
+    is_starz,
+    is_disney_combo,
+    is_disney_addon,
+    is_discovery_combo,
+    is_discovery_addon,
+    is_starz_combo,
+    is_starz_addon,
+    data_hora_compra,
+    subscription_status,
+    canal_compra,
+    data_conversao_efetiva,
+    data_da_suspensao,
+    motivo_suspensao,
+    assinatura_internacional,
+    data_hora_cancelamento,
+    dt_hr_cancelamento_final_ciclo,
+    ato_de_cancelamento,
+    canal_cancelamento,
+    motivo_cancelamento,
+    tipo_cancelamento,
+    ProductCode,
+    ProductCodeUnique__c,
+    status_integracao,
+    is_globoplay_combo_or_addon,
+    ASSINATURA_ID,
+    created_at,
+    state_date_last_update
+ FROM ${ref("sales_gold", "asset_gold")} 
+ WHERE asset_name = 'FlaTV+'
+ AND subscription_status = 'Ativo'
+
+ORDER BY data_hora_compra DESC

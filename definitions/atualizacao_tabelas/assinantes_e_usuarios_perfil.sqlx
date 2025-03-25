@@ -1,0 +1,17 @@
+config {
+  type: 'table',
+  schema: 'atualizacao_tabelas',
+  name: 'assinantes_e_usuarios_perfil',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_assinantes_e_usuarios_perfil',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+SELECT
+  count(distinct id_asset) as assinantes,
+  count(distinct globo_id) as usuarios
+from
+  ${ref('usuarios', 'perfil_assinantes_ativo_reduzido')}

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-pp-globoplay-hdg-prd",
+  schema: "simulcast",
+  name: "consumo_ibope",
+  description: ""
+}

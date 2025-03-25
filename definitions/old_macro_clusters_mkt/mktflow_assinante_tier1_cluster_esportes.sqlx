@@ -1,0 +1,176 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_esportes'],
+  name: 'mktflow_assinante_tier1_cluster_esportes',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+-------------------------------------------VERSÃO 2-----------------------------------------------
+
+--macro cluster tier 1 esportes
+
+--assinantes tier 1 que consumiram programas vod do genero esporte ou programas ao vivo do genero esporte ou futebol nos ultimos 180 dias.
+
+with base_ativa_pagante_com_trial_new_unnest AS (
+    SELECT globo_id FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ,
+    UNNEST(info) i
+    WHERE NOT mais_canais
+),
+
+todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_esporte as (
+SELECT *
+FROM todos_os_generos
+WHERE name LIKE '%Esporte%' 
+),
+
+consumo_em_genero_esporte as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_esporte b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_de_esporte as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")} 
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND genero_programa in ('ESPORTE', 'FUTEBOL')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo esporte' as base
+FROM consumo_em_genero_esporte
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo esporte' as base
+FROM consumo_em_programas_ao_vivo_de_esporte),
+
+--assinantes tier 1 que tentaram dar play em algum canal do sportv e levaram tapume nos últimos 30 dias.
+
+tier1_tapumesportv_ultimos30d as (
+    with tapume as (
+    SELECT
+    *
+    FROM
+    ${ref("consumo_clean", "tageamento_eventos")}
+    WHERE 
+    eventCategory = 'agora'
+    AND eventAction LIKE '%tapume.sportv%'
+    AND eventLabel = 'nao_assinante' 
+    AND table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+
+SELECT distinct a.globo_id_hit as globo_id, 'tapume sportv' as base
+FROM tapume a
+INNER JOIN base_ativa_pagante_com_trial_new_unnest b 
+on a.globo_id_hit = b.globo_id
+and globo_id_hit is not null),
+
+--assinantes tier 1 que navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias
+
+acesso_ge_ultimos15d as (
+with acesso as (
+SELECT
+  globoId as globo_id
+FROM
+  ${ref("foundation_ge", "foundation_ge_sessions")} w,
+UNNEST (w.hits) h
+WHERE
+  data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+  AND h.provider = "cadun"
+  AND globoId is not null),
+
+pelo_menos_15_acessos as (
+SELECT globo_id, COUNT(*) as quantidade
+FROM acesso
+GROUP BY globo_id
+HAVING COUNT(*) >= 15)
+
+SELECT distinct a.globo_id, 'acesso GE' as base
+FROM pelo_menos_15_acessos a
+INNER JOIN base_ativa_pagante_com_trial_new_unnest b 
+on a.globo_id = b.globo_id
+and a.globo_id is not null
+),
+
+--Ex-assinantes de Premiere, Telecine e Premiere, Globoplay + canais ao vivo e Premiere, Globoplay e Premiere, Premiere e Combate
+
+ex_ass_premiere as (
+SELECT distinct globoid as globo_id, 'ex-assinante premiere' as base
+FROM ${ref("Time_Inteligencia", "CRM_ExAssinantes_Premiere")} a
+INNER JOIN base_ativa_pagante_com_trial_new_unnest b
+ON a.globoid = b.globo_id
+),
+
+--Ex-assinantes de Combate, Globoplay e Combate, Premiere e Combate
+
+ex_ass_combate as (
+SELECT distinct globoid as globo_id, 'ex-assinante combate' as base
+FROM ${ref("Time_Inteligencia", "CRM_ExAssinantes_Combate")} a
+INNER JOIN base_ativa_pagante_com_trial_new_unnest b
+ON a.globoid = b.globo_id
+),
+
+--uniao de todos os atuais usuarios assinantes tier 1 que:
+--consumiram programas vod do genero esporte ou programas ao vivo do genero esporte ou futebol nos ultimos 180 dias, ou
+--tentaram dar play em algum canal do sportv e levaram tapume nos ultimos 30 dias, ou
+--navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias, ou
+--são ex-assinantes de produtos com premiere, ou 
+--ex-assinantes de produtos com combate
+
+basefinal as (
+SELECT distinct globo_id, base
+FROM uniao_consumo_vod_e_ao_vivo
+union distinct
+SELECT distinct globo_id, base
+FROM tier1_tapumesportv_ultimos30d
+union distinct
+SELECT distinct globo_id, base
+FROM acesso_ge_ultimos15d
+union distinct
+SELECT distinct globo_id, base 
+FROM ex_ass_premiere
+union distinct
+SELECT distinct globo_id, base 
+FROM ex_ass_combate
+),
+
+basefinal_2 as (
+select *
+from basefinal
+order by 1,2
+),
+
+basefinal_3 as (
+select distinct globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+from basefinal_2
+group by 1)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal_3 d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false
+
+
+--select distinct count(distinct globo_id) as gid, bases 
+--from oi
+--group by rollup(2)
+--order by 2 asc
+
+

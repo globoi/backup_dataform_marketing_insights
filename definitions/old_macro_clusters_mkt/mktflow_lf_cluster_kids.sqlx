@@ -1,0 +1,88 @@
+config {
+  type: "table",
+  name: "mktflow_lf_cluster_kids",
+  schema: "macro_clusters_mkt",
+  tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_kids']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+
+-----------------------------------VERSÃO 2--------------------------------------------------
+
+--macro cluster lf infantil
+--lf que consumiram programas vod do genero infantil ou programas ao vivo do genero infantil nos ultimos 180 dias ou que são assinantes ou ex-assinantes de Giga Gloob.
+
+with todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_infantil as (
+SELECT *
+FROM todos_os_generos
+WHERE name in ('Infantil', 'Infantojuvenil', 'Animação')
+),
+
+consumo_em_genero_infantil as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "all_impression")} a
+INNER JOIN genero_infantil b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_infantis as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND genero_programa in ('INFANTIL')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo infantil' as base
+FROM consumo_em_genero_infantil
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo infantil' as base
+FROM consumo_em_programas_ao_vivo_infantis),
+
+--Assinantes e Ex-assinantes de Giga Gloob
+
+giga_gloob as (
+SELECT DISTINCT
+  globo_id, 'usuário giga gloob' as base
+FROM ${ref("temp", "assinantes_e_ex_giga_gloob")}
+),
+
+--União de todos os usuários LF que consumiram programas vod do genero infantil ou programas ao vivo do genero infantil nos ultimos 180 dias e que são assinantes ou ex-assinantes de Giga Gloob.
+
+basefinal as (
+SELECT globo_id, base
+FROM uniao_consumo_vod_e_ao_vivo
+UNION DISTINCT
+SELECT globo_id, base
+FROM giga_gloob
+),
+
+basefinal_2 as (
+select *
+from basefinal
+order by 1,2
+),
+
+basefinal_3 as (
+select distinct globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+from basefinal_2
+group by 1)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal_3 d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Logado Free"
+

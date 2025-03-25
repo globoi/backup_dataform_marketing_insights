@@ -1,0 +1,137 @@
+config {
+  type: "table",
+  schema: "retrospectiva_2023"
+}
+
+with base as (
+  SELECT
+    *,case
+      when program_id = 23160
+      and globo_id is not null then true
+    end as assistiu_top1,
+    case
+      when program_id = 23674
+      and globo_id is not null then true
+    end as assistiu_top2,
+    case
+      when program_id = 25489
+      and globo_id is not null then true
+    end as assistiu_top3,
+    case
+      when program_id = 24727
+      and globo_id is not null then true
+    end as assistiu_top4,
+    case
+      when program_id = 23350
+      and globo_id is not null then true
+    end as assistiu_top5,
+    case
+      when program_id = 23253
+      and globo_id is not null then true
+    end as assistiu_top6,
+    case
+      when program_id = 10777
+      and globo_id is not null then true
+    end as assistiu_top7,
+    case
+      when program_id = 24046
+      and globo_id is not null then true
+    end as assistiu_top8,
+    case
+      when program_id = 26189
+      and globo_id is not null then true
+    end as assistiu_top9,
+    case
+      when program_id = 12121
+      and globo_id is not null then true
+    end as assistiu_top10
+  FROM
+    ${ref('retrospectiva_2023', 'consumo_retro_2023')} full
+    outer join (
+      SELECT
+        DISTINCT id AS program_id,
+        title as program_title_top10,
+        media_kit_resource__poster as media_kit_resource__poster_top10,
+        case
+          when id = 23160 then 'top_1'
+          when id = 23674 then 'top_2'
+          when id = 25489 then 'top_3'
+          when id = 24727 then 'top_4'
+          when id = 23350 then 'top_5'
+          when id = 23253 then 'top_6'
+          when id = 10777 then 'top_7'
+          when id = 24046 then 'top_8'
+          when id = 26189 then 'top_9'
+          when id = 12121 then 'top_10'
+        end as top
+      FROM
+        ${ref('conteudo_enriched', 'program')}
+      where
+        id in (
+          23160,
+          23674,
+          25489,
+          24727,
+          23350,
+          23253,
+          10777,
+          24046,
+          26189,
+          12121
+        )
+      order by
+        4 asc
+    ) using(program_id)
+),
+base2 AS (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        program_id,
+        globo_id,
+        status_assinatura,
+        assinatura_gplay,
+        mediaid,
+        date,
+        timestamp,
+        hours_watched,
+        program_title,
+        program_subset,
+        is_live,
+        program_title_top10,
+        media_kit_resource__poster_top10,
+        assistiu_top1,
+        assistiu_top2,
+        assistiu_top3,
+        assistiu_top4,
+        assistiu_top5,
+        assistiu_top6,
+        assistiu_top7,
+        assistiu_top8,
+        assistiu_top9,
+        assistiu_top10,
+        top
+      FROM
+        base
+    ) PIVOT(
+      max(program_title_top10) program_title_top10,
+      max(media_kit_resource__poster_top10) program_poster_url FOR top IN (
+        'top_1',
+        'top_2',
+        'top_3',
+        'top_4',
+        'top_5',
+        'top_6',
+        'top_7',
+        'top_8',
+        'top_9',
+        'top_10'
+      )
+    )
+)
+select
+  *
+from
+  base2

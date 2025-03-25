@@ -1,0 +1,43 @@
+config {
+  type: "table",
+  name: "E1_conteudos_consumidos",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries", 'schedule_tag=jornadas_mkt_E1_conteudos_consumidos'],
+}
+
+WITH program_reduc AS (
+  SELECT DISTINCT
+  id AS program_id,
+  media_kit_resource__poster
+  FROM ${ref("conteudo_enriched", "program")}
+  WHERE media_kit_resource__poster IS NOT NULL
+),
+
+filtros_conteudos AS (
+  SELECT *
+  FROM ${ref("conteudo_enriched", "content")}
+  INNER JOIN program_reduc USING (program_id)
+  WHERE status = "published" AND title_url_for_consumption IS NOT NULL
+),
+
+ds_final1 AS (
+  SELECT * EXCEPT (globo_id, userid),
+  userid AS globo_id
+  FROM ${ref("consumo_enriched", "impression")} imp
+  INNER JOIN filtros_conteudos USING (program_id)
+  WHERE DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY) <= `date`
+  AND imp.program_subset = "series"
+  AND hours_watched >= 0.15
+),
+
+ds_final AS (
+  SELECT
+  program_id,
+  COUNT(DISTINCT globo_id) AS gid_distintos
+  FROM ds_final1
+  GROUP BY program_id
+)
+
+SELECT *,
+  ROW_NUMBER() OVER (ORDER BY gid_distintos DESC) AS E1_rank_conteudos
+FROM ds_final

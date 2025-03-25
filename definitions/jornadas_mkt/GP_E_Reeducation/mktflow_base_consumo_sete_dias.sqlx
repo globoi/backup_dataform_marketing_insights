@@ -1,0 +1,23 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_base_consumo_sete_dias",
+        "schedule_cron=0 9 * * *"
+    ],
+    name: 'mktflow_base_consumo_sete_dias',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {}
+,bigquery: {
+    labels: {
+      mktcloud: "true",
+      urban: "list"
+    }
+  }
+}
+
+
+select distinct 'named_user' as identifier_type, userId as UUID
+from `gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` 
+where date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 7 DAY)
+and hours_watched > 0

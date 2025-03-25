@@ -1,0 +1,13 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=segment_api_permutive_ge_bottom2'],
+    name: 'permutive_ge_bottom2',
+    schema: 'segment_api',
+    description: 'base de globoids para teste de intereção com bottom2 anual full no ge',
+    columns: {}
+}
+
+SELECT
+  DISTINCT globo_id AS user_id
+FROM ${ref("segmento_ge", "ge_bottom2")}
+--`gglobo-mkt-ins-hdg-prd.campanhas_mkt.ge_bottom2`

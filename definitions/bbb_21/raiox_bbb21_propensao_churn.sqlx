@@ -1,0 +1,282 @@
+config {
+  type: 'table',
+  name: 'raiox_bbb21_propensao_churn',
+  schema: 'bbb_21',
+  tags: ['bbb_21'],
+  description: '',
+  columns: {}
+}
+WITH raiox_bbb21 AS (
+  SELECT *
+  FROM ${ref("bbb_21", "RaioXBBB21_historico")}  
+  WHERE semana < TIMESTAMP("2021-05-09 12:00:00", "America/Sao_Paulo" )
+)
+, pivoted AS (
+  SELECT * FROM 
+      (SELECT
+        globo_id,
+        Ativo,
+        CancelouVol2021,
+        CancelouVol2020,
+        assinou_2021,
+        soma_horas,
+        Filmes_horas,
+        Mais_Canais_horas,
+        Novela_horas,
+        Series_horas,
+        outros_conteudos_horas,
+        semana,
+        Cluster_bbb
+      FROM
+      raiox_bbb21)
+   PIVOT(
+      SUM(soma_horas) as sum_soma_horas,
+      SUM(Filmes_horas) as sum_Filmes_horas,
+      SUM(Mais_Canais_horas) as sum_Mais_Canais_horas,
+      SUM(Novela_horas) as sum_Novela_horas,
+      SUM(Series_horas) as sum_Series_horas,
+      SUM(outros_conteudos_horas) as sum_outros_conteudos_horas,
+      COUNT(DISTINCT semana) as count_distinct_semana
+    FOR Cluster_bbb 
+    IN ("0. No Live" nolive, "1. Light User" lightuser, "2. Mid-Light User"   midlightuser, "3. Mid-Heavy User" midheavyuser, "4. Heavy User" heavyuser)
+  )
+)
+, add_column_Horas_BBB AS (
+  SELECT * ,
+  CASE
+      WHEN sum_soma_horas_nolive IS NULL THEN 0
+      ELSE sum_soma_horas_nolive 
+      END +
+  CASE
+      WHEN sum_soma_horas_lightuser IS NULL THEN 0
+      ELSE sum_soma_horas_lightuser
+      END +
+  CASE
+      WHEN sum_soma_horas_midlightuser IS NULL THEN 0
+      ELSE sum_soma_horas_midlightuser
+      END +
+  CASE
+      WHEN sum_soma_horas_midheavyuser IS NULL THEN 0
+      ELSE sum_soma_horas_midheavyuser
+      END +
+  CASE
+      WHEN sum_soma_horas_heavyuser  IS NULL THEN 0
+      ELSE sum_soma_horas_heavyuser 
+    END
+    AS Horas_BBB
+  FROM pivoted
+)
+, add_column_Horas_Total AS (
+  SELECT * ,
+    CASE WHEN sum_Filmes_horas_nolive is null THEN 0 ELSE sum_Filmes_horas_nolive END +
+    CASE WHEN sum_Mais_Canais_horas_nolive is null THEN 0 ELSE sum_Mais_Canais_horas_nolive END +
+    CASE WHEN sum_Novela_horas_nolive is null THEN 0 ELSE sum_Novela_horas_nolive END +
+    CASE WHEN sum_outros_conteudos_horas_nolive is null THEN 0 ELSE sum_outros_conteudos_horas_nolive END +
+    CASE WHEN sum_Series_horas_nolive is null THEN 0 ELSE sum_Series_horas_nolive END +
+    CASE WHEN sum_Filmes_horas_lightuser is null THEN 0 ELSE sum_Filmes_horas_lightuser END +
+    CASE WHEN sum_Mais_Canais_horas_lightuser is null THEN 0 ELSE sum_Mais_Canais_horas_lightuser END +
+    CASE WHEN sum_Novela_horas_lightuser is null THEN 0 ELSE sum_Novela_horas_lightuser END +
+    CASE WHEN sum_outros_conteudos_horas_lightuser is null THEN 0 ELSE sum_outros_conteudos_horas_lightuser END +
+    CASE WHEN sum_Series_horas_lightuser is null THEN 0 ELSE sum_Series_horas_lightuser END +
+    CASE WHEN sum_Filmes_horas_midlightuser is null THEN 0 ELSE sum_Filmes_horas_midlightuser END +
+    CASE WHEN sum_Mais_Canais_horas_midlightuser is null THEN 0 ELSE sum_Mais_Canais_horas_midlightuser END +
+    CASE WHEN sum_Novela_horas_midlightuser is null THEN 0 ELSE sum_Novela_horas_midlightuser END +
+    CASE WHEN sum_outros_conteudos_horas_midlightuser is null THEN 0 ELSE sum_outros_conteudos_horas_midlightuser END +
+    CASE WHEN sum_Series_horas_midlightuser is null THEN 0 ELSE sum_Series_horas_midlightuser END +
+    CASE WHEN sum_Filmes_horas_midheavyuser is null THEN 0 ELSE sum_Filmes_horas_midheavyuser END +
+    CASE WHEN sum_Mais_Canais_horas_midheavyuser is null THEN 0 ELSE sum_Mais_Canais_horas_midheavyuser END +
+    CASE WHEN sum_Novela_horas_midheavyuser is null THEN 0 ELSE sum_Novela_horas_midheavyuser END +
+    CASE WHEN sum_outros_conteudos_horas_midheavyuser is null THEN 0 ELSE sum_outros_conteudos_horas_midheavyuser END +
+    CASE WHEN sum_Series_horas_midheavyuser is null THEN 0 ELSE sum_Series_horas_midheavyuser END +
+    CASE WHEN sum_Filmes_horas_heavyuser is null THEN 0 ELSE sum_Filmes_horas_heavyuser END +
+    CASE WHEN sum_Mais_Canais_horas_heavyuser is null THEN 0 ELSE sum_Mais_Canais_horas_heavyuser END +
+    CASE WHEN sum_Novela_horas_heavyuser is null THEN 0 ELSE sum_Novela_horas_heavyuser END +
+    CASE WHEN sum_outros_conteudos_horas_heavyuser is null THEN 0 ELSE sum_outros_conteudos_horas_heavyuser END +
+    CASE WHEN sum_Series_horas_heavyuser is null THEN 0 ELSE sum_Series_horas_heavyuser END +
+    CASE WHEN Horas_BBB is null THEN 0 ELSE Horas_BBB END
+  AS Horas_Total
+  FROM add_column_Horas_BBB
+
+)
+, rename_columns AS (
+  SELECT 
+    globo_id,
+    Horas_BBB,
+    Horas_Total,
+    count_distinct_semana_nolive as NoLive,
+    count_distinct_semana_lightuser as LightUser,
+    count_distinct_semana_midlightuser as MidLightUser,
+    count_distinct_semana_midheavyuser as MidHeavyUser,
+    count_distinct_semana_heavyuser as HeavyUser,
+    ativo,
+    CancelouVol2021,
+    CancelouVol2020,
+    assinou_2021
+  FROM add_column_Horas_Total
+)
+, entrada_cluster AS (
+  SELECT min(semana) as min_of_semana ,globo_id from raiox_bbb21
+  group by globo_id
+)
+, join_entrada_cluster AS (
+  SELECT *
+  FROM rename_columns
+  LEFT JOIN entrada_cluster
+  USING(globo_id)
+)
+
+, calc_max_semana AS (
+  SELECT max(semana) as max_of_semana ,assinou_2021 from raiox_bbb21
+  group by assinou_2021
+)
+
+, join_max_semana AS (
+  SELECT * except(nolive,lightuser,midlightuser,midheavyuser,heavyuser) ,
+        (TIMESTAMP_DIFF(max_of_semana, min_of_semana, DAY) / 7) + 1 as semanas_total,
+        CASE WHEN nolive is null THEN 0 ELSE nolive END AS nolive,
+        CASE WHEN lightuser is null THEN 0 ELSE lightuser END AS lightuser,
+        CASE WHEN midlightuser is null THEN 0 ELSE midlightuser END AS midlightuser,
+        CASE WHEN midheavyuser is null THEN 0 ELSE midheavyuser END AS midheavyuser,
+        CASE WHEN heavyuser is null THEN 0 ELSE heavyuser END AS heavyuser
+  FROM join_entrada_cluster
+  LEFT JOIN calc_max_semana
+  USING(assinou_2021)
+)
+
+, column_fora_cluster AS (
+  SELECT *,
+  Semanas_Total - nolive -lightuser - midlightuser - midheavyuser - heavyuser AS Fora_Cluster
+  FROM join_max_semana
+)
+
+, create_columns_cluster_e_share AS (
+  SELECT *,
+  CASE 
+WHEN 
+    HeavyUser >= MidHeavyUser  and 
+    HeavyUser >= MidLightUser and 
+    HeavyUser >= LightUser and 
+    HeavyUser >= NoLive and
+    HeavyUser >= Fora_Cluster
+    THEN '4.HeavyUser'
+
+WHEN 
+    MidHeavyUser >= HeavyUser  and 
+    MidHeavyUser >= MidLightUser and 
+    MidHeavyUser >= LightUser and 
+    MidHeavyUser >= NoLive and
+    MidHeavyUser>= Fora_Cluster
+    THEN '3.Mid-HeavyUser'
+
+WHEN 
+    MidLightUser >= HeavyUser  and 
+    MidLightUser >= MidHeavyUser and 
+    MidLightUser >= LightUser and 
+    MidLightUser >= NoLive and
+    MidLightUser>= Fora_Cluster
+    THEN '2.Mid-LightUser'
+
+WHEN 
+    LightUser >= HeavyUser  and 
+    LightUser >= MidHeavyUser and 
+    LightUser >= MidLightUser and 
+    LightUser >= NoLive and
+    LightUser>= Fora_Cluster
+    THEN '1.LightUser'
+
+WHEN 
+    NoLive >= HeavyUser  and 
+    NoLive >= MidHeavyUser and 
+    NoLive >= MidLightUser and 
+    NoLive >= LightUser and
+    NoLive >= Fora_Cluster
+    THEN '0.NoLive'
+
+ELSE 'Fora_Cluster'
+
+END as Cluster_BBB_Acumulado,
+  round( Horas_BBB/Horas_Total , 2) AS Share_Total_BBB
+  FROM column_fora_cluster
+)
+
+, create_column_cluster_share_total AS (
+  SELECT *, 
+  CASE 
+    WHEN Share_Total_BBB >= 0.8 THEN '2. Alta Concentração'
+    WHEN Share_Total_BBB >= 0.5 THEN '1. Média Concentração'
+    ELSE '0. Diversificado'
+  END AS Cluster_Share_BBB_Total
+  FROM create_columns_cluster_e_share
+)
+, column_ordem_risco_churn AS (
+    SELECT * ,
+    CASE 
+
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '0.NoLive' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 1
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '4.HeavyUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 2
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 3
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 4
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '1.LightUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 5
+
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '0.NoLive' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 6
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '4.HeavyUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 7
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 8
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 9
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '1.LightUser' and Cluster_Share_BBB_Total = '2. Alta Concentração'   THEN 10
+
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '0.NoLive' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 11
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '4.HeavyUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 12
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 13
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 14
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '1.LightUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 15
+
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '0.NoLive' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 16
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '4.HeavyUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 17
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 18
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 19
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '1.LightUser' and Cluster_Share_BBB_Total = '1. Média Concentração'   THEN 20
+
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '0. Diversificado'   THEN 21
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '0. Diversificado'   THEN 22
+
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '3.Mid-HeavyUser' and Cluster_Share_BBB_Total = '0. Diversificado'   THEN 23
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = '2.Mid-LightUser' and Cluster_Share_BBB_Total = '0. Diversificado'   THEN 24
+
+      WHEN assinou_2021 and Cluster_BBB_Acumulado = 'Fora_Cluster'  THEN 26
+      WHEN not assinou_2021 and Cluster_BBB_Acumulado = 'Fora_Cluster'  THEN 27
+
+      ELSE 25
+
+  END AS Ordem_Risco_Churn
+  FROM create_column_cluster_share_total
+)
+, join_ultima_comunicacao_assinante AS (
+SELECT column_ordem_risco_churn.*, 
+  tipo_assinante,
+  canal_compra,
+  produto,
+  gender,
+  age,
+  data_ultimo_consumo,
+  telefone,
+  endereco,
+  produto_contratado,
+  perfil_email,
+  perfil_uso_push,
+  flag_abriu_push_30d,
+  flag_recebeu_push_30d,
+  flag_abriu_app_30d,
+  flag_abriu_email_30d,
+  flag_recebeu_email_30d,
+  nolive + lightuser+ MidLightUser + MidHeavyUser + heavyuser as semanas_cluster_bbb
+ FROM column_ordem_risco_churn
+LEFT JOIN ${ref("comunicacao", "ultima_comunicacao_assinante")} 
+USING (globo_id)
+)
+, calc_column_share_semanas_bbb AS (
+  SELECT * ,
+  semanas_cluster_bbb / semanas_total as share_semanas_bbb
+  FROM join_ultima_comunicacao_assinante
+)
+SELECT * FROM calc_column_share_semanas_bbb
+

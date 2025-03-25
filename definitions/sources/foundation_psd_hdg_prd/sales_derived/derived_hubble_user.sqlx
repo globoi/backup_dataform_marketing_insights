@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "hubble_user",
+    schema: "sales_derived",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

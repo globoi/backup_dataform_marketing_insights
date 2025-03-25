@@ -1,0 +1,75 @@
+config {
+  type: "table",
+  name: "generos_retrospectiva_2023",
+  schema: "retrospectiva_2023"
+}
+
+SELECT
+  *
+EXCEPT(genero),
+  CASE
+    WHEN program_id = 12082 THEN "Reality Show"
+    WHEN genero IN ('Artes e Cultura', 'Artes') THEN 'Variedades'
+    WHEN genero = 'Artes e Cultura' THEN 'Artes'
+    WHEN genero = 'Ciência e Tecnologia' THEN 'Ciência'
+    WHEN genero IN ('Comédia Romântica', 'Humor') THEN 'Comédia'
+    WHEN genero = 'Gastronomia' THEN 'Culinária'
+    WHEN genero = 'Série Documental' THEN 'Documentário'
+    WHEN genero = 'Entrevistas e Reflexões' THEN 'Entrevista'
+    WHEN genero IN (
+      'Esportes Radicais',
+      'Surfe',
+      'Esporte',
+      'Esporte Caratê',
+      'Esportes de Inverno',
+      'Futebol',
+      'Judô',
+      'Kickboxing',
+      'Lutas',
+      'MMA',
+      'Skate',
+      'Snowboard',
+      'Boxe'
+    ) THEN 'Esporte'
+    WHEN genero IN ('Ficção Científica', 'Ficção-Científica') THEN 'Ficção'
+    WHEN genero = 'História e Política' THEN 'História'
+    WHEN genero = 'Música' THEN 'Musical'
+    WHEN genero IN (
+      'Investigação',
+      'Jurídico',
+      'Crime'
+    ) THEN 'Policial'
+    WHEN genero = 'Mistério' THEN 'Suspense'
+    WHEN genero = 'Biografias' THEN 'Biografia'
+    WHEN genero = 'Cinema & Fotografia' THEN 'Cinema'
+    WHEN genero = 'Comportamento/estilo De Vida' THEN 'Comportamento'
+    WHEN genero = 'Culinária/Gastronomia' THEN 'Culinária'
+    WHEN genero in ('Cultura', 'Cult') THEN 'Cultural'
+    WHEN genero IN ('Documental', 'Documentários Musicais') THEN 'Documentário'
+    WHEN genero IN ('Educativo', 'Educação') THEN 'Educativo'
+    WHEN genero IN('Família', 'Família real') THEN 'Família'
+    WHEN genero = 'Infantojuvenil' THEN 'Infantil'
+    WHEN genero = 'Jornalismo/Current Affairs' THEN 'Jornalismo'
+    when genero in (
+      'Diversidade e Identidade',
+      'Feminismo',
+      'LGBTQIAP+'
+    ) then 'Diversidade e Identidade'
+    when genero in (
+      'Saúde',
+      'Saúde Mental',
+      'Saúde e Bem-estar'
+    ) then 'Saúde'
+    when genero in (
+      'Terror',
+      'Terror/Horror',
+      'Thriller/Suspense'
+    ) then 'Terror'
+    when genero in ('Faroeste', 'Western') then 'Faroeste'
+    ELSE genero
+  END AS genero
+FROM
+  ${ref('jornadas_mkt', 'genero_todas_combinacoes')}
+WHERE
+  program_id NOT IN (8426, 9095, 9191)
+  AND genero != 'Erótico'

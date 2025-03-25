@@ -1,0 +1,38 @@
+config {
+  type: "table",
+  name: "First_Play_Geral",
+  schema: "consumo",
+  tags: ['consumo_staging_2'],
+  description: 'Base de identificação do primeiro play de um usuário após assinatura.',
+    columns: {
+  globo_id:'Código de identificação do usuário.',
+  AssetId:'Código do item da Cesta (Produto que o cliente adquiriu).',
+  firstWatched:'Código do programa do primeiro programa assistido.',
+  first_watched_title:'Título do programa.', hours_watched_for_first_program:'Quantidade de horas assistida no primeiro play do usuário.',
+  timestamp_for_first_program:'Identifica a data do primeiro consumo.',
+  mediaid:'Codigo da midia assistida.',
+  data_hora_compra:'Data e Hora compra de um ativo.',
+  Convertido:'Identifica se o usuário assinou após o fim do trial.',
+  Tipo_Venda:'Indica se foi um trial ou venda direta.'
+}}
+
+SELECT 
+  *,
+  NULL AS Convertido,
+  'Venda Direta' AS Tipo_Venda
+FROM
+    ${ref("consumo", "First_Play_VD")}
+UNION ALL
+SELECT 
+  globo_id,
+  assetid AS AssetId,
+  firstWatched,
+  first_watched_title,
+  hours_watched_for_first_program,
+  timestamp_for_first_program,
+  mediaid,
+  data_hora_compra,
+  convertido,
+  'Trial' AS Tipo_Venda
+FROM
+  ${ref("consumo", "Trial_Mes")}

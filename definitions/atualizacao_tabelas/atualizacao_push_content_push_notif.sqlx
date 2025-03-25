@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  schema: 'atualizacao_tabelas',
+  name:'atualizacao_push_content_push_notif',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_atualizacao_push_content_push_notif',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH
+  t AS (
+  SELECT
+    MAX(DATA) AS max_data_push_notification
+  FROM
+    ${ref('comunicacao', 'push_notification')} )
+SELECT
+  CONCAT(max_data_push_notification,' - max_data_push_notification') as max_data
+FROM
+  t
+UNION ALL
+SELECT
+  CONCAT(max_data_push_content, ' - max_data_push_content') as max_data
+FROM (
+  SELECT
+    DATE(MAX(push_occurred)) AS max_data_push_content
+  FROM
+    ${ref('comunicacao', 'push_content')} )

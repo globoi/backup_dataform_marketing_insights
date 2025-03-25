@@ -1,0 +1,101 @@
+config {
+    type: "table",
+    name: "mktflow_jornada_de_series",
+    schema: "jornadas_mkt",
+    tags: ["GP_E_ContinueAssistindo", 'schedule_tag=jornadas_mkt_mktflow_jornada_de_series']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+  nome_episodio AS (
+  SELECT
+    *
+  FROM
+    ${ref("jornadas_mkt", "nome_episodio")} ),
+  base_ativa AS (
+  SELECT
+    globo_id,
+    info.assinatura_gplay AS assinatura_gplay,
+    info.mais_canais AS mais_canais
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ba,
+    UNNEST(info) AS info
+  WHERE
+    tipo_assinante NOT LIKE '%trial%' ),
+  series AS (
+  SELECT
+    mediaid,
+    globo_id,
+    program_id,
+    program_title,
+    ultimo_consumo,
+    ultimo_episodio_assistido,
+    season,
+    season_episode_rank,
+    terminou_serie
+  FROM
+    ${ref("consumo", "series_history")} QUALIFY (COUNT(DISTINCT(mediaid)) OVER(PARTITION BY globo_id, program_id)) > 3 ),
+  acabou_serie AS (
+  SELECT
+    globo_id,
+    program_id
+  FROM
+    ${ref("consumo", "series_history")}
+  WHERE
+    terminou_serie ),
+  join_all AS (
+  SELECT
+    *
+  FROM
+    series
+  LEFT JOIN
+    acabou_serie
+  USING
+    (globo_id,
+      program_id)
+  LEFT JOIN
+    nome_episodio
+  USING
+    (mediaid,
+      program_id)
+  INNER JOIN
+    base_ativa
+  USING
+    (globo_id)
+  WHERE
+    (mais_canais
+      OR service_id != 6807)
+    AND acabou_serie.globo_id IS NULL ),
+  after_join_step_1 AS (
+  SELECT
+    * EXCEPT(ultimo_consumo),
+    MAX(ultimo_consumo) OVER(PARTITION BY globo_id, program_id) AS ultimo_consumo
+  FROM
+    join_all
+  WHERE
+    ultimo_episodio_assistido ),
+  after_join_step_2 AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    DATETIME(ultimo_consumo) AS ultimo_consumo,
+    season,
+    season_episode_rank,
+    media_kit_resource__poster,
+    media_kit_resource__logotipo_xl,
+    assinatura_gplay,
+    CURRENT_DATE() AS dt_proc
+  FROM
+    after_join_step_1
+  WHERE
+    DATE_SUB(CURRENT_DATE(), INTERVAL 5 DAY) >= DATE(ultimo_consumo)
+    AND DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) <= DATE(ultimo_consumo) QUALIFY ROW_NUMBER() OVER(PARTITION BY globo_id) = 1 )
+SELECT
+  *
+FROM
+  after_join_step_2

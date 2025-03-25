@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  name: 'mktflow_Base_jornada_gshow_novelas_LF',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_noveleiros_lf','schedule_tag=jornadas_mkt_mktflow_Base_jornada_gshow_novelas_LF'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT DISTINCT
+userid as globo_id
+FROM
+`valiant-circuit-129220.gshow.pgt_*`
+WHERE (_TABLE_SUFFIX BETWEEN
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+    AND
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+)
+AND provider = 'cadun'
+AND userid is not null
+AND object LIKE '%gshow.globo.com/novelas/%'

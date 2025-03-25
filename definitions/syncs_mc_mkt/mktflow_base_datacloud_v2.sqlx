@@ -1,0 +1,40 @@
+config {
+    type: "table",
+    schema: "syncs_mc_mkt",
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "syncs_mc_mkt",
+            owner: "mins"
+        }
+    }
+}
+
+WITH
+  base AS (
+  SELECT
+    DISTINCT *,
+    CASE
+      WHEN ((globoplay IS TRUE OR mais_canais IS TRUE) AND (telecine IS NOT NULL OR discovery IS NOT NULL OR disney IS NOT NULL OR flatv IS NOT NULL OR lionsgate IS NOT NULL OR premiere IS NOT NULL OR star IS NOT NULL OR combate IS NOT NULL)) THEN TRUE
+      ELSE FALSE
+  END
+    AS combo,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY asset_id DESC) AS rn
+  FROM
+    ${ref('datacloud', 'base_datacloud')}
+  INNER JOIN (
+    SELECT
+      DISTINCT globo_id
+    FROM ${ref('usuarios', 'base_ativa_pagante_com_trial_new')})
+  USING
+    (globo_id)
+  WHERE
+    tipo_usuario='Assinante'
+  QUALIFY
+    rn=1),
+    base2 as (
+SELECT
+  DISTINCT *
+FROM
+  base )
+  select * except(rn) from base2

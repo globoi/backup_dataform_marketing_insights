@@ -1,0 +1,36 @@
+config {
+    type: "table",
+    name: "Lst_Rec_Pers_Genero_T5_Pivoted_Aux_Retro2024",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com metadados dos conteúdos da recomendação.',
+  columns: {
+    program_title: 'Título do programa.',
+    title_url_for_consumption: 'URL de destino do programa para consumo na plataforma.',
+    url_add_minha_lista: 'URL de destino para adicionar ao minha lista.',
+    media_kit_resource__poster: 'Link do poster do programa.',
+    program_id: 'Código do programa.',
+    title_id: 'Código do título do programa.',
+    program_description: 'Breve descrição do programa.'
+  },
+}
+SELECT
+  DISTINCT
+  program_title,
+  title_url_for_consumption,
+  url_add_minha_lista,
+  media_kit_resource__poster,
+  program_id,
+  title_id,
+  program_description
+FROM
+ ${ref('retrospectiva_2024','Trilho_Rec_Pers_por_Genero_T5_Retro2024')}

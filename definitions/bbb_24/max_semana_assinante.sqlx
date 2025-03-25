@@ -1,0 +1,33 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech"    }
+  },
+  description: 'Tabela com a flag assinou_2024 e a última semana em que o usuário aparece no cluster.',
+  columns: {
+    assinou_2024: 'Flag se o usuário assinou após 08/01/2024.',
+    max_semana: 'Última semana em que o usuário apareceu no raiox_bbb_24_assinantes.'
+  }
+
+}
+
+with max_semana as (
+  select
+ assinou_2024,
+    max(semana) as max_semana
+  from
+    ${ref("bbb_24", "raiox_bbb_24_assinantes")}
+  group by
+    1
+)
+select
+  *
+from
+  max_semana
+where
+  assinou_2024 is not null

@@ -1,0 +1,28 @@
+config {
+  type: "incremental",  
+  schema: "usuarios",
+  name: "base_ativa_incremental_old",
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+select 
+globo_id,
+id_asset,
+tipo_assinante,
+sistema,
+mais_canais,
+addon_disney,
+addon_deezer,
+Produto_Contratado,
+em_ativacao,
+dt_assinatura_comeco,
+canal_compra,
+data_hora_compra,
+produto,
+origem,
+assinatura_gplay,
+tempo_de_base_agrupado,
+CURRENT_DATE() as dt_proc from ${ref('usuarios','base_ativa_pagante_com_trial')}
+

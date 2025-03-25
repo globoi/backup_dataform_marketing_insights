@@ -1,0 +1,110 @@
+config {
+  type: "table",  
+  schema: "usuarios",
+  name: "free_users_all",
+  tags: ["usuarios_staging_2",
+        "schedule_tag=usuarios_free_users_all"
+  ],
+  description: '',
+  columns: {}
+}
+
+WITH base_internacional AS (
+  SELECT DISTINCT 
+   globo_id
+  FROM
+    ${ref('sales_gold','asset_gold')} 
+  WHERE ProductCode IN ('01t3l00000O3yOxAAJ', '01t3l00000O3yOsAAJ', '01t3l00000Oq6JTAAZ', '01t3l00000Oq6JOAAZ') AND subscription_status = 'Ativo'
+),
+gplay_int AS (
+  SELECT
+    globoID AS globo_id,
+    CountryCode as country_code,
+    GP_internacional_ind
+  FROM ${ref("consumo_clean", "globoplay_international")}
+  WHERE 
+    GP_internacional_ind NOT IN ('globo-play-beta')
+    and date_view between DATE('2022-11-03') and current_date()
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globoID ORDER BY date_view DESC) = 1
+),
+
+
+sales AS (
+ SELECT 
+    u.globoId AS globo_id,
+    u.createdAt AS dt_criacao_gid,
+    u.bornIn AS born_in,
+    u.gender,
+    u.age,
+    u_all.dt_free_inicio,
+    u_all.dt_free_fim,
+    'Salesforce' AS SISTEMA,
+    country_code,
+    GP_internacional_ind
+  FROM 
+    ${ref("globoid_clean", "globoid_user")} u
+  INNER JOIN 
+    ${ref("globoid_enriched", "globoid_user_all")} u_all
+  USING 
+    (globoId)
+  LEFT JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} b ON b.globo_id = u.globoId
+  LEFT JOIN base_internacional i ON i.globo_id = u.globoId
+  LEFT JOIN gplay_int ON gplay_int.globo_id =  u.globoId
+  
+  LEFT JOIN ${ref("sales_gold", "subscription_dependent_details")} acd 
+    ON u.globoId = acd.dependent_customer_id AND acd.status = 'Active'
+  WHERE i.globo_id IS NULL
+  AND  b.globo_id IS NULL
+  AND NOT (u.status = 'Ativo') 
+  AND acd.dependent_customer_id IS NULL
+  -- AND NOT EXISTS (
+  --   SELECT 1 FROM ${ref("sales_enriched", "relacionamento")} relacionamento 
+  --   WHERE relacionamento.Asset_status = 'Ativo' 
+  --   AND relacionamento.EVA_Status_Relacionamento__c = 'Ativo' 
+  --   AND relacionamento.globo_id_dependente = u.globoId)
+),
+
+filter_legado_users AS (
+  SELECT l.globo_id
+  FROM ${ref("legado", "user_legado_only")} AS l
+  LEFT JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS u ON u.globo_id = l.globo_id
+  LEFT JOIN sales AS s ON s.globo_id = l.globo_id
+  WHERE 
+    u.globo_id IS NULL
+    AND s.globo_id IS NULL
+),
+
+legado_users AS (
+  SELECT legado.* FROM ${ref("legado", "user_legado_only")} AS legado
+  INNER JOIN filter_legado_users AS filt ON filt.globo_id = legado.globo_id
+)
+
+SELECT 
+  globo_id,
+  dt_criacao_gid,
+  born_in,
+  gender,
+  age,
+  dt_free_inicio,
+  dt_free_fim,
+  SISTEMA,
+  country_code,
+  GP_internacional_ind
+FROM
+  sales
+
+UNION ALL
+
+SELECT 
+  globo_id,
+  dt_criacao_gid,
+  born_in,
+  gender,
+  age,
+  dt_free_inicio,
+  dt_free_fim,
+  SISTEMA,
+  country_code,
+  GP_internacional_ind
+FROM
+  legado_users

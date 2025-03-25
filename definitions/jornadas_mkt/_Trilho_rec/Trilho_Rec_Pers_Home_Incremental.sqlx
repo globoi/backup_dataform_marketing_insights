@@ -1,0 +1,18 @@
+config {
+  type: "incremental",  
+  schema: "trilho",
+  name: "Trilho_Rec_Pers_Home_Incremental",
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+SELECT
+  globo_id,
+  program_title,
+  title_url_for_consumption,
+  rank_final,
+  program_id,
+  title_id,
+  CURRENT_DATE() AS dt_proc
+ FROM ${ref('trilho','Trilho Rec Pers Home T5')}

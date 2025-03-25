@@ -1,0 +1,63 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old', 'schedule_tag=macro_clusters_mkt_mktflow_base_automatica_torcedores_flamengo_2'],
+  name: 'mktflow_base_automatica_torcedores_flamengo_2',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true",
+      urban:"list"
+    }
+  }
+}
+
+-- Base de torcedores do Flamengo, sejam usuários assinantes ou LF 
+
+-- Nova fonte de times do coração, snapshot diário
+-- estrutura-esportes.Cartola.TimeCoracao_Cart18_20_GE
+WITH
+  base_ult_com AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("comunicacao", "ultima_comunicacao_geral")} 
+  )
+
+SELECT
+  'named_user' AS identifier_type,
+  globoid AS globo_id
+FROM
+  ${ref("Cartola", "TimeCoracao_Cart18_20_GE")} AS a
+INNER JOIN 
+  base_ult_com AS b 
+    ON a.globoID = b.globo_id
+WHERE
+  time_aferido = 'Flamengo'
+
+
+
+-- Backup do processo pela tabela que consulta somente GE
+-- WITH
+-- base as (
+--   SELECT
+-- _TABLE_SUFFIX as part,
+-- *,
+-- row_number() over (partition by globoID order by updated_at desc) row_desc
+-- FROM  
+-- ${ref("globoid_public", "attributes_*")}
+-- WHERE attribute_key = 'time_futebol_coracao'
+-- AND _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) )
+-- AND globoID in (
+--   SELECT globo_id
+--   FROM ${ref("comunicacao", "ultima_comunicacao_geral")}
+--   )
+-- )
+-- SELECT distinct 'named_user' as identifier_type, globoID as globo_id, attribute_value
+-- FROM base
+-- WHERE lower(attribute_value) IN (
+--   'flamengo', 
+--   'Flamengo')
+-- order by 3 asc

@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=combate_mkt_mktflow_base_ativa_v2', 'schedule_cron=30 12 * * *'],
+    name: 'mktflow_base_ativa_v2',
+    schema: 'combate_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "combate_mkt"
+        }
+    }
+}
+
+SELECT globo_id,asset_name 
+FROM ${ref("sales_gold", "asset_gold")} --`gglobo-foundation-psd-hdg-prd.sales_gold.asset_gold` 
+WHERE 
+asset_name LIKE '%Combate%'
+AND state LIKE '%active%'

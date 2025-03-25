@@ -1,0 +1,17 @@
+config {
+    type: 'table',
+    name: 'atualizacao_base_ultima_abertura_app',
+    schema: 'atualizacao_tabelas',
+    tags: ['atualizacao_tabelas',
+        'atualizacao_tabelas_2',
+        'schedule_tag=atualizacao_tabelas_atualizacao_base_ultima_abertura_app',
+        "schedule_cron=0 10,13 * * *"
+    ],
+    description: '',
+    columns: {}
+}
+
+SELECT
+  MAX(Data_Abertura) AS max_data_abertura
+FROM
+  ${ref('comunicacao', 'base_ultima_abertura_app')}

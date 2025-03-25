@@ -1,0 +1,30 @@
+config {
+  type: "table",
+  name: "mktflow_Trilho_Rec_Genero_T5_Pivoted",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_mktflow_Trilho_Rec_Genero_T5_Pivoted']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT 
+  globo_id,
+  rank_1,
+  rank_2,
+  rank_3,
+  rank_4,
+  rank_5,
+  personalizado
+FROM ${ref("jornadas_mkt", "Trilho_rec_genero_t5_alt_pivoted")}
+UNION ALL 
+SELECT 
+  globo_id,
+  rank_1,
+  rank_2,
+  rank_3,
+  rank_4,
+  rank_5,
+  personalizado
+FROM ${ref("jornadas_mkt", "Lst_Rec_Pers_Genero_T5_Pivoted")}

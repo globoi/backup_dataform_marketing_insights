@@ -1,0 +1,50 @@
+config {
+  type: "table",
+  schema: "bbb_22",
+  name: "base_desistencia",
+  tags: ["bbb_22"],
+}
+WITH base AS (
+  SELECT * EXCEPT(assinou_2022,Cluster_BBB_Acumulado, Cluster_Share_BBB_Total),
+        "desistencia_total" as desistencia,
+        DATE_TRUNC(data_desistencia, MONTH) AS mes_desistencia,
+        CASE  
+          WHEN Cluster_Share_BBB_Total IS NULL 
+            THEN False
+          ELSE assinou_2022
+        END AS assinou_2022,
+        CASE 
+          WHEN Cluster_Share_BBB_Total IS NULL 
+            THEN "Sem BBB"
+          ELSE Cluster_Share_BBB_Total
+        END AS Cluster_Share_BBB_Total,
+        CASE
+          WHEN Cluster_BBB_Acumulado IN ('0.NoLive' ,
+                                        '1.LightUser' ,
+                                        '2.Mid-LightUser' ,
+                                        '3.Mid-HeavyUser' ,
+                                        'Sem BBB',
+                                        '4.HeavyUser' )
+              THEN Cluster_BBB_Acumulado
+          WHEN Cluster_BBB_Acumulado  is null THEN 'Sem BBB'
+        END AS Cluster_BBB_Acumulado
+  FROM ${ref("bbb_22","base_acompanhamento")} 
+  WHERE data_desistencia IS NOT NULL
+)
+  SELECT * 
+  FROM
+  (
+    SELECT  assinou_2022,
+            mes_desistencia,
+            Cluster_BBB_Acumulado,
+            Cluster_Share_BBB_Total,
+            desistencia,
+            id_asset
+    FROM base
+  )
+  PIVOT (
+    COUNT(id_asset) 
+    FOR desistencia IN ('desistencia_total')
+  )
+
+

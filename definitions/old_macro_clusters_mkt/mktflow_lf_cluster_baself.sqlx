@@ -1,0 +1,18 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_baself'],
+  name: 'mktflow_lf_cluster_baself',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT distinct 'named_user' as identifier_type, globo_id
+FROM ${ref("comunicacao", "ultima_comunicacao_geral")}
+WHERE tipo_cadastro = 'Logado Free'

@@ -1,0 +1,47 @@
+config {
+  type: 'table',
+  tags: ['usuarios_staging_3',
+         "schedule_tag=usuarios_dados_usuarios_assinantes"
+  ],
+  name: 'dados_usuarios_assinantes',
+  schema: 'usuarios',
+  description: '',
+  columns: {}
+}
+
+WITH
+step_info AS (
+  SELECT
+    globo_id, id_asset, tipo_assinante, mais_canais, dt_assinatura_comeco, canal_compra,
+    data_hora_compra, produto, Produto_Contratado,
+    origem, tempo_de_base_agrupado, numero_assinaturas,
+    numero_dependentes, gender, age, address_state
+  FROM
+    ${ref("usuarios", "step_info")}
+),
+
+primeiro_play AS (
+  SELECT
+    first_play, first_play_subset, data_first_play,
+    assetid AS id_asset, globo_id
+  FROM
+    ${ref("consumo","perfil_assinante__primeiro_play")}
+),
+
+ultimo_consumo AS (
+  SELECT
+    ultimo_consumo,
+    ultimo_consumo_subset,
+    assetid AS id_asset,
+    globo_id,
+    DATE(data_ultimo_consumo, "America/Sao_Paulo") AS data_ultimo_consumo
+  FROM
+    ${ref("consumo", "ultimo_consumo")}
+)
+
+SELECT 
+  *
+FROM
+  step_info
+  LEFT JOIN primeiro_play USING(globo_id, id_asset)
+  LEFT JOIN ultimo_consumo USING (globo_id, id_asset)

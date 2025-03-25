@@ -1,0 +1,51 @@
+config {
+  type: 'table',
+  name: 'RaioX_BBB_22_ultima_comunicacao',
+  schema: 'bbb_22',
+  description: '',
+  columns: {}
+}
+
+WITH 
+lista_globoid AS (
+    SELECT
+       DISTINCT(globo_id)
+    FROM
+        ${ref("bbb_22", "Raiox_BBB_22_Agrupado_historico")}
+),
+
+optin AS (
+    SELECT
+        globo_id,
+        Status_Opt_In
+    FROM
+        ${ref("comunicacao", "base_opt_in_whatsapp")}
+     QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id) = 1
+),
+
+ultima_step_1 AS (
+    SELECT
+        globo_id, tipo_assinante, canal_compra, produto,
+        tempo_de_base_agrupado, gender, age,first_play,
+        ultimo_consumo, data_ultimo_consumo, Produto_Contratado,
+        telefone, endereco,Perfil_Email, Perfil_Uso_Push,
+        Flag_Recebeu_Email_30D, Flag_Abriu_Email_30D,Flag_Recebeu_Push_30D,
+        Flag_Abriu_App_30D, Flag_Abriu_Push_30D
+    FROM
+        ${ref("comunicacao", "ultima_comunicacao_assinante")}
+),
+
+ultima_step_2 AS (
+    SELECT
+        * EXCEPT(Status_Opt_In),
+        COALESCE(Status_Opt_In, FALSE) AS Status_Opt_In
+    FROM
+        ultima_step_1
+        INNER JOIN lista_globoid
+        USING(globo_id)
+        LEFT JOIN optin
+        USING(globo_id)
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id) = 1
+)
+
+SELECT * FROM ultima_step_2

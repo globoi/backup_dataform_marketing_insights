@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.defaultDatabase,
+  schema: "raw",
+  name: "Genero programas",
+  description: ""
+}

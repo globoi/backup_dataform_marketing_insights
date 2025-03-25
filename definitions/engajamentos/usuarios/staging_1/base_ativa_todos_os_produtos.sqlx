@@ -1,0 +1,172 @@
+config {
+  type: "table",
+  name: "base_ativa_todos_os_produtos",
+  schema: "usuarios",
+    bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "usuarios",
+      owner: "mins",
+      horario: "08h30min",
+      origem: "sales_gold-salesforce"
+    }
+  },
+  description: 'Tabela de assinantes ativos de todos os produtos (pagantes/cupom/trial).',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    tipo_assinante: 'Identifica se o usuário é titular ou dependente.',
+    sistema: 'Identifica o sistema de registro do assinante (Ex: SalesForce).',
+    info: {
+      description: "Array com as informações da assinatura.",
+      columns: {
+        id_asset: 'Código que identifica a assinatura.',
+        data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+        dt_assinatura_comeco: 'Identifica a data mínima de assinatura do usuário.',
+        activation_at: 'Data da ativação da assinatura (GMT-3).',
+        unsubscribe_at: 'Data de cancelamento (GMT-3).',
+        scheduled_unsubscribe_at: 'Data de agendamento do cancelamento.',
+        end_cycle_at: 'Data de final do ciclo da assinatura.',
+        canal_compra: 'Canal de Assinatura (Web, Inapp Google, Inapp Apple, Inapp Roku e etc).',
+        Produto_Contratado: 'Identifica o produto contratado pelo usuário (Ex: Globoplay, Premiere, Disney +, etc).',
+        produto: 'Identifica a periodicidade da cobrança do produto adquirido.(Ex: Anual, bianual ou mensal).',
+        origem: 'Identifica a origem da assinatura do usuário.(Ex: Venda direta, Trial, Upgrade.)',
+        assinatura_gplay: 'Identifica se a assinatura é nacional ou internacional.',
+        subscription_type: 'Forma como a assinatura foi adquirida.',
+        subscription_status: 'Último status da assinatura (Ativo, Cancelado, Suspenso, Em Upgrade, Em Downgrade, Em ativação, Pagamento Pendente, Em Upgrade Agendado, Em cancelamento, Em Crossgrade Agendado).',
+        status: 'Valor que descreve o status do cliente.',
+        origin_id: 'Identificador da origem da compra do usuário.',
+        origin_name: 'Nome da origem da compra do usuário.',
+        tempo_de_base: 'Tempo de base (em dias) do usuário.',
+        tempo_de_base_agrupado: 'Identifica o tempo de base agrupado do usuario.(Ex: 1. Até 1 mês)',
+        mais_canais: 'Identifica se o usuário possui o mais canais no pacote de assinatura.'
+      }
+    }
+  }
+}
+
+with base_ativa as (SELECT
+  ss.globo_id,
+  ss.object_id as id_asset, 
+  'titular' as tipo_assinante,
+    CASE
+      WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais,
+      timestamp(sd.subscription_at) as data_hora_compra,
+  sd.activation_at,
+  sd.unsubscribe_at,
+  sd.scheduled_unsubscribe_at,
+  sd.end_cycle_at,
+  sd.purchase_channel as canal_compra,
+  pd.name as Produto_Contratado,
+        date(COALESCE(
+      min(sd.subscription_at),
+      CAST(sd.activation_at AS DATE)
+    )) as dt_assinatura_comeco,  sd.billing_frequency as produto,
+  case when NOT ass.teve_degustacao THEN 'Venda direta'
+  WHEN LOWER(ass.eva_tipo_de_aquisicao_c) LIKE '%upgrade%' THEN 'Upgrade'
+  WHEN LOWER(ass.eva_tipo_de_aquisicao_c) LIKE '%downgrade%' THEN 'Downgrade'
+  when ass.teve_degustacao then 'Trial' else ass.eva_tipo_de_aquisicao_c end as origem,
+  case when pd.is_international = FALSE then 'nacional' else 'internacional' end as assinatura_gplay,
+  subscription_type,
+  sd.subscription_status,
+  ss.state as status,
+  sd.origin_id,
+  sd.origin_name,
+      DATE_DIFF(
+      CURRENT_DATE(),
+      COALESCE(
+        min(sd.subscription_at),
+        CAST(sd.activation_at AS DATE)
+      ),
+      DAY
+    ) AS tempo_de_base
+  FROM ${ref('sales_gold','subscription_state')} ss
+JOIN ${ref('sales_gold','subscription_details')} sd ON ss.object_id = sd.id 
+JOIN ${ref('sales_gold','product_details')} pd ON sd.product_id = pd.id
+join (select id,eva_tipo_de_aquisicao_c, eva_periodo_trial_form_c > 0 AS teve_degustacao from ${ref('salesforce','asset')}) ass on ss.object_id = ass.id
+WHERE
+  DATE(ss.state_date) = CURRENT_DATE-1
+    AND lower(ss.state) like '%active%'
+    and lower(ss.state) not like '%active_coupon%' 
+        group by all
+  
+  ),
+base as (select *,    CASE
+      WHEN tempo_de_base <= 30 THEN '1. Até 1 mês'
+      WHEN tempo_de_base <= 60 THEN '2. Entre 1 e 2 Meses'
+      WHEN tempo_de_base <= 90 THEN '3. Entre 2 e 3 Meses'
+      WHEN tempo_de_base <= 180 THEN '4. Entre 3 e 6 Meses'
+      WHEN tempo_de_base <= 360 THEN '5. Entre 6 e 12 Meses'
+      WHEN tempo_de_base <= 720 THEN '6. Entre 12 e 24 Meses'
+      ELSE '7. Mais de 24 Meses'
+    END AS tempo_de_base_agrupado from base_ativa),
+
+    titular_sf as (
+ select globo_id,
+ tipo_assinante,
+ array_agg(
+      struct(
+        id_asset,
+        data_hora_compra,
+                dt_assinatura_comeco,
+        activation_at,
+        unsubscribe_at,
+        scheduled_unsubscribe_at,
+        end_cycle_at,
+        canal_compra,
+                Produto_Contratado,
+        produto,
+        origem,
+        assinatura_gplay,
+        subscription_type,
+        subscription_status,
+        status,
+        origin_id,
+        origin_name,
+        tempo_de_base,
+        tempo_de_base_agrupado,
+        mais_canais
+      )
+    ) as info from base where globo_id is not null
+     group by all),
+dependentes_sf_step1 AS (
+  SELECT
+    DISTINCT ss.globo_id as globoid_tit,
+    acd.D_2_C_Dependent_Globo_ID_c as globoid_dep
+  FROM ${ref('sales_gold','subscription_state')} ss
+    JOIN ${ref('sales_gold','subscription_details')} sd ON ss.object_id = sd.id
+    JOIN ${ref('sales_gold','product_details')} pd ON sd.product_id = pd.id
+    left join ${ref('salesforce','d_2_c_account_dependent_c')} acd ON sd.customer_id = acd.d_2_c_parent_c
+  WHERE
+    DATE(ss.state_date) = CURRENT_DATE -1
+    AND lower(ss.state) like '%active%'
+    and lower(ss.state) not like '%active_coupon%' 
+    --  AND sd.subscription_status = 'Ativo'
+   -- AND LOWER(pd.name) LIKE '%globoplay%'
+    and D_2_C_Status_c = 'Active'
+),
+
+dependentes_sf AS (
+  SELECT
+    dependentes_sf_step1.globoid_dep AS globo_id,
+    'dependente' as tipo_assinante,
+    titular_sf.info
+      FROM
+    dependentes_sf_step1
+    INNER JOIN titular_sf ON dependentes_sf_step1.globoid_tit = titular_sf.globo_id
+    where dependentes_sf_step1.globoid_dep is not null
+)
+SELECT
+  *
+FROM
+  dependentes_sf
+  where globo_id is not null
+
+UNION ALL
+SELECT
+  *
+FROM
+  titular_sf
+  where globo_id is not null

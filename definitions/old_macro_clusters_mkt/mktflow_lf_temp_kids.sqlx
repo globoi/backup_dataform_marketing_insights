@@ -1,0 +1,32 @@
+config {
+    type: "table",
+    name: "mktflow_lf_temp_kids",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old", 'schedule_tag=macro_clusters_mkt_mktflow_lf_temp_kids'],
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+SELECT
+  imp.userid AS globo_id,
+  SUM(
+    CASE
+      WHEN imp.program_subset = 'kids' THEN 1
+    ELSE
+    0
+  END
+    )AS kids_play,
+  COUNT(*) AS Plays
+FROM
+  ${ref("consumo_enriched", "impression")} AS imp
+INNER JOIN
+  ${ref("usuarios", "Free users")} AS fu
+ON
+  fu.globo_id = imp.userid
+GROUP BY
+  1
+HAVING
+  SAFE_DIVIDE(kids_play,Plays) >= 0.15

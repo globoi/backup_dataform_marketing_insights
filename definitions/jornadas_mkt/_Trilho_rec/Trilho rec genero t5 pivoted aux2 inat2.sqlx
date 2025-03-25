@@ -1,0 +1,17 @@
+config {
+  type: "table",
+  name: "Trilho rec genero t5 pivoted aux2 inat2",
+  schema: "trilho"
+  
+}
+
+---desativada
+---tags: ['trilho_rec', 'schedule_tag=trilho_Trilho_rec_genero_t5_pivoted_aux2_inat2']
+SELECT DISTINCT
+  program_title,
+  title_url_for_consumption,
+  media_kit_resource__poster,
+  program_id,
+  title_id
+FROM 
+  ${ref("trilho", "Trilho rec pers por genero t5 inat2")}

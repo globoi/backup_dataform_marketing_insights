@@ -1,0 +1,16 @@
+config {
+  type: 'table',
+  name: 'base_cancelados_vol',
+  tags: ['bbb_22'],
+  schema: 'bbb_22',
+}
+SELECT AssetId as id_asset, 
+       globo_id,
+       data_hora_cancelamento,
+       dt_hr_cancelamento_final_ciclo,
+       DATE_TRUNC(data_hora_cancelamento, MONTH) AS mes_sol_cancel,
+       DATE_TRUNC(dt_hr_cancelamento_final_ciclo, MONTH) AS mes_cancel_efet,
+FROM ${ref("usuarios","base_cancelamento")} 
+WHERE LOWER(AssetName) LIKE "%globoplay%"
+
+

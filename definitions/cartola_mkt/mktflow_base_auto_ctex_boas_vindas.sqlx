@@ -1,0 +1,103 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_auto_ctex_boas_vindas', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_auto_ctex_boas_vindas',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  cadastro AS (
+  SELECT
+    globo_id,
+    CAST(created_at AS DATE) AS data_cadastro,
+    has_cell_phone_confirmed
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.d_account`
+    ${ref("analytics", "d_account")}
+  ),
+  bonus_cad AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_bonus`
+    ${ref("analytics", "f_bonus")}
+  WHERE
+    status_id != 2
+    AND value > 0
+    AND classification = "CADASTRO" ),
+  ftd AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_deposit`
+    ${ref("analytics", "f_deposit")}
+  WHERE
+    status_id = 2 ),
+  entries AS (
+  SELECT
+    globo_id,
+    COUNTIF(bet_value = 0) AS entradas_free,
+    COUNTIF(bet_value > 0) AS entradas_pagas,
+    SUM(IFNULL(ledger_entry_bonus_amount,0)) AS bonus_gasto
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_entry`
+    ${ref("analytics", "f_entry")}
+  WHERE
+    status_id != 1
+  GROUP BY
+    1 ),
+  saldo AS (
+  SELECT
+    globo_id,
+    total_wallet_current_value
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.d_wallet`
+    ${ref("analytics", "d_wallet")}
+  )
+SELECT
+  c.globo_id,
+  c.data_cadastro,
+IF
+  (bc.globo_id IS NOT NULL, TRUE, FALSE) AS recebeu_bonus_cadastro,
+IF
+  (ftd.globo_id IS NOT NULL, TRUE, FALSE) AS fez_primeiro_deposito,
+IF
+  (e.globo_id IS NOT NULL
+    AND e.entradas_pagas > 0, TRUE, FALSE) AS entrou_disputa_paga,
+IF
+  (e.globo_id IS NOT NULL
+    AND e.entradas_free > 0, TRUE, FALSE) AS entrou_disputa_free,
+IF
+  (IFNULL(s.total_wallet_current_value, 0) < 1, TRUE, FALSE) AS possui_menos_de_1_real,
+IF
+  (c.has_cell_phone_confirmed IS TRUE, TRUE, FALSE) AS possui_telefone_cadastrado,
+IF
+  (e.bonus_gasto > 0, TRUE, FALSE) AS utilizou_bonus
+FROM
+  cadastro c
+LEFT JOIN
+  bonus_cad bc
+ON
+  c.globo_id = bc.globo_id
+LEFT JOIN
+  ftd
+ON
+  c.globo_id = ftd.globo_id
+LEFT JOIN
+  entries e
+ON
+  c.globo_id = e.globo_id
+LEFT JOIN
+  saldo s
+ON
+  c.globo_id = s.globo_id

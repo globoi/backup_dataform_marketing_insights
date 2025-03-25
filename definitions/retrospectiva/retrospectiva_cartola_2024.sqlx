@@ -1,0 +1,79 @@
+config {
+    type: 'table',
+    name: 'retrospectiva_cartola_2024',
+    schema: 'retrospectiva',
+    description: 'retrospectiva cartola em 2024',
+    columns: {}
+}
+
+
+-- CARTOLA RODADAS ESCALADAS 
+
+WITH dados_tratados AS ( 
+SELECT globo_id as globoid 
+  , ultima_escalacao_dt 
+  , CASE WHEN EXTRACT(HOUR FROM ultima_escalacao_dt) >= 00 AND EXTRACT(HOUR FROM ultima_escalacao_dt) < 06 THEN "Madrugada"  
+         WHEN EXTRACT(HOUR FROM ultima_escalacao_dt) >= 06 AND EXTRACT(HOUR FROM ultima_escalacao_dt) < 12 THEN "Manhã"  
+         WHEN EXTRACT(HOUR FROM ultima_escalacao_dt) >= 12 AND EXTRACT(HOUR FROM ultima_escalacao_dt) < 18 THEN "Tarde"  
+         WHEN EXTRACT(HOUR FROM ultima_escalacao_dt) >= 18 AND EXTRACT(HOUR FROM ultima_escalacao_dt) <= 23 THEN "Noite"  
+  END AS periodo_escalacao 
+  , CASE WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 1 THEN "Domingo"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 2 THEN "Segunda"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 3 THEN "Terça"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 4 THEN "Quarta"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 5 THEN "Quinta"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 6 THEN "Sexta"  
+         WHEN EXTRACT(DAYOFWEEK FROM ultima_escalacao_dt) = 7 THEN "Sábado"  
+  END AS dia_semana_escalacao 
+  , COUNT(*) as contagem 
+FROM --`gglobo-cartola-hdg-prd.report_staging.report_rodada` 
+ ${ref("report_staging", "report_rodada")}
+WHERE temporada = 2024 AND escalacoes_num > 0 
+GROUP BY ALL), 
+ 
+-- PEGAR GLOBOIDS E TOTAL DE PAGEVIEWS  
+usuarios AS ( 
+SELECT DISTINCT globoid 
+  , SUM(contagem) as contagem 
+FROM dados_tratados 
+GROUP BY ALL), 
+ 
+  
+--PEGAR O DIA DA SEMANA DE MAIOR CONSUMO 
+dia_semana AS ( 
+SELECT * 
+FROM(   
+SELECT DISTINCT globoid 
+  , dia_semana_escalacao 
+  , SUM(contagem) as contagem 
+  , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY SUM(contagem) DESC) AS rk_dia_semana_consumo 
+FROM dados_tratados 
+GROUP BY ALL 
+) 
+WHERE rk_dia_semana_consumo = 1 
+ORDER BY globoid DESC 
+), 
+
+--PEGAR O PERIODO DE MAIOR CONSUMO 
+periodo AS ( 
+SELECT * 
+FROM(   
+SELECT DISTINCT globoid 
+  , periodo_escalacao 
+  , SUM(contagem) as contagem 
+  , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY SUM(contagem) DESC) AS rk_periodo_consumo 
+FROM dados_tratados 
+GROUP BY ALL 
+) 
+WHERE rk_periodo_consumo = 1 
+ORDER BY globoid DESC 
+) 
+ 
+-- JUNTAR OS DADOS 
+SELECT DISTINCT usuarios.globoid 
+  , usuarios.contagem as cartola_rodada_escalada 
+  , dia_semana.dia_semana_escalacao as cartola_dia_semana 
+  , periodo.periodo_escalacao as cartola_periodo 
+FROM usuarios 
+LEFT JOIN dia_semana ON usuarios.globoid = dia_semana.globoid  
+LEFT JOIN periodo ON usuarios.globoid = periodo.globoid  

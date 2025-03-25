@@ -1,0 +1,59 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_humor',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_humor',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram programas de humor vod (filmes,series ou programas) ou programas de humor ao vivo nos ultimos 180 dias.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+--macro cluster premium humor
+--assinantes premium que consumiram programas de humor vod (filmes,series ou programas) ou programas de humor ao vivo nos ultimos 180 dias.
+
+with 
+consumo_em_genero_humor as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  INNER JOIN ${ref('jornadas_mkt','genero_todas_combinacoes')} b
+    ON a.program_id = b.program_id
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND lower(genero) in('humor', 'comédia') 
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.16
+),
+
+consumo_em_programas_ao_vivo_humor as (
+  SELECT distinct globoid, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')} 
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND subgenero_programa in ('COMEDIA','HUMORISTICO')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.16
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT globo_id, 'consumo humor' as base
+  FROM consumo_em_genero_humor
+
+  UNION DISTINCT
+  
+  SELECT globoid as globo_id, 'consumo humor' as base
+  FROM consumo_em_programas_ao_vivo_humor
+)
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+

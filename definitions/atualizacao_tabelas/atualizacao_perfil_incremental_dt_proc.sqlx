@@ -1,0 +1,28 @@
+config {
+    type: 'table',
+    name: 'atualizacao_perfil_incremental_dt_proc',
+    schema: 'atualizacao_tabelas',
+    tags: ['atualizacao_tabelas',
+        'atualizacao_tabelas_2',
+        'schedule_tag=atualizacao_tabelas_atualizacao_perfil_incremental_dt_proc',
+         "schedule_cron=0 10,13 * * *"
+    ],
+    description: '',
+    columns: {}
+}
+
+WITH
+  tabela AS (
+  SELECT
+    dt_proc,
+    COUNT(*) AS qtd_registros
+  FROM
+    ${ref('usuarios', 'perfil_assinantes_ativo_incremental')}
+  GROUP BY
+    1 )
+SELECT
+  *
+FROM
+  tabela
+ORDER BY
+  1 desc

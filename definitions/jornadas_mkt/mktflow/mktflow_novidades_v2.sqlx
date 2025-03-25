@@ -1,0 +1,150 @@
+config {
+  type: "table",
+  name: "mktflow_novidades_v2",
+  schema: "jornadas_mkt"
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+---tabela desativada
+---tags: ["mktflow_novidades_v2", 'schedule_tag=jornadas_mkt_mktflow_novidades_v2']
+
+WITH 
+program AS (
+  SELECT * FROM ${ref("conteudo_enriched", "program")}
+),
+
+primeiro_consumo AS (
+  SELECT * FROM ${ref("consumo", "primeiro_consumo_usuarios")}
+),
+
+auxiliar_tier AS (
+  SELECT * FROM ${ref("jornadas_mkt", "auxiliar_tier")}
+),
+
+program_daily AS (
+  SELECT 
+    *,
+    row_number() OVER (PARTITION BY program_id ORDER BY `date` ASC) AS filtro
+  FROM 
+  ( SELECT
+      *,
+      sum(unique_users) OVER (
+        PARTITION BY program_id ORDER BY `date` ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) AS running_total,
+      row_number() OVER (PARTITION BY program_id ORDER BY date ASC) AS linhas 
+    FROM 
+      ${ref("consumo_derived", "program_daily")}
+    WHERE 
+      program_subset IN ("special", "varieties", "humor", "series", "novelas", "realities", "kids")
+  )
+  WHERE 
+    running_total > 100
+),
+
+datas_lancamento AS (
+  SELECT DISTINCT
+    program_id,
+    program_title,
+    program_subset,
+    `date` 
+  FROM 
+    program_daily
+  WHERE 
+    filtro = 1
+),
+
+novidades_1 AS (
+  SELECT 
+    *,
+    date_diff(current_date(), `date`, DAY) AS idade
+  FROM 
+    datas_lancamento
+),
+
+novidades_2 AS (
+  SELECT 
+    *,
+    row_number() OVER (PARTITION BY program_subset ORDER BY date desc) AS newest,
+    row_number() OVER (PARTITION BY program_subset, tier_1 ORDER BY date desc) AS newest_tier_1_temp
+  FROM 
+    novidades_1 
+  LEFT JOIN 
+    auxiliar_tier
+  USING
+    (program_id)
+
+),
+
+novidades_3 AS (
+  SELECT 
+    *,
+    CASE WHEN tier_1 = "tier_1" THEN newest_tier_1_temp ELSE NULL END AS newest_tier_1
+  FROM 
+    novidades_2
+  WHERE 
+    newest <= 10 AND newest_tier_1_temp <= 10
+),
+
+novidades_4 AS (
+  SELECT 
+    program_id,
+    program_title,
+    program_subset,
+    `date`,
+    idade,
+    newest_tier_1,
+    newest,
+    current_date() AS dt_proc
+  FROM 
+    novidades_3
+),
+
+novidades_5 AS (
+  SELECT 
+    * EXCEPT (program_id, program_title, program_subset), 
+    novidades_4.program_id,
+    novidades_4.program_title,
+    novidades_4.program_subset
+  FROM 
+    novidades_4
+  LEFT JOIN 
+    program 
+  ON 
+    novidades_4.program_id = program.id
+  LEFT JOIN 
+    primeiro_consumo 
+  USING 
+    (program_id)
+),
+
+novidades_6 AS (
+  SELECT
+    dt_proc,
+    program_id,
+    program_title,
+    program_subset,
+    `date`,
+    idade,
+    newest_tier_1,
+    newest,
+    media_kit_resource__poster,
+    url_for_consumption,
+    SUM(Usuario_dia_0) AS SUM_of_Usuario_dia_0
+  FROM 
+    novidades_5
+  GROUP BY 
+    dt_proc, program_id, program_title, program_subset, `date`, idade, newest_tier_1, newest, 
+    media_kit_resource__poster, url_for_consumption
+)
+
+SELECT 
+  * EXCEPT (SUM_of_Usuario_dia_0,status)
+FROM 
+  novidades_6 
+    inner join (select distinct program_id, status from ${ref("conteudo_enriched", "all_content")} where status='published') using(program_id)
+WHERE 
+  SUM_of_Usuario_dia_0 >= 1000

@@ -1,0 +1,195 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech",
+      horario: "11h00min"
+    }
+  },
+  description: 'Tabela com os LFs/Ex-Assinantes e o histórico de consumo/cancelamento em BBB.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+tipo_usuario: 'Classificação do usuário em Logado Free/Ex-Assinante.', 
+consumiu_bbb_20: 'Flag se o usuário consumiu o BBB 2020.',
+assinou_cancelou_bbb_20:'Flag se o usuário assinou entre 01/01/2020 e 30/04/2020, solicitou o cancelamento entre 01/04/2020 e 31/05/2020 e teve a assinatura cancelada no ano de 2020.',
+consumiu_bbb_21:'Flag se o usuário consumiu o BBB 2021.',
+assinou_cancelou_bbb_21:'Flag se o usuário assinou entre 01/01/2021 e 30/04/2021, solicitou o cancelamento entre 01/04/2021 e 31/05/2021 e teve a assinatura cancelada no ano de 2021.',
+consumiu_bbb_22:'Flag se o usuário consumiu o BBB 2022.',
+assinou_cancelou_bbb_22:'Flag se o usuário assinou entre 01/01/2022 e 30/04/2022, solicitou o cancelamento entre 01/04/2022 e 31/05/2022 e teve a assinatura cancelada no ano de 2022.',
+consumiu_bbb_23:'Flag se o usuário consumiu o BBB 2023.',
+consumiu_bbb_23_simulcast:'Flag se o usuário consumiu o BBB 2023 ao vivo via GA/SIMULCAST.',
+assinou_cancelou_bbb_23:'Flag se o usuário assinou entre 01/01/2023 e 30/04/2023, solicitou o cancelamento entre 01/04/2023 e 31/05/2023 e teve a assinatura cancelada no ano de 2023.'
+  }
+}
+
+WITH base_bbb_20 AS (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS consumiu_bbb_20
+  FROM
+    ${ref('bbb_20', 'status_Erick_historico')}
+),
+base_bbb_21 AS (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS consumiu_bbb_21
+  FROM
+    ${ref('bbb_21', 'raiox_bbb_21_propensao_churn')}
+),
+base_bbb_22 AS (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS consumiu_bbb_22
+  FROM
+    ${ref('bbb_22', 'Raiox_BBB_22_Agrupado_historico')}
+),
+base_bbb_23 AS (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS consumiu_bbb_23
+  FROM
+    ${ref('bbb_23', 'Raiox_BBB_23_Assinantes_Agrupado')}
+),
+base_bbb_23_simulcast as (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS consumiu_bbb_23_simulcast
+  from
+    ${ref('bbb_23', 'Raiox_BBB_23_LF_Simulcast')}
+),
+lfs AS (
+  SELECT
+    DISTINCT globo_id,
+    tipo_cadastro
+  FROM
+    ${ref('comunicacao', 'ultima_comunicacao_geral')}
+  where
+    tipo_cadastro = 'Logado Free'
+),
+base_rein AS (
+  SELECT
+    DISTINCT id,
+    product_name,
+    (
+      subscription_at BETWEEN '2020-01-01'
+      AND '2020-04-30'
+    )
+    AND (
+      unsubscribe_at BETWEEN '2020-04-01'
+      AND '2020-05-31'
+    )
+    AND (
+      EXTRACT(
+        YEAR
+        FROM
+          end_cycle_at
+      ) = 2020
+    ) AS assinou_cancelou_bbb_20,
+    (
+      subscription_at BETWEEN '2021-01-01'
+      AND '2021-04-30'
+    )
+    AND (
+      unsubscribe_at BETWEEN '2021-04-01'
+      AND '2021-05-31'
+    )
+    AND (
+      EXTRACT(
+        YEAR
+        FROM
+          end_cycle_at
+      ) = 2021
+    ) AS assinou_cancelou_bbb_21,
+    (
+      subscription_at BETWEEN '2022-01-01'
+      AND '2022-04-30'
+    )
+    AND (
+      unsubscribe_at BETWEEN '2022-04-01'
+      AND '2022-05-31'
+    )
+    AND (
+      EXTRACT(
+        YEAR
+        FROM
+          end_cycle_at
+      ) = 2022
+    ) AS assinou_cancelou_bbb_22,
+    (
+      subscription_at BETWEEN '2023-01-01'
+      AND '2023-04-30'
+    )
+    AND (
+      unsubscribe_at BETWEEN '2023-04-01'
+      AND '2023-05-31'
+    )
+    AND (
+      EXTRACT(
+        YEAR
+        FROM
+          end_cycle_at
+      ) = 2023
+    ) AS assinou_cancelou_bbb_23,
+    subscription_status,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at
+  FROM
+    ${ref('sales_gold', 'subscription_details')}
+),
+base_rein2 AS (
+  SELECT
+    *
+  FROM
+    base_rein
+    JOIN ${ref('sales_gold', 'last_subscription_state')} AS s ON s.object_id = base_rein.id
+  WHERE
+    LOWER(product_name) LIKE '%globoplay%'
+),
+base_rein3 AS (
+  SELECT
+    globo_id,
+    COALESCE(MAX(assinou_cancelou_bbb_20), FALSE) AS assinou_cancelou_bbb_20,
+    COALESCE(MAX(assinou_cancelou_bbb_21), FALSE) AS assinou_cancelou_bbb_21,
+    COALESCE(MAX(assinou_cancelou_bbb_22), FALSE) AS assinou_cancelou_bbb_22,
+    COALESCE(MAX(assinou_cancelou_bbb_23), FALSE) AS assinou_cancelou_bbb_23
+  FROM
+    base_rein2
+  GROUP BY
+    1
+)
+SELECT
+  globo_id,
+  ifnull(tipo_usuario, 'Logado Free') as tipo_usuario,
+  IFNULL(consumiu_bbb_20, FALSE) AS consumiu_bbb_20,
+  IFNULL(assinou_cancelou_bbb_20, FALSE) AS assinou_cancelou_bbb_20,
+  IFNULL(consumiu_bbb_21, FALSE) AS consumiu_bbb_21,
+  IFNULL(assinou_cancelou_bbb_21, FALSE) AS assinou_cancelou_bbb_21,
+  IFNULL(consumiu_bbb_22, FALSE) AS consumiu_bbb_22,
+  IFNULL(assinou_cancelou_bbb_22, FALSE) AS assinou_cancelou_bbb_22,
+  IFNULL(consumiu_bbb_23, FALSE) AS consumiu_bbb_23,
+  ifnull(consumiu_bbb_23_simulcast, false) as consumiu_bbb_23_simulcast,
+  IFNULL(assinou_cancelou_bbb_23, FALSE) AS assinou_cancelou_bbb_23
+FROM
+  lfs
+  LEFT JOIN base_bbb_20 USING (globo_id)
+  LEFT JOIN base_bbb_21 USING (globo_id)
+  LEFT JOIN base_bbb_22 USING (globo_id)
+  LEFT JOIN base_bbb_23 USING (globo_id)
+  left join base_bbb_23_simulcast using(globo_id)
+  LEFT JOIN base_rein3 USING (globo_id)
+  left join (
+    select
+      distinct globo_id,
+      'Ex-Assinante' as tipo_usuario
+    from
+      ${ref('sales_gold', 'subscription_details')} as sd
+      inner join ${ref('sales_gold', 'last_subscription_state')} AS s ON s.object_id = sd.id
+    where
+      subscription_status = 'Cancelado'
+      and lower(product_name) like '%globoplay%'
+  ) using(globo_id)

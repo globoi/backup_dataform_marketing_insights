@@ -1,0 +1,69 @@
+config {
+  type: 'table',
+  name: 'mktflow_originais',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_S_BoasVindasTier1','schedule_tag=jornadas_mkt_mktflow_originais'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH 
+program AS (
+  SELECT * FROM ${ref("conteudo_enriched", "program")}
+),
+
+acervo_programas AS (
+  SELECT 
+    * 
+  FROM 
+    ${ref("conteudo", "acervo")}
+  WHERE 
+    -- lower(Categorizao) LIKE "%original%" 
+    conteudo_original
+    OR id = 12384 
+),
+
+originais_1 AS (
+  SELECT 
+    * 
+  FROM 
+    acervo_programas
+  LEFT JOIN 
+    ${ref("consumo_enriched", "impression")} AS impression
+  ON 
+    acervo_programas.id = impression.program_id
+  WHERE 
+    id NOT IN (12082, 12081)
+    AND `date`  >= DATE_ADD(CURRENT_DATE(), INTERVAL -7 DAY)
+),
+
+views_agg AS (
+  SELECT 
+    id,
+    COUNT(sessionid) AS `views` 
+  FROM 
+    originais_1
+  GROUP BY 
+    id
+)
+
+SELECT 
+  1 AS globo_id,
+  rank() OVER (ORDER BY views DESC) AS rank,
+  id AS program_id,
+  title AS program_title,
+  url_for_consumption,
+  media_kit_resource__logotipo_xl,
+  media_kit_resource__poster
+FROM 
+  views_agg
+LEFT JOIN 
+  program
+USING (id)
+WHERE 
+  id NOT IN (10878, 11874, 11602, 10853, 11991, 10684, 10827)
+ORDER BY rank ASC

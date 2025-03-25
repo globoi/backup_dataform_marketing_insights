@@ -1,0 +1,114 @@
+config {
+  type: "table",
+  schema: 'campanhas_mkt',
+  tags: [
+    "schedule_tag=campanhas_mkt_mktflow_plat_usuarios_ass_30d",
+    "schedule_cron=0 14 * * *"
+  ],
+  bigquery: {
+    labels: {
+      owner: "martech",
+      mktcloud: "true"
+    }
+  }
+}
+WITH
+impression AS (
+  SELECT 
+    userid AS globo_id,
+    environment,
+    COUNT(userid) AS plays,
+    ROUND(SUM(hours_watched), 2) AS horas,
+    COUNT(DISTINCT program_title) AS qtd_programas_distintos,
+    COUNT(DISTINCT program_subset) AS qtd_subsets_distintos,
+    COUNT(DISTINCT date) AS qtd_dias_uso
+  FROM ${ref("consumo_enriched","impression")}
+  WHERE
+    `date` >= '2020-07-01'
+    AND `date` >= date_add(current_date(), INTERVAL -30 DAY)
+  GROUP BY 
+    userid,
+    environment
+),
+
+base_ativa_pagante_com_trial AS (
+  SELECT 
+    globo_id,
+    tipo_assinante,
+    case when dt_assinatura_comeco > cast(CURRENT_DATE() as date) then date(data_hora_compra) else dt_assinatura_comeco end as dt_assinatura_comeco,
+    canal_compra,
+    produto,
+    assinatura_gplay,
+    tempo_de_base_agrupado
+  FROM ${ref("usuarios","base_ativa_pagante_com_trial_new")},
+  UNNEST (info) as info_trial
+),
+
+perfil AS (
+  SELECT
+    globo_id,
+    gender,
+    age,
+    data_ultimo_consumo,
+    inativo,
+    ultimo_consumo,
+    first_play,
+    mais_canais
+  FROM ${ref("usuarios","perfil")}
+),
+
+impression_base_ativa AS (
+  SELECT
+    *,
+    ROUND(SAFE_DIVIDE(horas, plays), 1) AS horas_plays
+  FROM 
+    impression
+  LEFT JOIN
+    base_ativa_pagante_com_trial
+  USING 
+    (globo_id)
+  WHERE
+    tempo_de_base_agrupado IS NOT NULL
+),
+
+add_perfil AS (
+  SELECT 
+    *,
+    CASE 
+      WHEN age < 15 THEN NULL
+      WHEN age > 90 THEN NULL
+      ELSE age
+    END AS idade
+  FROM
+    impression_base_ativa
+  LEFT JOIN
+    perfil
+  USING
+    (globo_id)
+)
+
+SELECT 
+  globo_id AS userid,
+  idade,
+  environment,
+  plays,
+  horas,
+  horas_plays,
+  qtd_programas_distintos,
+  qtd_subsets_distintos,
+  qtd_dias_uso,
+  tipo_assinante,
+  dt_assinatura_comeco,
+  canal_compra,
+  produto,
+  assinatura_gplay,
+  tempo_de_base_agrupado,
+  gender,
+  inativo,
+  ultimo_consumo,
+  first_play,
+  mais_canais,
+  data_ultimo_consumo 
+FROM 
+  add_perfil
+    

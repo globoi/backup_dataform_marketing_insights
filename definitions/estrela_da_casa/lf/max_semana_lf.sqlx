@@ -1,0 +1,23 @@
+config {
+  type: "table",
+  schema: 'estrela_da_casa',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "estrela_da_casa",
+      owner: "martech"    }
+  },
+  description: 'Tabela com os LFs do raiox_lf_estrela_da_casa e a última semana em que aparecem no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    max_semana: 'Última semana em que o usuário apareceu no raiox_lf_estrela_da_casa.'
+  }
+
+}
+
+with max_semana as (
+select distinct globo_id, max(semana) as max_semana from ${ref("estrela_da_casa", "raiox_lf_estrela_da_casa")}
+where globo_id is not null
+group by 1
+)
+select * from max_semana

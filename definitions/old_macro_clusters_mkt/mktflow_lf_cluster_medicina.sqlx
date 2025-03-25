@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_medicina",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_medicina']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id
+FROM (
+    SELECT
+        imp.userid AS globo_id,
+    FROM
+        ${ref("consumo_enriched", "impression")} imp
+        INNER JOIN ${ref("usuarios", "Free users")} fua
+        ON imp.userid = fua.globo_id
+    WHERE
+        imp.program_id IN (10904, 12900, 10777, 11673, 13331, 12226, 13560)
+        AND `date` <= CURRENT_DATE()
+
+UNION ALL
+
+    SELECT
+        globo_id_sessao AS globo_id
+    FROM
+        ${ref("jornadas_mkt", "tapume_ao_vivo_nao_assinante")}
+        INNER JOIN ${ref("usuarios", "Free users")}
+        ON globo_id = globo_id_sessao
+    WHERE
+        LOWER(eventAction) = 'tapume.universal'
+)

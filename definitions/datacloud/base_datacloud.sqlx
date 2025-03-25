@@ -1,0 +1,244 @@
+config {
+    type: "table",
+    name: "base_datacloud",
+    schema: 'datacloud',
+    tags: ['schedule_tag=datacloud_base_datacloud',
+        "schedule_cron=30 11 * * *"
+    ],
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        data_compra: 'Identifica a data de compra do produto pelo usuário.',
+        periodicidade: 'Identifica a periodicidade da cobrança do produto adquirido.(Ex: Anual, bianual ou mensal).',
+        canal_compra: 'Canal de Assinatura (Web, Inapp Google, Inapp Apple, Inapp Roku e etc).',
+        qtd_assinaturas: 'Identifica quantas assinaturas o usuário possui ou possuiu.',
+        tipo_usuario: 'Identifica se o usuário é um Assinante,LF ou Ex-Assinante.',
+        tipo_assinante: 'Identifica se o usuário é um titular, LF ou dependente.',
+        globoplay: 'Flag se o usuário possui o produto Globoplay.',
+        mais_canais: 'Flag se o usuário possui o produto Globoplay + Canais.',
+        telecine: 'Flag se o usuário possui o produto Telecine.',
+        cartola_pro: 'Flag se o usuário possui o produto Cartola PRO.',
+        cartola_express: 'Flag se o usuário possui o produto Cartola Express.',
+        deezer: 'Flag se o usuário possui o produto Deezer.',
+        discovery: 'Flag se o usuário possui o produto Discovery.',
+        disney: 'Flag se o usuário possui o produto Disney.',
+        flatv: 'Flag se o usuário possui o produto FlaTV.',
+        giga: 'Flag se o usuário possui o produto GigaGloob.',
+        lionsgate: 'Flag se o usuário possui o produto Lionsgate.',
+        premiere: 'Flag se o usuário possui o produto Premiere.',
+        star: 'Flag se o usuário possui o produto Star.',
+        combate: 'Flag se o usuário possui o produto Combate.',
+        sem_produto_associado: 'Flag se o usuário não possui nenhum produto associado.',
+        origin_id: 'Identificador da origem da compra do usuário.',
+        origin_name: 'Nome da origem da compra do usuário.',
+        assinatura_gplay: 'Identifica se a assinatura é nacional ou internacional.',
+        asset_id: 'Código que identifica a assinatura.',
+        acessou_g1_30d: 'Flag informando se o usuário acessou o G1 nos últimos 30 dias.',
+        acessou_gshow_30d: 'Flag informando se o usuário acessou o Gshow nos últimos 30 dias.',
+        acessou_ge_30d: 'Flag informando se o usuário acessou o GE nos últimos 30 dias.',
+        acessou_home_30d: 'Flag informando se o usuário acessou a home nos últimos 30 dias.',
+        acessou_receitas_30d: 'Flag informando se o usuário acessou o Receitas nos últimos 30 dias.',
+        telefone: 'Informa se o assinante possui número de telefone cadastrado.',
+        endereco: 'Informa se o assinante possui número endereço cadastrado.',
+        dt_aniversario: 'Informa se o assinante possui a data de aniversário cadastrada.',
+        first_play: 'Informa qual o primeiro programa que o assinante assistiu.',
+        first_play_subset: 'Informa qual o primeiro subset que o assinante assistiu.',
+        data_first_play: 'Informa qual a primeira data que o assinante assistiu seu primeiro programa.',
+        ultimo_consumo: 'Informa qual o último programa que o assinante assistiu.',
+        ultimo_consumo_subset: 'Informa qual o último subset que o assinante assistiu.',
+        data_ultimo_consumo: 'Informa qual a última data que o assinante assistiu seu último programa.',
+        whatsapp_optin_datetime: 'Informa a data em que o usuário realizou o optin no whatsapp.',
+        whatsapp_optin_status: 'Informa a se o assinante possui optin no whatsapp.',
+        push_ultimo_data_enviado: 'Informa a data do último push enviado pro assinante.',
+        push_ultimo_titulo_enviado: 'Informa o título do último push enviado pro assinante.',
+        push_ultimo_descricao_enviado: 'Informa a descrição do último push enviado pro assinante.',
+        push_ultimo_data_aberto: 'Informa a data do último push aberto pelo assinante.',
+        push_ultimo_titulo_aberto: 'Informa o título do último push aberto pelo assinante.',
+        push_ultimo_descricao_aberto: 'Informa a descrição do último push aberto pelo assinante.',
+        push_perfil_uso: 'Informa o perfil de push do assinante. Ex: Se abriu push há mais de 1 mês.',
+        push_qtd_enviado_30D: 'Quantidade de push enviados para o assinante nos últimos 30 dias.',
+        push_qtd_aberto_30D: 'Quantidade de push abertos pelo assinante nos últimos 30 dias.',
+        push_flag_enviado_30D: 'Flag informando se o assinante recebeu push nos últimos 30 dias.',
+        push_flag_aberto_30D: 'Flag informando se o assinante abriu push nos últimos 30 dias.',
+        push_optout_qtd: 'Quantidade de opt out em push que o assinante possui.',
+        push_optout_ultimo_data: 'Última data em que o assinante realizou opt out.',
+        push_optout_status: 'Informa se o assinante possui push ativo ou não.',
+        email_qtd_enviado_30D: 'Quantidade de e-mails enviados para o assinante nos últimos 30 dias.',
+        email_ultimo_data_enviado: 'Informa a data do último e-mail enviado pro assinante.',
+        email_ultimo_data_click: 'Informa a data do último click em e-mail pelo assinante.',
+        email_ultimo_data_aberto: 'Informa a data do último e-mail aberto pelo assinante.',
+        email_qtd_aberto_30D: 'Quantidade de e-mails abertos pelo assinante nos últimos 30 dias.',
+        email_perc_aberto_30D: 'Percentual de abertura de e-mail pelo assinante nos últimos 30 dias.',
+        email_perfil_30D: 'Informa o perfil de e-mail do assinante. Ex: Heavy User (abriu pelo menos 50% dos e-mails).',
+        email_flag_enviado_30D: 'Flag informando se o assinante recebeu e-mail nos últimos 30 dias.',
+        email_flag_aberto_30D: 'Flag informando se o assinante abriu e-mail nos últimos 30 dias.',
+        appopen_qtd_30D: 'Quantidade de vezes que o assinante abriu o app nos últimos 30 dias.',
+        appopen_qtd_devices: 'Quantidade de devices que o assinante usou para abrir o app.',
+        appopen_qtd_dias: 'Quantidade de dias que o assinante abriu o app.',
+        appopen_ultimo_data: 'Última data que o assinante abriu o app.',
+        appopen_flag_30D: 'Flag informando se o assinante abriu o app nos últimos 30 dias.',
+        acesso_qtd_dias: 'Quantidade de dias que o assinante acesso a plataforma.',
+        acesso_ultima_data: 'Última data que o assinante acessou a plataforma.',
+        acesso_qtd_plataformas: 'Quantidade de plataformas que o assinante acessou.',
+        acesso_flag_30D: 'Flag se o assinante acessou a plataforma nos últimos 30 dias.',
+        consumo_qtd_dias: 'Quantidade de dias que o assinante consumiu na plataforma.',
+        consumo_qtd_midia: 'Quantidade de midias que o assinante consumiu na plataforma.',
+        consumo_qtd_programs: 'Quantidade de programas que o assinante consumiu na plataforma.',
+        consumo_mean_hwatched: 'Médias de horas de consumo do assinante na plataforma.',
+        consumo_tipo_conteudo: 'Tipo de conteúdo que o assinante assistiu. Ex: íntegra, trecho, etc',
+        consumo_flag_30D: 'Flag se o assinante consumiu algum conteúdo nos últimos 30 dias.',
+        time_coracao: 'Identifica o time do coração cadastrado pelo usuário.'
+    }
+}
+
+WITH
+  datacloud AS (
+  SELECT
+    * EXCEPT( nome_do_produto,
+      id_asset,
+      g1,
+      gshow,
+      ge,
+      home,
+      receitas),
+    IFNULL(g1,FALSE) AS acessou_g1_30d,
+    IFNULL(gshow,FALSE) AS acessou_gshow_30d,
+    IFNULL(ge,FALSE) AS acessou_ge_30d,
+    IFNULL(home,FALSE) AS acessou_home_30d,
+    IFNULL(receitas,FALSE) AS acessou_receitas_30d
+  FROM
+    ${ref('datacloud', 'base_todos_os_globo_ids_v2')}
+  LEFT JOIN (
+    SELECT
+      globo_id,
+      i.id_asset AS asset_id
+    FROM
+      ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} AS b,
+      UNNEST(b.info) AS i )
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS g1
+    FROM
+      ${ref('foundation_g1', 'foundation_g1_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS gshow
+    FROM
+      ${ref('foundation_gshow', 'foundation_gshow_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS ge
+    FROM
+      ${ref('foundation_ge', 'foundation_ge_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS home
+    FROM
+      ${ref('foundation_home', 'foundation_home_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS receitas
+    FROM
+      ${ref('foundation_receitas', 'foundation_receitas_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id))
+SELECT
+  DISTINCT * EXCEPT(time_coracao),
+  IFNULL(time_coracao,'Sem time cadastrado') AS time_coracao
+FROM
+  datacloud
+LEFT JOIN (
+  SELECT
+    DISTINCT id AS globo_id,
+    time_do_coracao_nome_popular AS time_coracao
+  FROM
+    ${ref("visao_360_analitica", "globoid_demografico_visao_360_atributos")}
+  ORDER BY
+    2 ASC )
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    telefone,
+    endereco,
+    dt_aniversario,
+    first_play,
+    first_play_subset,
+    data_first_play,
+    ultimo_consumo,
+    ultimo_consumo_subset,
+    data_ultimo_consumo,
+    whatsapp_optin_datetime,
+    whatsapp_optin_status,
+    push_ultimo_data_enviado,
+    push_ultimo_titulo_enviado,
+    push_ultimo_descricao_enviado,
+    push_ultimo_data_aberto,
+    push_ultimo_titulo_aberto,
+    push_ultimo_descricao_aberto,
+    push_perfil_uso,
+    push_qtd_enviado_30D,
+    push_qtd_aberto_30D,
+    push_flag_enviado_30D,
+    push_flag_aberto_30D,
+    push_optout_qtd,
+    push_optout_ultimo_data,
+    push_optout_status,
+    email_qtd_enviado_30D,
+    email_ultimo_data_enviado,
+    email_ultimo_data_click,
+    email_ultimo_data_aberto,
+    email_qtd_aberto_30D,
+    email_perc_aberto_30D,
+    email_perfil_30D,
+    email_flag_enviado_30D,
+    email_flag_aberto_30D,
+    appopen_qtd_30D,
+    appopen_qtd_devices,
+    appopen_qtd_dias,
+    appopen_ultimo_data,
+    appopen_flag_30D,
+    acesso_qtd_dias,
+    acesso_ultima_data,
+    acesso_qtd_plataformas,
+    acesso_flag_30D,
+    consumo_qtd_dias,
+    consumo_qtd_midia,
+    consumo_qtd_programs,
+    consumo_mean_hwatched,
+    consumo_tipo_conteudo,
+    consumo_flag_30D
+  FROM
+    ${ref('comunicacao', 'ultima_comunicacao_geral_staging_1')})
+USING
+  (globo_id)

@@ -1,0 +1,67 @@
+config {
+  type: "incremental",
+  schema: 'bbb_24',
+
+  bigquery:  {partitionBy: "data",
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech",
+      horario: "12h15min"}},
+  description: 'Dataset com dados de consumo e interatividade de conteúdos BBB (a partir de 08/01/2024) na plataforma do GShow. Dados expandidos por data, tipo de materia (Home, Votacao, Casa de Vidro), fullVisitorId e globo_id',
+  columns: {
+    data: 'A data da sessão no formato AAAAMMDD.',
+    fullVisitorId: 'O ID exclusivo do visitante.',
+    temporada_bbb: 'Com base no pagepath um case é gerado com atribuições de BBB24, BBB23, BBB22 ou BBBOutros, onde remete o consumo de pagepaths de BBB anteriores',
+    materia: 'Mesmo que "editoriaN3", refere-se ao tipo de conteúdo (Home, Votacao, Casa de Vidro) consumido pelo usuário. ',
+    dqtd_sessoes: 'Quantidade de sessões distintas por data, fullvisitorId e globo_id',
+    dqtd_conteudos: 'Quantidade de contéudos [pagePaths] distintos por data, fullvisitorId e globo_id',
+    qtd_interacoes_conteudos: 'Quantidade de hits de type=event por data, fullvisitorId e globo_id',
+    sum_tempoNaPagina: 'Soma do tempo, em segundos, total em página(s) por data, fullvisitorId e globo_id',
+    qtd_votacao: 'Quantidade de hits de votação (eventLabel = Opcao voto) por data, fullvisitorId e globo_id',
+    data_etl: 'Data de consulta e processamento dos dados da foundation_gshow_sessions'
+  }
+}
+
+WITH CTE AS (
+  SELECT
+    data
+    ,fullVisitorId
+    ,globoid
+    ,sessionId
+    ,origemExterna
+    ,PagePath
+    ,tipoconsumo
+    ,tempoNaPagina
+    ,editoriaN3
+    ,eventLabel
+    ,CASE
+      WHEN REGEXP_CONTAINS(PagePath, '(?i)(bbb(-|)24)') THEN 'BBB24'
+      WHEN REGEXP_CONTAINS(PagePath, '(?i)(bbb(-|)23)') THEN 'BBB23'
+      WHEN REGEXP_CONTAINS(PagePath, '(?i)(bbb(-|)22)') THEN 'BBB22'
+      ELSE 'OutrosBBB'
+    END temporada_bbb
+    ,CURRENT_DATE() data_etl
+  FROM ${ref("foundation_gshow", "foundation_gshow_sessions")} , UNNEST(hits) hits
+  WHERE data >= '2024-01-08' 
+    AND editoriaN2 = 'BBB'
+    AND globoId IS NOT NULL
+)
+
+SELECT
+   data
+  ,fullVisitorId
+  ,globoid                              globo_id
+  ,temporada_bbb
+  ,editoriaN3                           materia
+  ,COUNT(DISTINCT sessionId)            dqtd_sessoes
+  ,COUNT(DISTINCT PagePath)             dqtd_conteudos
+  ,COUNT(CASE WHEN tipoconsumo = 'evento' THEN 1 END)  qtd_interacoes_conteudos
+  ,SUM(tempoNaPagina)                   sum_tempoNaPagina
+  ,COUNT(CASE WHEN eventLabel = 'Opcao voto' THEN 1 END) qtd_votacao
+  ,data_etl
+
+FROM CTE
+${when(incremental(), `where data > (select max(data) from ${self()})`)}
+GROUP BY data, fullVisitorId, globoid, temporada_bbb, editoriaN3, data_etl
+

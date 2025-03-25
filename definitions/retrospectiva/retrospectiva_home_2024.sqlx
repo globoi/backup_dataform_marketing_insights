@@ -1,0 +1,117 @@
+config {
+    type: 'table',
+    name: 'retrospectiva_home_2024',
+    schema: 'retrospectiva',
+    description: 'retrospectiva home em 2024',
+    columns: {}
+}
+
+-- QUERY FINAL POR USUÁRIO 
+
+WITH  
+-- FOUNDATION HOME 
+dados AS (    
+  SELECT    
+    IF(globoid is null or globoid in ('','undefined'), fullVisitorId, globoid) as globoid   
+  , IF(pagePath is null, screenName, pagePath) as pagina   
+  , pagePath -- retirar dps 
+  , screenName -- retirar dps 
+  , data 
+  , horarioHit 
+FROM --`gglobo-prodservdig-hdg-prd.foundation_home.foundation_home_sessions_v3`
+ ${ref("foundation_home", "foundation_home_sessions_v3")} AS a, UNNEST(hits) AS h 
+-- FILTRO POR TIPO DE CONSUMO, NÃO AMBIENTE 
+WHERE (data >= "2024-01-01" AND data <= "2024-11-17")  -- TESTE DE UMA SEMANA 
+AND h.tipoConsumo IN ('pageview','screenview') 
+AND h.provider = "cadun" 
+--AND globoid = "2e0c1139-0aea-4bb5-a6a0-f0b77a4f77ea" 
+), 
+ 
+ 
+--confirmar udfs de editorias com o time de inteligencia (varia de um produto para outro) 
+dados_tratados AS (  
+SELECT  
+  globoid   
+  , pagina  -- retirar dps 
+  , pagePath  -- retirar dps 
+  , screenName  -- retirar dps 
+  , COUNT(*) AS contagem 
+  , EXTRACT(DAYOFWEEK FROM data) as data -- retirar dps 
+  , EXTRACT(HOUR FROM horarioHit) as horarioHit -- retirar dps 
+  , CASE WHEN EXTRACT(HOUR FROM horarioHit) >= 00 AND EXTRACT(HOUR FROM horarioHit) < 06 THEN "Madrugada"  
+         WHEN EXTRACT(HOUR FROM horarioHit) >= 06 AND EXTRACT(HOUR FROM horarioHit) < 12 THEN "Manhã"  
+         WHEN EXTRACT(HOUR FROM horarioHit) >= 12 AND EXTRACT(HOUR FROM horarioHit) < 18 THEN "Tarde"  
+         WHEN EXTRACT(HOUR FROM horarioHit) >= 18 AND EXTRACT(HOUR FROM horarioHit) <= 23 THEN "Noite"  
+  END AS periodo_consumo  
+  , CASE WHEN EXTRACT(DAYOFWEEK FROM data) = 1 THEN "Domingo"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 2 THEN "Segunda"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 3 THEN "Terça"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 4 THEN "Quarta"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 5 THEN "Quinta"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 6 THEN "Sexta"  
+         WHEN EXTRACT(DAYOFWEEK FROM data) = 7 THEN "Sábado"  
+  END AS dia_semana_consumo 
+FROM dados   
+GROUP BY ALL), 
+ 
+ 
+-- PEGAR GLOBOIDS E TOTAL DE PAGEVIEWS  
+usuarios AS ( 
+SELECT DISTINCT globoid 
+  , SUM(contagem) as contagem 
+FROM dados_tratados 
+GROUP BY ALL), 
+ 
+--PEGAR A PAGINA DE MAIOR CONSUMO 
+pagina_tratada AS ( 
+SELECT * 
+FROM(   
+SELECT DISTINCT globoid 
+  , SUM(contagem) as contagem 
+  , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY SUM(contagem) DESC) AS rk_pagina_tratada 
+FROM dados_tratados 
+GROUP BY ALL 
+) 
+WHERE rk_pagina_tratada = 1 
+ORDER BY globoid DESC 
+), 
+ 
+ 
+--PEGAR O DIA DA SEMANA DE MAIOR CONSUMO 
+dia_semana AS ( 
+SELECT * 
+FROM(   
+SELECT DISTINCT globoid 
+  , dia_semana_consumo 
+  , SUM(contagem) as contagem 
+  , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY SUM(contagem) DESC) AS rk_dia_semana_consumo 
+FROM dados_tratados 
+GROUP BY ALL 
+) 
+WHERE rk_dia_semana_consumo = 1 
+ORDER BY globoid DESC 
+), 
+ 
+--PEGAR O PERIODO DE MAIOR CONSUMO 
+periodo AS ( 
+SELECT * 
+FROM(   
+SELECT DISTINCT globoid 
+  , periodo_consumo 
+  , SUM(contagem) as contagem 
+  , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY SUM(contagem) DESC) AS rk_periodo_consumo 
+FROM dados_tratados 
+GROUP BY ALL 
+) 
+WHERE rk_periodo_consumo = 1 
+ORDER BY globoid DESC 
+) 
+ 
+-- JUNTAR OS DADOS 
+SELECT DISTINCT usuarios.globoid 
+  , usuarios.contagem as home_consumo 
+  , dia_semana.dia_semana_consumo as home_dia_semana 
+  , periodo.periodo_consumo as home_periodo 
+FROM usuarios 
+LEFT JOIN dia_semana ON usuarios.globoid = dia_semana.globoid  
+LEFT JOIN periodo ON usuarios.globoid = periodo.globoid  

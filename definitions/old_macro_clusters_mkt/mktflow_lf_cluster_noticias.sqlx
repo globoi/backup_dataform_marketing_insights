@@ -1,0 +1,32 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_noticias",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_noticias']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id
+FROM (
+    SELECT
+        imp.userid AS globo_id,
+    FROM
+        ${ref("consumo_enriched", "all_impression")} imp
+        INNER JOIN ${ref("usuarios", "Free users")} fua
+        ON imp.userid = fua.globo_id
+    WHERE
+        imp.program_subset = 'news'
+
+UNION ALL
+
+    SELECT
+        globo_id
+    FROM
+        ${ref("jornadas_mkt", "lf_temp_cluster_aovivo")}
+    WHERE
+        segmentation = 'news'
+)

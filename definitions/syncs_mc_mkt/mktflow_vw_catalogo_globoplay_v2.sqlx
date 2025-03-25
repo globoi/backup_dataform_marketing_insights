@@ -1,0 +1,43 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=syncs_mc_mkt_mktflow_vw_catalogo_globoplay_v2',
+    'schedule_cron=0 16 * * *',],
+    name: 'mktflow_vw_catalogo_globoplay_v2',
+    schema: 'syncs_mc_mkt',
+    
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            mktcloud: "true",
+            tags: "syncs_mc_mkt",
+            owner: "martech"
+        }
+    }
+}
+
+ 
+SELECT
+  * EXCEPT(servicos_midias,
+    generos,
+    ar_target,
+    nacionalidade,
+    regiao_disponivel,
+    regiao_bloqueado,
+    descritores_conteudo),
+  ARRAY_TO_STRING(ARRAY(
+    SELECT
+      CAST(id AS string)
+    FROM
+      UNNEST(a.servicos_midias)), " | ") AS id_servicos_midias_str,
+  ARRAY_TO_STRING(ARRAY(
+    SELECT
+      name
+    FROM
+      UNNEST(a.servicos_midias)), " | ") AS name_servicos_midias_str,
+  ARRAY_TO_STRING(ar_target, " | ") AS ar_target_str,
+  ARRAY_TO_STRING(nacionalidade, " | ") AS nacionalidade_str,
+  ARRAY_TO_STRING(regiao_disponivel, " | ") AS regiao_disponivel_str,
+  ARRAY_TO_STRING(regiao_bloqueado, " | ") AS regiao_bloqueado_str,
+  ARRAY_TO_STRING(descritores_conteudo, " | ") AS descritores_conteudo_str
+FROM
+  ${ref('conteudo', 'vw_catalogo_globoplay')} a

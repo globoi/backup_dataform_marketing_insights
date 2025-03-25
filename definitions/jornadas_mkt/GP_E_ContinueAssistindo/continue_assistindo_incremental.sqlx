@@ -1,0 +1,20 @@
+config {
+  type: "incremental",
+  name: "continue_assistindo_incremental",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_ContinueAssistindo",'schedule_tag=jornadas_mkt_continue_assistindo_incremental'],
+  uniqueKey: ["globo_id", "dt_proc"]
+}
+
+
+SELECT
+  globo_id,
+  program_id,
+  program_title,
+  TIMESTAMP(ultimo_consumo) AS ultimo_consumo,
+  season,
+  season_episode_rank,
+  assinatura_gplay,
+  dt_proc 
+FROM
+    ${ref("jornadas_mkt", "mktflow_jornada_de_series")}

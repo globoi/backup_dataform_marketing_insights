@@ -1,0 +1,19 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt",
+  tags: ["syncs_mc_mkt", 'schedule_tag=jornadas_mkt_mktflow_consumo_ao_vivo_estrela_da_casa',
+    'schedule_cron=30 11 * * *'
+  ]
+  ,
+    bigquery: {
+        labels: {mktcloud: "true",
+            schedule: "diario",
+            tags: "jornadas_mkt",
+            owner: "mins"
+        }
+    }
+}
+
+select * from ${ref('estrela_da_casa','raiox_lf_estrela_da_casa')}
+where total_horas_simulcast >= 0.5
+and semana = DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7

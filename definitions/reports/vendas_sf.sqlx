@@ -1,0 +1,127 @@
+config {
+    type: "table",
+    schema: "reports",
+    tags: ["schedule_tag=reports_vendas_sf",
+        'schedule_cron=0 9 * * *'
+    ]
+}
+
+WITH
+  fp AS (
+  SELECT
+    object_id as subscription_id,
+    data_consumo as extract_date,
+    video_id AS media_id,
+    programa AS content_title,
+    subset AS program_category,
+    -- device,
+    /*((
+    select round(sum(cast(part as int64) * weight), 4)
+    from unnest(regexp_extract_all(CAST(time_to_play AS STRING), r'\d+')) part with offset
+    join unnest([365*24, 365/12*24, 24, 1, 1/60, 1/3600]) weight with offset
+    using (offset)
+    ))
+    */
+    dif_consumo_assinatura_hora AS horas_ate_fp
+    -- transforma coluna de intervalo em horas
+    --time_to_play,
+  FROM
+    ${ref('primeiro_play_gqa', 'primeiro_play_v2')}
+    -- `gglobo-int-assinaturas-hdg-prd.primeiro_play_gqa.primeiro_play_v2`
+    -- ${ref('sales_gold','first_play_details')})
+    -- cada asset possui primeiros plays em dias distintos e em alguns casos mais de um por dia,
+    -- mantem apenas a primeira linha por asset pra cada dia
+  QUALIFY
+    ROW_NUMBER() OVER (PARTITION BY object_id, data_consumo ORDER BY dif_consumo_assinatura_hora ASC) = 1 )
+SELECT
+  DATE(e.event_at) AS dt_venda,
+  e.event_at AS ts_venda,
+  e.globo_id,
+  ------ Produto
+  sd.id AS asset_id,
+IF
+  (pd.is_international, CONCAT(pd.name, " (Internacional)"), pd.name) AS nome_produto,
+  --adiciona sufixo para separar produtos de internacional
+  COALESCE(sd.billing_frequency,INITCAP(REGEXP_EXTRACT(pd.code,"(MENSAL|BIANUAL|ANUAL)"))) periodicidade,
+  --caso a periodicidade nao esteja preenchida, parseia do nome do produto
+  COALESCE(sd.purchase_channel, pd.channel) AS canal_compra,
+  pd.code AS codigo_produto,
+  pd.is_international AS flag_internacional,
+  ------ Outros
+  sd.subscription_status,
+  sd.product_type_at_subscription,
+  sd.product_type,
+  ------ Origem
+IF
+  (e.object_type = "partner", "9998",sd.origin_id) AS origem_id,
+IF
+  (e.object_type = "partner", "9998 | Parceiro", CONCAT(sd.origin_id, " | ", sd.origin_name)) AS origem,
+  ---- Pagamento
+  COALESCE(sd.payment_method, INITCAP(pt.name)) AS forma_pagamento,
+  sd.subscription_type,
+  CASE
+    WHEN sd.subscription_event_action = "-" THEN "venda_direta"
+    WHEN sd.subscription_event_action IS NOT NULL THEN sd.subscription_event_action
+    WHEN e.object_type = "partner" THEN "parceiro"
+    ELSE NULL
+END
+  AS tipo_venda,
+  REGEXP_EXTRACT(sd.currency_price, r"([a-zA-Z]+)") AS moeda,
+  sd.price AS preco,
+  sd.coupon AS cupom,
+  ------ First Play
+  DATE(fp.extract_date) AS dt_first_play,
+  fp.media_id AS media_id_fp,
+  fp.content_title AS titulo_fp,
+  INITCAP(fp.program_category) AS categoria_fp,
+  --fp.device AS dispositivo_fp,
+  fp.horas_ate_fp,
+  ------ Demografia
+  cd.gender AS genero_usr,
+  cd.age AS idade_usr,
+  cd.state AS estado_usr,
+  cd.city AS cidade_usr,
+FROM
+  -- `gglobo-vendas-hdg-prd.sales_gold.customer_events` e
+  ${ref('sales_gold', 'customer_events')} e
+LEFT JOIN
+  -- `gglobo-vendas-hdg-prd.sales_gold.subscription_details` sd ON e.object_id = sd.id
+  ${ref('sales_gold', 'subscription_details')} sd
+ON
+  e.object_id = sd.id
+LEFT JOIN
+  -- `gglobo-vendas-hdg-prd.sales_gold.partner_details` pt ON e.object_id = pt.partner_token
+  ${ref('sales_gold', 'partner_details')} pt
+ON
+  e.object_id = pt.partner_token
+LEFT JOIN
+  -- `gglobo-vendas-hdg-prd.sales_gold.product_details` pd ON sd.product_id = pd.id OR pt.product_id = pd.id
+  ${ref('sales_gold', 'product_details')} pd
+ON
+  sd.product_id = pd.id
+  OR pt.product_id = pd.id
+LEFT JOIN
+  -- `gglobo-vendas-hdg-prd.sales_gold.customer_details` cd on cd.id = sd.customer_id
+  ${ref('sales_gold', 'customer_details')} cd
+ON
+  cd.id = sd.customer_id
+LEFT JOIN
+  fp
+ON
+  fp.subscription_id = e.object_id
+  AND REGEXP_CONTAINS(pd.name,r"(?i)(globoplay|telecine)")
+  -- first play apenas para produtos contendo globoplay e/ou telecine
+  AND DATE_DIFF(fp.extract_date, DATE(e.event_at), DAY) BETWEEN 0
+  AND 1
+  -- mantem apenas fps ate um dia da compra
+WHERE
+  DATE(e.event_at) BETWEEN "2020-01-01"
+  AND CURRENT_DATE-1
+  AND e.event IN ('cross_up',
+    'subscription')
+  --and e.globo_id='43219df6-d8dc-484e-9b5c-4fb85c7a8d08'
+  --'d1c85506-6882-4b63-90e0-da96b93ab659'
+ORDER BY
+  dt_venda DESC,
+  asset_id
+NULLS LAST

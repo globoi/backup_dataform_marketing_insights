@@ -1,0 +1,40 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_jornada_boas_vindas_v2', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_jornada_boas_vindas_v2',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+SELECT
+  DISTINCT userid AS globo_id,
+  IF(time_declarado = true,true,false) time_declarado
+FROM ${ref("globo_esporte", "pgt_*")} -- `valiant-circuit-129220.globo_esporte.pgt_*`
+  LEFT JOIN ( SELECT distinct USERID, true time_declarado
+      FROM ${ref('ge_growth_time_coracao', 'time_unificado')} --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.time_unificado`
+    LEFT JOIN ${ref('ge_growth_time_coracao', 'soccer_team_sde_info')} --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.soccer_team_sde_info`
+      ON(ge_declared_team_id = clube_id)
+    INNER JOIN (SELECT DISTINCT globoid
+            FROM ${ref('public_globoid', 'users')}
+    --`gglobo-gid-dados-hdg-prd.public_globoid.users`
+          WHERE partition_date = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+      ON(USERID = globoid)
+WHERE nome_popular IS NOT NULL) USING(userid)
+WHERE
+  ( _TABLE_SUFFIX BETWEEN FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 8 DAY) )
+    AND FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) ) )
+  AND provider = 'cadun'
+  AND environment = "app"
+  AND userid IS NOT NULL
+  AND userid NOT IN (SELECT DISTINCT userid FROM ${ref("globo_esporte", "pgt_*")} --`valiant-circuit-129220.globo_esporte.pgt_*`
+  WHERE provider = 'cadun' AND environment = "app" 
+  AND _TABLE_SUFFIX BETWEEN FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 38 DAY) )
+    AND FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 9 DAY) ) )

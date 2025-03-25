@@ -1,0 +1,50 @@
+config {
+
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_jornada_inatividade', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_automatica_jornada_inatividade',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+WITH ultimas_rodadas AS (
+  -- Seleciona as últimas duas rodadas por usuário
+  SELECT globo_id,
+         rodada_id,
+         escalacoes_num,
+         ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY rodada_id DESC) AS rodada_ordem
+  FROM ${ref("report_staging", "report_rodada")} --`gglobo-cartola-hdg-prd.report_staging.report_rodada`
+  WHERE temporada = 2025
+),
+ultima_escalacao AS (
+  -- Conta as rodadas que não foram escaladas e verifica se o usuário escalou em alguma rodada
+  SELECT globo_id,
+         SUM(CASE WHEN escalacoes_num = 0 THEN 1 ELSE 0 END) AS rodadas_sem_escalar,
+         MAX(CASE WHEN escalacoes_num > 0 THEN 1 ELSE 0 END) AS escalou -- Nova coluna "escalou"
+  FROM ultimas_rodadas
+  WHERE rodada_ordem <= 2 -- Considera apenas as últimas duas rodadas
+  GROUP BY globo_id
+),
+usuarios AS (
+  SELECT u.globo_id,
+       CASE 
+         WHEN t.pro_em IS NULL THEN 'Free'
+         ELSE 'PRO'
+       END AS tipo_usuario,
+       u.escalou -- Inclui a coluna "escalou"
+  FROM ultima_escalacao u
+  JOIN ${ref("report_staging", "report_temporada")}  as t --`gglobo-cartola-hdg-prd.report_staging.report_temporada` t
+    ON u.globo_id = t.globo_id
+  WHERE u.rodadas_sem_escalar = 2 -- Filtra usuários que não escalaram nas duas rodadas
+)
+-- Seleciona o globo_id, tipo_usuario e a nova coluna escalou
+SELECT globo_id, tipo_usuario, escalou
+FROM usuarios

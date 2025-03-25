@@ -1,0 +1,31 @@
+config {
+  type: "table",
+  schema: 'estrela_da_casa',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "estrela_da_casa",
+      owner: "martech"
+    }
+  },
+  description: 'Tabela com os LFs do raiox_lf_estrela_da_casa e a semana em que entraram no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    min_semana: 'Semana em que o usuário entrou no raiox_lf_estrela_da_casa.'
+  }
+
+}
+
+WITH Entrada_Cluster AS (
+  SELECT
+    DISTINCT globo_id,
+    MIN(semana) AS min_semana
+  FROM
+    ${ref("estrela_da_casa", "raiox_lf_estrela_da_casa")}
+  GROUP BY
+    1
+)
+SELECT
+  *
+FROM
+  Entrada_Cluster

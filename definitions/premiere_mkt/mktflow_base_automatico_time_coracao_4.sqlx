@@ -1,0 +1,31 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=premiere_mkt_mktflow_base_automatica_time_coracao_4', 'schedule_cron=45 0 */3 * *'],
+    name: 'mktflow_base_automatica_time_coracao_4',
+    schema: 'premiere_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "premiere_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT globoid AS globo_id,
+  time_aferido
+FROM
+  -- `estrutura-esportes.Cartola.TimeCoracao_Cart18_20_GE`
+  ${ref("Cartola", "TimeCoracao_Cart18_20_GE")}
+WHERE
+  time_aferido NOT IN ( "Flamengo",
+    "Corinthians",
+    "Sao Paulo",
+    "Palmeiras",
+    "Vasco",
+    "Cruzeiro",
+    "Gremio" )

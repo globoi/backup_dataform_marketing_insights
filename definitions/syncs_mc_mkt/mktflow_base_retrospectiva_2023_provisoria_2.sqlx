@@ -1,0 +1,26 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt"
+
+}
+
+with base as (
+  SELECT
+    *
+  except(subset_mais_assistido,genero_mais_consumido),
+    case
+      when globo_id in ('da7480e6-0cce-493b-b74e-a990e90bc738', 'e051839e-5a42-4681-b613-bd18ab4dff7f') then 'Live'
+      else subset_mais_assistido
+    end as subset_mais_assistido,
+case when genero_mais_consumido is null then 'Variedades' else genero_mais_consumido end as genero_mais_consumido 
+  FROM
+    ${ref('syncs_mc_mkt', 'base_retrospectiva_2023_provisoria')}
+  where
+    ordem > 1902132
+)
+select
+  *
+except(ordem),
+TO_HEX(SHA256(CONCAT("Retrospectiva23", globo_id))) AS globo_id_hash
+from
+  base

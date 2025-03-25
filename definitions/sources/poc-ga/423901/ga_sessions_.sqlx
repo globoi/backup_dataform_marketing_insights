@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "poc-ga",
+  schema: "423901",
+  name: "ga_sessions_*",
+  description: ""
+}

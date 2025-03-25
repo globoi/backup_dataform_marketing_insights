@@ -1,0 +1,28 @@
+config {
+  type: 'table',
+  name: 'atualizacao_ultimo_push',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_ultimo_push',
+ "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH tabela AS (
+  SELECT
+    Data_Recebimento,
+    DATETIME(Data_Abertura, "America/Sao_Paulo") AS Data_Abertura,
+    DATETIME(Data_Abertura_Ultimo_Push, "America/Sao_Paulo") AS Data_Abertura_Ultimo_Push,
+    Data_Ultima_Abertura_App
+  FROM
+    ${ref('comunicacao', 'base_ultimo_push')}
+)
+SELECT
+  MAX(Data_Recebimento) AS max_data_recebimento,
+  MAX(Data_Abertura) AS max_data_abertura,
+  MAX(Data_Abertura_Ultimo_Push) AS max_data_abertura_ultimo_push,
+  MAX(Data_Ultima_Abertura_App) AS max_data_ultima_abertura_app
+FROM
+  tabela

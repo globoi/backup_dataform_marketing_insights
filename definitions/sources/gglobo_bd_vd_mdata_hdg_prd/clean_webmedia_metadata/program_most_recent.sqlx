@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-bd-vd-mdata-hdg-prd",
+  schema: "clean_webmedia_metadata",
+  name: "program_most_recent",
+  description: ""
+}

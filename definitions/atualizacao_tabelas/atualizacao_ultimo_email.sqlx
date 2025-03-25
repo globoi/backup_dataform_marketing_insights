@@ -1,0 +1,28 @@
+config {
+  type: 'table',
+  name: 'atualizacao_ultimo_email',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_ultimo_email',
+ "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH tabela AS (
+  SELECT
+    DATETIME(Data_Envio, "America/Sao_Paulo") AS Data_Envio,
+    DATETIME(Data_Abertura, "America/Sao_Paulo") AS Data_Abertura,
+    DATETIME(Data_Click, "America/Sao_Paulo") AS Data_Click,
+    dt_assinatura_comeco
+  FROM
+    ${ref('comunicacao', 'ultimo_email')}
+)
+SELECT
+  MAX(dt_assinatura_comeco) AS max_dt_assinatura_comeco,
+  MAX(Data_Envio) AS max_data_envio,
+  MAX(Data_Abertura) AS max_data_abertura,
+  MAX(Data_Click) AS max_data_click
+FROM
+  tabela

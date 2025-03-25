@@ -1,0 +1,28 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=receitas_mkt_mktflow_base_auto_rct_acessos_90d', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_auto_rct_acessos_90d',
+    schema: 'receitas_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "receitas_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT userid AS globo_id
+FROM
+    -- `valiant-circuit-129220.receitas.pgt_*`
+    ${ref("receitas", "pgt_*")}
+WHERE
+  (_TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY))
+    AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) )
+  AND provider = 'cadun'
+  AND userid IS NOT NULL
+  AND object LIKE '%receitas.globo.com/%'

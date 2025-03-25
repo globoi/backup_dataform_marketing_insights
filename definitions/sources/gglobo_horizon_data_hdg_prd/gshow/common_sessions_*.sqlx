@@ -1,0 +1,6 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-horizon-data-hdg-prd", 
+    schema: "gshow", 
+    name: "common_sessions_*", 
+    description: ""}

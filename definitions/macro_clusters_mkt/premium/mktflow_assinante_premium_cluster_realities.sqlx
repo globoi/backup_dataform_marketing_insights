@@ -1,0 +1,101 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_realities',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_realities',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      tags: "",
+      owner: "martech" ,
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: 'assinantes premium que consumiram reality show vod ou reality show ao vivo nos ultimos 180 dias ou acessaram gshow na editoria de reality nos ultimos 15 dias.',
+  columns: {
+  },
+}
+
+--macro cluster premium reality show
+
+--assinantes premium que consumiram reality show vod ou reality show ao vivo nos ultimos 180 dias ou acessaram gshow na editoria de reality nos ultimos 15 dias.
+
+with consumo_em_genero_realities as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND program_subset = 'realities'
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+consumo_em_programas_ao_vivo_realities as (
+  SELECT distinct globoid, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')}
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa in ('REALITY SHOW')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT globo_id, 'consumo realities' as base
+  FROM consumo_em_genero_realities
+
+  UNION DISTINCT
+
+  SELECT globoid as globo_id, 'consumo realities' as base
+  FROM consumo_em_programas_ao_vivo_realities
+),
+
+----assinantes premium que navegaram na editoria de Realities do GSHOW nos últimos 15 dias
+
+acesso_gshow_ultimos15d as (
+  SELECT distinct globoId AS globo_id, 'acesso GSHOW' AS base
+  FROM ${ref('foundation_gshow','foundation_gshow_sessions_v3')} s, UNNEST (s.hits) AS h 
+  WHERE data BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) AND CURRENT_DATE()
+    AND h.provider = "cadun"
+    AND REGEXP_CONTAINS(h.pagePath, "/realities/")
+    AND globoId IS NOT NULL
+),
+
+--uniao de todos os atuais usuarios assinantes premium que:
+--consumiram reality shows vod ou reality shows ao vivo nos ultimos 180 dias, ou
+--navegaram na editoria de Realities do GSHOW nos últimos 15 dias
+
+basefinal as (
+
+  WITH uniao as (
+    SELECT distinct globo_id, base
+    FROM uniao_consumo_vod_e_ao_vivo
+  
+    UNION DISTINCT
+  
+    SELECT distinct globo_id, base
+    FROM acesso_gshow_ultimos15d
+  ),
+
+  base_ordenada as (
+    SELECT *
+    FROM uniao
+    ORDER BY 1,2
+  )
+
+  --tirando réplicas de GLOBO_ID da base_ordenada
+  SELECT DISTINCT globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+  FROM base_ordenada
+  GROUP BY 1
+  
+)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+

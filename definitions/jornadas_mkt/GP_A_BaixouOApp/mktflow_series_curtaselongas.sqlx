@@ -1,0 +1,42 @@
+config {
+  type: "table",
+  name: "mktflow_series_curtaselongas",
+  schema: "jornadas_mkt",
+  tags: ["GP_A_BaixouOApp",'schedule_tag=jornadas_mkt_mktflow_series_curtaselongas']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH content_series_globoplay AS (
+  SELECT * 
+  FROM ${ref("consumo_derived", "content")}
+  WHERE program_subset = "series" and url_for_consumption like "%globoplay%"
+),
+mean_duration_minutes AS (
+  SELECT program_title, program_id, AVG(duration_in_minutes) AS MEAN_of_duration_in_minutes 
+  FROM content_series_globoplay
+  GROUP BY program_title, program_id
+),
+add_columns_tipo_e_dtproc AS (
+  SELECT * except(MEAN_of_duration_in_minutes), 
+  CASE
+    WHEN MEAN_of_duration_in_minutes > 30 THEN 'Longa'
+    ELSE 'Curta'
+  END AS tipo ,
+  CURRENT_DATE() AS dt_proc
+  FROM mean_duration_minutes
+),
+join_program AS (
+  SELECT add_columns_tipo_e_dtproc.* ,
+         program.media_kit_resource__poster,
+         2 as globo_id
+  FROM add_columns_tipo_e_dtproc 
+  LEFT JOIN ${ref("conteudo_enriched", "program")} as program
+  on (program_id = id)
+)
+
+select * from join_program 
+

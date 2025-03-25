@@ -1,0 +1,41 @@
+config {
+  type: 'table',
+  name: 'mktflow_winback_ex_assinantes_cancelaram_2_meses',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AvisaQueTaBombando','schedule_tag=jornadas_mkt_mktflow_winback_ex_assinantes_cancelaram_2_meses'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+WITH
+asset AS (
+  SELECT
+    sd.id AS assetid,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    DATETIME(end_cycle_at) AS dt_cancelamento_final_ciclo,
+    cd.globo_id,
+    pd.name AS ProductName
+  FROM
+    ${ref("sales_gold", "subscription_details")} AS sd
+  INNER JOIN
+    ${ref("sales_gold", "customer_details")}  AS cd
+    ON cd.id = sd.customer_id
+  INNER JOIN 
+    ${ref("sales_gold", "product_details")} AS pd 
+    ON sd.product_id = pd.id
+  )
+
+SELECT
+    DISTINCT(globo_id)
+FROM
+    asset
+    INNER JOIN ${ref("usuarios", "Free users")}
+    USING(globo_id)
+WHERE
+    DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY) < dt_cancelamento_final_ciclo
+    AND ProductName NOT IN ("Deezer Premium", "Disney+", "discovery+")

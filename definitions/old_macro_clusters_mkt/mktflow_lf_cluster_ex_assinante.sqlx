@@ -1,0 +1,22 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_ex_assinante",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_ex_assinante']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id
+FROM
+    ${ref("usuarios", "Free users")}
+    INNER JOIN ${ref("usuarios", "base_ativa_incremental_new")}
+    USING (globo_id)
+WHERE
+    dt_proc = CURRENT_DATE()
+    AND assinatura_gplay = 'nacional'
+    AND tipo_assinante = 'titular'
+    AND globo_id IS NOT NULL

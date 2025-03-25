@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-prodservdig-hdg-prd",
+  schema: "cartola_analytics",
+  name: "report_Tracking",
+  description: ""
+}

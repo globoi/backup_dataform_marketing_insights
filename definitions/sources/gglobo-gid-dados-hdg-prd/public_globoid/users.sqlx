@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-gid-dados-hdg-prd",
+  schema: "public_globoid",
+  name: "users",
+  description: ""
+}

@@ -1,0 +1,26 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=macro_clusters_mkt_mktflow_rotina_times_do_coracao_urban_grupo2',
+      'schedule_cron=0 10 * * *'],
+  name: 'mktflow_rotina_times_do_coracao_urban_grupo2',
+  schema: 'macro_clusters_mkt',
+  description: '',
+   bigquery: {
+    labels: {
+      tags: "timedocoracao",
+      owner: "martech",
+       mktcloud: "true",
+       urban: "attribute"
+        }
+    },
+  columns: {
+  
+  }
+}
+
+SELECT
+  named_user,
+  time_futebol
+FROM
+${ref("macro_clusters_mkt", "rotina_times_do_coracao_urban")} 
+WHERE indice_grupo = 2

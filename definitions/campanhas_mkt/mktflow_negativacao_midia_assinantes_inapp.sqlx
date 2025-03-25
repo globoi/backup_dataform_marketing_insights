@@ -1,0 +1,19 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=campanhas_mkt_mktflow_negativacao_midia_assinantes_inapp'],
+  name: 'mktflow_negativacao_midia_assinantes_inapp',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+select distinct globo_id
+from ${ref("usuarios", "base_ativa_pagante_com_trial_new")} a,
+unnest (a.info) i 
+where lower(i.canal_compra) like '%inapp%' 

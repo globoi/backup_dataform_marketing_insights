@@ -1,0 +1,368 @@
+config {
+  type: 'table',
+  name: 'inatividade_consumo',
+  schema: 'consumo',
+  tags: ['consumo_staging_1',
+        "schedule_tag=consumo_inatividade_consumo"
+  ],
+  description: 'Dataset com dados de inatividade de consumo expandidos por globo_id e período de inatividade. Aplica-se ao Assinante (Titular e Dependente) e usuário LF. Considera-se inatividade intervalos de consumo que excedam 31 dias. Considerar consultar documentação: https://globo.atlassian.net/wiki/spaces/MIC/pages/403849838841/Base+de+inatividade+consumo',
+  columns: {
+    'globo_id': 'Identificador do usuário',
+    'asset_id': 'Código que identifica unicamente o ativo. Ex.: 02i1N000008IbcpQAC',
+    'inatividade_periodo': 'Identificar do período de inatividade do usuário. Intervalos que o usuário fica mais de 31 sem consumo de conteúdo são contabilizados como um período.',
+    'inatividade_status': 'Para todos períodos históricos, este valor será uma constante "Inativo". Trazemos sempre a ultima mídia consumida pelo usuário (id, timestamp e hours_watched), deste cenário, verificamos o intervalo do consumo, onde inferior a 31 dias é "Ativo", senão "Inativo".',
+    'ultimo_mediaid': 'Última mídia (id) consumida até a entreada no período de inatividade',
+    'ultimo_hours_watched': 'Horas de consumo da ultima mídia consumida até a entreada no período de inatividade',
+    'ultimo_timestamp': 'Data da ultima mídia consumida até a entreada no período de inatividade',
+    'primeiro_pos_mediaid': 'Primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.',
+    'primeiro_pos_hours_watched': 'Total de horas de consumo da Primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.',
+    'primeiro_pos_timestamp': 'Data da primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.',
+    'inatividade_intervalo': 'Diferença, em dias, da ultimo_timestamp e o primeiro_pos_timestamp. Caso primeiro_pos_timestamp seja nulo, considera-se a data de processamento do pipeline',
+    'paid_ultimo_mediaid': 'Última mídia paga (impression.assinante_only) consumida até o momento de inatividade.',
+    'paid_ultimo_hours_watched': 'Horas de consumo da última mídia paga (impression.assinante_only) consumida até o momento de inatividade.',
+    'paid_ultimo_timestamp': 'Data da última mídia paga (impression.assinante_only) consumida até o momento de inatividade.',
+    'inatividade_pre_qtd_plays': 'Quantidade de play (contagem de midia_ids) até o momento de inatividade',
+    'inatividade_pre_sum_hours_watched': 'Soma das horas de play até o momento de inatividade',
+    'cadastro_tipo_assinante': 'Identifica o cadastro do usuário {Titular, dependente ou Logado Free}. Considerar consultar pipeline para entender as atribuições.',
+    'cadastro_status': 'Identifica o status do usuário {Ativo, Cancelado, Suspenso}. Considerar consultar pipeline para entender as atribuições.',
+    'cadastro_produto': 'Identifica o produto contratado do usuário',
+    'produto':'Informa qual é a frequência em que a cobrança é feita. Ex.: Mensal',
+    'tempo_de_base_agrupado': 'Informa o tempo de base agrupado do usuário',
+    'cadastro_data_init': 'Identifica a data de criação do globo_id. Considerar consultar pipeline para entender as atribuições.',
+    'cadastro_data_fim': 'Identifica a data final de cadastro do globo_id, engloba: data_cancelamento, data_suspensão, data_atual etc. Considerar consultar pipeline para entender as atribuições.'
+  }
+}
+
+WITH
+-- INÍCIO DA ASSET --   
+asset_gold AS (
+  SELECT
+    cst.globo_id,
+    sd.id AS assetid,
+    sd.product_name AS asset_name,
+    sd.subscription_payment_method AS forma_pagamento,
+    LOWER(sd.product_name) LIKE '%globoplay%' AS is_globoplay,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    sd.subscription_status,
+    sd.effective_conversion_at AS data_conversao_efetiva,
+    sd.on_hold_at AS data_da_suspensao,
+    prd.is_international AS assinatura_internacional,
+    TIMESTAMP(sd.unsubscribe_at) AS data_hora_cancelamento,
+    prd.code AS ProductCode,
+    prd.code_unique AS ProductCodeUnique__c,
+    sd.created_at,
+
+    lss.state,
+    lss.state_date AS state_date_last_update
+  FROM
+    ${ref("sales_gold", "subscription_details")} AS sd
+  LEFT JOIN ${ref("sales_gold", "product_details")} prd ON sd.product_id = prd.id
+  LEFT JOIN ${ref("sales_gold", "customer_details")} cst ON sd.customer_id = cst.id
+  INNER JOIN ${ref("sales_gold", "last_subscription_state")} lss ON sd.id = lss.object_id
+
+  WHERE
+    LOWER(prd.code) NOT LIKE '%cort%'
+    AND (LOWER(sd.subscription_payment_method) NOT LIKE '%cortesia%' OR sd.subscription_payment_method IS NULL)
+    AND DATE(TIMESTAMP(sd.subscription_at)) < CURRENT_DATE("America/Sao_Paulo")
+    AND LOWER(sd.product_name) LIKE '%globoplay%'
+)
+-- FIM DA ASSET --
+, dependentes_sf_step1 AS (
+  SELECT
+    DISTINCT ss.globo_id as globoid_tit,
+    acd.dependent_globoid as globoid_dep,
+    start_date,
+    end_date,
+    status,
+    pd.name AS cadastro_produto,
+    acd.extract_date AS created_date
+  FROM
+    ${ref("sales_gold", "subscription_state")} ss
+    JOIN ${ref("sales_gold", "subscription_details")} sd ON ss.object_id = sd.id
+    JOIN ${ref("sales_gold", "product_details")} pd ON sd.product_id = pd.id
+    -- left join ${ref("salesforce", "d_2_c_account_dependent_c")} acd ON sd.customer_id = acd.d_2_c_parent_c
+    INNER JOIN ${ref("sales_gold", "subscription_dependent_details")} acd ON ss.globo_id = acd.parent_globo_id
+  WHERE
+    DATE(ss.state_date) = CURRENT_DATE -1
+    AND LOWER(pd.name) LIKE '%globoplay%'
+),
+
+assinantes AS (
+  SELECT
+    globo_id,
+    AssetId as asset_id,
+    COALESCE(
+      data_conversao_efetiva,
+      CAST(data_hora_compra AS DATE)
+    ) AS dt_assinatura_comeco,
+    data_hora_compra,
+    'Titular' AS cadastro_tipo_assinante,
+    subscription_status AS cadastro_status,
+    asset_name AS cadastro_produto,
+    CASE
+      WHEN LOWER(ProductCode) LIKE '%bianual%' THEN 'bianual'
+      WHEN ProductCodeUnique__c LIKE 'Pro-0130' THEN 'anual'
+      WHEN LOWER(ProductCode) LIKE '%anual%' THEN 'anual'
+      ELSE 'mensal'
+    END AS produto,
+    DATE(created_at) AS cadastro_data_init,
+    COALESCE(
+      DATE_SUB(
+        LEAD(DATE(created_at)) OVER (
+          PARTITION BY globo_id
+          ORDER BY
+            DATE(created_at) ASC
+        ),
+        INTERVAL 1 DAY
+      ),
+      DATE(data_da_suspensao),
+      DATE(data_hora_cancelamento),
+      CURRENT_DATE()
+    ) AS cadastro_data_fim
+  FROM
+    asset_gold
+  WHERE
+    is_globoplay
+    AND assinatura_internacional IS NOT TRUE
+),
+dependentes AS (
+  SELECT
+    globoid_dep AS globo_id,
+    AssetId as asset_id,
+    COALESCE(
+      data_conversao_efetiva,
+      CAST(data_hora_compra AS DATE)
+    ) AS dt_assinatura_comeco,
+    data_hora_compra,
+    'Dependente' AS cadastro_tipo_assinante,
+    IF(
+      end_date IS NULL,
+      v2.status,
+      R.status
+    ) AS cadastro_status,
+    cadastro_produto,
+    CASE
+      WHEN LOWER(ProductCode) LIKE '%bianual%' THEN 'bianual'
+      WHEN ProductCodeUnique__c LIKE 'Pro-0130' THEN 'anual'
+      WHEN LOWER(ProductCode) LIKE '%anual%' THEN 'anual'
+      ELSE 'mensal'
+    END AS produto,
+    DATE(start_date) AS cadastro_data_init,
+    COALESCE(
+      DATE(end_date),
+      DATE(data_hora_cancelamento),
+      CURRENT_DATE()
+    ) AS cadastro_data_fim
+  FROM
+    dependentes_sf_step1 AS R
+    INNER JOIN (
+      SELECT
+        AssetId,
+        globo_id,
+        data_hora_cancelamento,
+        subscription_status AS status,
+        ProductCode,
+        ProductCodeUnique__c,
+        data_conversao_efetiva,
+        data_hora_compra
+      FROM
+        asset_gold
+    ) AS v2 ON R.globoid_tit = v2.globo_id
+),
+users AS (
+  SELECT
+    *
+  FROM
+    assinantes
+  UNION ALL
+  SELECT
+    *
+  FROM
+    dependentes
+),
+/*Estrutura/Lógica de Inatividade*/
+impression AS (
+  SELECT
+    userid AS globo_id,
+    `timestamp` AS timestamp_media,
+    DATE(`timestamp`) AS date_media,
+    hours_watched,
+    mediaid,
+    assinante_only
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    `date` >= DATE_SUB(CURRENT_DATE(), INTERVAL 730 DAY)
+),
+inatividade_1 AS (
+  SELECT
+    globo_id,
+    mediaid AS ultimo_mediaid,
+    hours_watched AS ultimo_hours_watched,
+    timestamp_media AS ultimo_timestamp,
+    assinante_only,
+    LEAD(mediaid) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS primeiro_pos_mediaid,
+    LEAD(hours_watched) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS primeiro_pos_hours_watched,
+    LEAD(timestamp_media) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS primeiro_pos_timestamp,
+    DATE_DIFF(
+      COALESCE(
+        LEAD(timestamp_media) OVER (
+          PARTITION BY globo_id
+          ORDER BY
+            timestamp_media ASC
+        ),
+        CURRENT_TIMESTAMP()
+      ),
+      timestamp_media,
+      DAY
+    ) AS inatividade_intervalo,
+    LAST_VALUE(IF(assinante_only, mediaid, NULL) IGNORE NULLS) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS paid_ultimo_mediaid,
+    LAST_VALUE(
+      IF(assinante_only, hours_watched, NULL) IGNORE NULLS
+    ) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS paid_ultimo_hours_watched,
+    LAST_VALUE(
+      IF(assinante_only, timestamp_media, NULL) IGNORE NULLS
+    ) OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        timestamp_media ASC
+    ) AS paid_ultimo_timestamp
+  FROM
+    impression
+),
+inatividade_2 AS (
+  SELECT
+    *,
+    FIRST_VALUE(
+      IF(
+        inatividade_intervalo >= 31,
+        ultimo_timestamp,
+        NULL
+      ) IGNORE NULLS
+    ) OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        ultimo_timestamp ASC ROWS BETWEEN CURRENT ROW
+        AND UNBOUNDED FOLLOWING
+    ) AS TEMP_inatividade_range
+  FROM
+    inatividade_1
+),
+inatividade_3 AS (
+  SELECT
+    *,
+    COUNT(ultimo_mediaid) OVER (PARTITION BY globo_id, TEMP_inatividade_range) AS inatividade_pre_qtd_plays,
+    SUM(ultimo_hours_watched) OVER (PARTITION BY globo_id, TEMP_inatividade_range) AS inatividade_pre_sum_hours_watched
+  FROM
+    inatividade_2
+),
+final as (
+  SELECT
+    i.globo_id,
+    u.asset_id,
+    ROW_NUMBER() OVER (
+      PARTITION BY i.globo_id,
+      u.asset_id
+      ORDER BY
+        i.ultimo_timestamp ASC
+    ) AS inatividade_periodo,
+    IF(
+      i.inatividade_intervalo >= 31,
+      'Inativo',
+      'Ativo'
+    ) AS inatividade_status,
+    i.ultimo_mediaid,
+    i.ultimo_hours_watched,
+    i.ultimo_timestamp,
+    i.primeiro_pos_mediaid,
+    i.primeiro_pos_hours_watched,
+    i.primeiro_pos_timestamp,
+    i.inatividade_intervalo,
+    i.paid_ultimo_mediaid,
+    i.paid_ultimo_hours_watched,
+    i.paid_ultimo_timestamp,
+    i.inatividade_pre_qtd_plays,
+    i.inatividade_pre_sum_hours_watched,
+    COALESCE(u.cadastro_tipo_assinante, "Logado Free") AS cadastro_tipo_assinante,
+    COALESCE(u.cadastro_status, "Ativo") AS cadastro_status,
+    COALESCE(u.cadastro_produto, "Globoplay Free") AS cadastro_produto,
+    u.produto,
+    u.cadastro_data_init,
+    u.cadastro_data_fim,
+    DATE_DIFF(CURRENT_DATE(), CAST(u.data_hora_compra AS DATE), DAY) AS tempo_de_base,
+    
+  FROM
+    inatividade_3 i
+    LEFT JOIN users u ON i.globo_id = u.globo_id
+      AND DATE(i.ultimo_timestamp) BETWEEN u.cadastro_data_init AND u.cadastro_data_fim
+  WHERE
+    IF(
+      inatividade_intervalo >= 31
+      OR primeiro_pos_mediaid IS NULL,
+      TRUE,
+      FALSE
+    )
+)
+
+select
+  globo_id,
+  asset_id,
+  case
+    when inatividade_status = 'Ativo' then 0
+    else inatividade_periodo
+  end as inatividade_periodo,
+  inatividade_status,
+  ultimo_mediaid,
+  ultimo_hours_watched,
+  ultimo_timestamp,
+  primeiro_pos_mediaid,
+  primeiro_pos_hours_watched,
+  primeiro_pos_timestamp,
+  inatividade_intervalo,
+  paid_ultimo_mediaid,
+  paid_ultimo_hours_watched,
+  paid_ultimo_timestamp,
+  inatividade_pre_qtd_plays,
+  inatividade_pre_sum_hours_watched,
+  cadastro_tipo_assinante,
+  cadastro_status,
+  cadastro_produto,
+  produto,
+  CASE
+    WHEN tempo_de_base <= 30 THEN '1. Até 1 mês'
+    WHEN tempo_de_base <= 60 THEN '2. Entre 1 e 2 Meses'
+    WHEN tempo_de_base <= 90 THEN '3. Entre 2 e 3 Meses'
+    WHEN tempo_de_base <= 180 THEN '4. Entre 3 e 6 Meses'
+    WHEN tempo_de_base <= 360 THEN '5. Entre 6 e 12 Meses'
+    WHEN tempo_de_base <= 720 THEN '6. Entre 12 e 24 Meses'
+    when cadastro_produto='Globoplay Free' then null
+    ELSE '7. Mais de 24 Meses'
+  END AS tempo_de_base_agrupado,
+  cadastro_data_init,
+  cadastro_data_fim
+from
+  final
+order by
+  1,
+  2,
+  3 asc

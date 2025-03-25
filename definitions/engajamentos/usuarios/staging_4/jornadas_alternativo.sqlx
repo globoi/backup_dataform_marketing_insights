@@ -1,0 +1,57 @@
+config {
+  type: "table",
+  name: "jornadas_alternativo",
+  schema: "usuarios",
+  tags: ["usuarios_staging_4",
+        "schedule_tag=usuarios_jornadas_alternativo"
+  ]
+}
+
+WITH jornadas_alternativo_1 AS (
+SELECT
+  GLOBO_ID AS globo_id,
+  email_send_id,
+  send_date,
+  JourneyName,  
+  ActivityOrEmailName,
+  journey_type,
+  was_delivered,
+  was_opened,
+  was_clicked,
+  was_unsubscribed,
+  DATE(send_date) AS data_disparo,
+  COALESCE(JourneyName, ActivityOrEmailName) AS nome_jornada,
+  COALESCE(journey_type, "disparo_pontual") AS tipo_jornada,
+  CAST(was_delivered AS INT64) AS entregues,
+  CAST(was_opened AS INT64) AS aberturas, 
+  CAST(was_clicked AS INT64) AS cliques,
+  CAST(was_unsubscribed AS INT64) AS descadastros
+FROM
+    ${ref("mkt_enriched", "email_send")}
+WHERE
+  journey_type LIKE '%Engagement%'
+  AND DATE(send_date) >= '2020-01-01'
+),
+
+jornadas_alternativo AS (
+  SELECT
+    data_disparo,
+    nome_jornada,
+    tipo_jornada,
+    globo_id,
+    COUNT(DISTINCT(email_send_id)) AS envios,
+    COUNT(DISTINCT(globo_id)) AS usuarios_unicos,
+    SUM(entregues) AS entregues,
+    SUM(aberturas) AS aberturas,
+    SUM(cliques) AS cliques,
+    SUM(descadastros) AS descadastros
+  FROM
+    jornadas_alternativo_1
+  GROUP BY
+    data_disparo,
+    nome_jornada,
+    tipo_jornada,
+    globo_id
+)
+
+SELECT * FROM jornadas_alternativo

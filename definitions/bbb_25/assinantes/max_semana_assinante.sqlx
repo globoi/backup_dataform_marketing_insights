@@ -1,0 +1,34 @@
+config {
+    type: "table",
+    schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_max_semana_assinante'],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "bbb_25",
+            owner: "martech"
+        }
+    },
+    description: 'Tabela com a flag assinou_2025 e a última semana em que os usuários aparecem no cluster.',
+    columns: {
+        assinou_2025: 'Flag se o usuário assinou após 13/01/2025.',
+        max_semana: 'Última semana em que o usuário apareceu no raiox_bbb_25_assinantes.'
+    }
+
+}
+
+WITH
+  max_semana AS (
+  SELECT
+    assinou_2025,
+    MAX(semana) AS max_semana
+  FROM
+    ${ref("bbb_25", "raiox_bbb_25_assinantes")}
+  GROUP BY
+    1 )
+SELECT
+  *
+FROM
+  max_semana
+WHERE
+  assinou_2025 IS NOT NULL

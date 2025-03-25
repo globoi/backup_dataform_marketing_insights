@@ -1,0 +1,112 @@
+config {
+    type: 'table',
+    name: 'jornada_upgrade_categoria',
+    schema: 'jornadas_mkt',
+    tags: ['GP_A_UpgradeCategoria', 'schedule_tag=jornadas_mkt_jornada_upgrade_categoria',
+    'schedule_cron=30 18 * * *'
+    ],
+    description: ''
+}
+
+SELECT
+  DISTINCT globo_id_hit AS globo_id,
+  CASE
+    WHEN LOWER(eventAction) LIKE "%multishow%" THEN 'multishow'
+    WHEN LOWER(eventAction) LIKE "%gnt%" THEN 'gnt'
+    WHEN LOWER(eventAction) LIKE "%agora_no_viva%" THEN 'viva'
+    WHEN LOWER(eventAction) LIKE "%mais na tela%" THEN 'mais na tela'
+    WHEN LOWER(eventAction) LIKE "%universal%" THEN 'universal'
+    WHEN LOWER(eventAction) LIKE "%syfy%" THEN 'syfy'
+    WHEN LOWER(eventAction) LIKE "%studio universal%" THEN 'studio universal'
+    WHEN LOWER(eventAction) LIKE "%megapix%" THEN 'megapix'
+    WHEN LOWER(eventAction) LIKE "%canal brasil%" THEN 'canal brasil'
+    WHEN LOWER(eventAction) LIKE "%bis%" THEN 'bis'
+    WHEN LOWER(eventAction) LIKE "%globonews%" THEN 'globonews'
+    WHEN LOWER(eventAction) LIKE "%sportv%" THEN 'sportv'
+    WHEN LOWER(eventAction) LIKE "%off%" THEN 'off'
+    WHEN LOWER(eventAction) LIKE "%premiere%" THEN 'premiere'
+END
+  AS canal
+FROM
+  ${ref('consumo_clean', 'tageamento_eventos')} AS t
+WHERE
+  table_suffix_date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+  AND (LOWER(eventAction) LIKE "%multishow%"
+    OR LOWER(eventAction) LIKE "%gnt%"
+    OR LOWER(eventAction) LIKE "%agora_no_viva%"
+    OR LOWER(eventAction) LIKE "%mais na tela%"
+    OR LOWER(eventAction) LIKE "%universal%"
+    OR LOWER(eventAction) LIKE "%syfy%"
+    OR LOWER(eventAction) LIKE "%studio universal%"
+    OR LOWER(eventAction) LIKE "%megapix%"
+    OR LOWER(eventAction) LIKE "%canal brasil%"
+    OR LOWER(eventAction) LIKE "%bis%"
+    OR LOWER(eventAction) LIKE "%globonews%"
+    OR LOWER(eventAction) LIKE "%sportv%"
+    OR LOWER(eventAction) LIKE "%off%"
+    OR LOWER(eventAction) LIKE "%premiere%")
+  --date_diff(current_date(), table_suffix_date)<=30
+  --table_suffix_date >= FORMAT_DATE("%Y%m%d",DATE_SUB(CURRENT_DATE(),INTERVAL 30 DAY))
+  --table_suffix_date >= "2024-07-10"
+  --AND LOWER(CONCAT(eventAction, eventCategory, eventLabel)) LIKE "%tapume%"
+  -- and lower(sistema_operacional) like 'tizen'
+  AND LOWER(eventAction) LIKE '%tapume.nao_assinante%'
+  AND LENGTH(globo_id_hit) - LENGTH(REPLACE(globo_id_hit, '-', '')) = 4
+QUALIFY
+  (ROW_NUMBER() OVER (PARTITION BY globo_id_sessao ) = 1)
+  AND (ROW_NUMBER() OVER (PARTITION BY globo_id_hit ) = 1)
+UNION DISTINCT
+SELECT
+  DISTINCT userId AS globo_id,
+  -- horizonClientDeviceGroup,
+  --horizonEnvironment,
+  --url,
+  --area,
+  --actionType,
+  -- destination,
+  CASE
+    WHEN LOWER(componentLabel) LIKE "%multishow%" THEN 'multishow'
+    WHEN LOWER(componentLabel) LIKE "%gnt%" THEN 'gnt'
+    WHEN LOWER(componentLabel) LIKE "%viva%" THEN 'viva'
+    WHEN LOWER(componentLabel) LIKE "%mais na tela%" THEN 'mais na tela'
+    WHEN LOWER(componentLabel) LIKE "%universal%" THEN 'universal'
+    WHEN LOWER(componentLabel) LIKE "%syfy%" THEN 'syfy'
+    WHEN LOWER(componentLabel) LIKE "%studio universal%" THEN 'studio universal'
+    WHEN LOWER(componentLabel) LIKE "%megapix%" THEN 'megapix'
+    WHEN LOWER(componentLabel) LIKE "%canal brasil%" THEN 'canal brasil'
+    WHEN LOWER(componentLabel) LIKE "%bis%" THEN 'bis'
+    WHEN LOWER(componentLabel) LIKE "%globonews%" THEN 'globonews'
+    WHEN LOWER(componentLabel) LIKE "%sportv%" THEN 'sportv'
+    WHEN LOWER(componentLabel) LIKE "%off%" THEN 'off'
+    WHEN LOWER(componentLabel) LIKE "%premiere%" THEN 'premiere'
+END
+  AS canal
+  --componentItem,
+  --componentItemLabel,
+  -- componentType as tapume--,
+  -- areaTitle,
+  --SAFE.PARSE_DATE('%Y%m%d',_TABLE_SUFFIX) as dt_proc
+FROM
+  ${ref('globo_play', 'globoplay_events_v2_1_*')}
+WHERE
+  --userId='9db3a1d8-336e-4ed2-be9d-e038be5bd5b9'
+  --AND
+  LOWER(componentType) LIKE '%tapume.nao_assinante%'
+  AND _TABLE_SUFFIX >= FORMAT_DATE("%Y%m%d",DATE_SUB(CURRENT_DATE(),INTERVAL 30 DAY))
+  AND LENGTH(userId) - LENGTH(REPLACE(userId, '-', '')) = 4
+  AND (LOWER(componentLabel) LIKE "%multishow%"
+    OR LOWER(componentLabel) LIKE "%gnt%"
+    OR LOWER(componentLabel) LIKE "%viva%"
+    OR LOWER(componentLabel) LIKE "%mais na tela%"
+    OR LOWER(componentLabel) LIKE "%universal%"
+    OR LOWER(componentLabel) LIKE "%syfy%"
+    OR LOWER(componentLabel) LIKE "%studio universal%"
+    OR LOWER(componentLabel) LIKE "%megapix%"
+    OR LOWER(componentLabel) LIKE "%canal brasil%"
+    OR LOWER(componentLabel) LIKE "%bis%"
+    OR LOWER(componentLabel) LIKE "%globonews%"
+    OR LOWER(componentLabel) LIKE "%sportv%"
+    OR LOWER(componentLabel) LIKE "%off%"
+    OR LOWER(componentLabel) LIKE "%premiere%")
+QUALIFY
+  (ROW_NUMBER() OVER (PARTITION BY globo_id ) = 1)

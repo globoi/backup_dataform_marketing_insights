@@ -1,0 +1,31 @@
+config {
+ 
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_acima_80pts_ultima_rodada','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_acima_80pts_ultima_rodada',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+  
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+with max_rodada as (
+select max(rodada_id) ultima_rodada
+from ${ref("report_staging", "report_rodada")} a
+where a.temporada = 2024
+)
+
+select distinct 'named_user' as identifier_type, globo_id as UUID
+from ${ref("report_staging", "report_rodada")} a
+inner join max_rodada
+on a.rodada_id = max_rodada.ultima_rodada
+where temporada = 2024
+and pontos_num >= 80

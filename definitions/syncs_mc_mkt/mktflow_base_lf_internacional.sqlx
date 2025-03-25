@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt",
+  tags: ["syncs_mc_mkt", 'schedule_tag=syncs_mc_mkt_mktflow_base_lf_internacional',
+    'schedule_cron=35 16 * * *'
+  ]
+  ,
+    bigquery: {
+        labels: {mktcloud: "true",
+            schedule: "diario",
+            tags: "syncs_mc_mkt",
+            owner: "mins"
+        }
+    }
+}
+
+
+SELECT * FROM ${ref('internacional','base_lf_internacional')}

@@ -1,0 +1,25 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=jornadas_mkt_mktflow_continue_assistindo_os_outros_logadofree'],
+  name: 'mktflow_continue_assistindo_os_outros_logadofree',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT distinct b.globo_id
+FROM ${ref("consumo_enriched", "impression")} as a
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} as b
+ON a.userId = b.globo_id
+WHERE b.tipo_cadastro = "Logado Free"
+AND date >= "2023-05-30"
+AND a.program_id = 23674
+AND a.mediaid = 11219995
+GROUP BY 1
+ORDER BY 1

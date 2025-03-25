@@ -1,0 +1,59 @@
+config {
+  type: 'incremental',
+  name: 'ultimo_consumo_inc',
+  schema: 'consumo',
+  uniqueKey: ['globo_id'],
+  tags: ["schedule_tag=consumo_ultimo_consumo_inc"],
+  description: '',
+  columns: {
+    globo_id: '',
+    ultimo_consumo: '',
+    data_ultimo_consumo: '',
+    ultimo_consumo_subset: '',
+    assinante_only: '',
+    hours_watched: '',
+    program_id: '',
+    dia_semana_ultimo_consumo: '',
+    hour: '',
+    date: '',
+    periodo_ultimo_consumo: ''
+  }
+}
+
+pre_operations {
+  declare max_dt default(
+    ${when(incremental(),
+    `SELECT MAX(date) FROM ${self()}`,
+    `SELECT DATE('2017-12-31')`)}
+  )
+}
+
+WITH
+ultimo_consumo as (
+  SELECT 
+    userid as globo_id,
+    program_title AS ultimo_consumo,
+    `timestamp` AS data_ultimo_consumo,
+    program_subset AS ultimo_consumo_subset,
+    assinante_only,
+    hours_watched,
+    program_id,
+    FORMAT_DATE("%a", `timestamp`) AS dia_semana_ultimo_consumo,
+    EXTRACT(HOUR FROM DATETIME(`timestamp`, 'America/Sao_Paulo')) AS `hour`,
+    `date`,
+    CASE
+      WHEN `hour` BETWEEN 6 AND 11 THEN "Manhã"
+      WHEN `hour` BETWEEN 12 AND 17 THEN "Tarde"
+      WHEN `hour` BETWEEN 18 AND 23 THEN "Noite"
+      WHEN `hour` BETWEEN 0 AND 5 THEN "Madrugada"
+    END AS periodo_ultimo_consumo
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  WHERE
+    program_id != 8426
+    AND is_full_content
+    AND date > max_dt
+  QUALIFY ROW_NUMBER() OVER(PARTITION BY userid ORDER BY `timestamp` DESC) = 1 
+)
+
+SELECT * FROM ultimo_consumo

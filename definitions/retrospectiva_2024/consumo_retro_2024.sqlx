@@ -1,0 +1,47 @@
+config {
+    type: "table",
+    name: "consumo_retro_2024",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com dados de consumo de 2024 dos usuários que já foram assinantes em 2024',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    status_assinatura: 'Status mais recente da assinatura do usuário.',
+    assinatura_gplay: 'Tipo de assinatura do usuário. Divisão entre nacional e internacional.',
+    mediaid: 'Código de identificação do episódio consumido.',
+    date: 'Data do consumo.',
+    timestamp: 'Data e hora do consumo.',
+    hours_watched: 'Horas consumidas pelo usuário.',
+    program_title: 'Título do programa consumido.',
+    program_subset: 'Subset do programa consumido.',
+    program_id: 'Código de identificação do programa consumido.',
+    is_live: 'Flag pra identificar se o conteúdo consumido é ao vivo.'    
+  },
+}
+
+
+SELECT distinct 
+  userid AS globo_id,
+  grupo,
+  mediaid,
+  date,
+  timestamp,
+  hours_watched,
+  program_title,
+  program_subset,
+  program_id,
+  is_live
+FROM  ${ref('consumo_enriched', 'impression')} as i
+INNER JOIN ${ref('retrospectiva_2024','elegibilidade_2024')} as a 
+  on a.globo_id = i.userid
+WHERE EXTRACT( YEAR FROM date ) >= 2024
+  AND a.grupo like '%com consumo'

@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  name: "Trilho_rec_genero_t5_alt_pivoted_aux",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_Trilho_rec_genero_t5_alt_pivoted_aux']
+}
+
+SELECT
+  DISTINCT
+  program_title,
+  title_url_for_consumption,
+  url_add_minha_lista,
+  media_kit_resource__poster,
+  program_id,
+  title_id,
+  program_description
+FROM
+  ${ref("jornadas_mkt", "Lista_trilho_rec_alt_top_series")} 

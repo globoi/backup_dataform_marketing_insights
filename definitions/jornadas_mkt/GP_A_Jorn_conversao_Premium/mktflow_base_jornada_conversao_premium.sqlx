@@ -1,0 +1,230 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_base_jornada_conversao_premium",
+        "schedule_cron=0 10 * * *"
+    ],
+    name: 'mktflow_base_jornada_conversao_premium',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {},
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+WITH
+  clusters AS (
+  SELECT
+    DISTINCT h.globo_id,
+    'Humor' AS segmento
+  FROM
+    ${ref("macro_clusters_mkt", "mktflow_lf_cluster_humor")} AS h
+    --`gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.mktflow_lf_cluster_humor` h
+  UNION DISTINCT
+  SELECT
+    DISTINCT n.globo_id,
+    'Novelas' AS segmento
+  FROM
+    ${ref("macro_clusters_mkt", "mktflow_lf_cluster_novela")} AS n
+    --`gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.mktflow_lf_cluster_novela` n
+  UNION DISTINCT
+  SELECT
+    DISTINCT e.globo_id,
+    'Esportes' AS segmento
+  FROM
+    ${ref("jornadas_mkt", "mktflow_lf_cluster_esportes")} AS e
+    --`gglobo-mkt-ins-hdg-prd.jornadas_mkt.mktflow_lf_cluster_esportes` e
+  UNION DISTINCT
+  SELECT
+    DISTINCT k.globo_id,
+    'Infantil' AS segmento
+  FROM
+    ${ref("macro_clusters_mkt", "mktflow_lf_cluster_kids")} AS k
+    --`gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.mktflow_lf_cluster_kids` k
+  UNION DISTINCT
+  SELECT
+    DISTINCT news.globo_id,
+    'Noticias' AS segmento
+  FROM
+    ${ref("macro_clusters_mkt", "mktflow_lf_cluster_noticias")} AS news
+    --`gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.mktflow_lf_cluster_noticias` news
+  UNION DISTINCT
+  SELECT
+    DISTINCT v.globo_id,
+    'Variedades' AS segmento
+  FROM
+    ${ref("macro_clusters_mkt", "mktflow_lf_cluster_variedades")} AS v
+    --`gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.mktflow_lf_cluster_variedades` v
+    ),
+    editoria_ge AS (
+    SELECT
+      `gglobo-prodservdig-hdg-prd.foundation_ge.udf_editoria_n1`(h.pagePath) AS editoriaN1,
+    IF
+      (globoid IS NULL
+        OR globoid IN ('',
+          'undefined'), fullVisitorId, globoid) AS globoid,
+      pagePath,
+      DATA
+    FROM
+      ${ref("foundation_ge", "foundation_ge_sessions_v3")} AS a,
+      --`gglobo-prodservdig-hdg-prd.foundation_ge.foundation_ge_sessions_v3` AS a,
+      UNNEST(hits) AS h
+    INNER JOIN (
+      SELECT
+        DISTINCT globoid
+      FROM
+        ${ref("public_globoid", "users")}
+        --`gglobo-gid-dados-hdg-prd.public_globoid.users`
+      WHERE
+        partition_date = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    USING
+      (globoid)
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+      AND h.tipoConsumo IN ('pageview',
+        'screenview') ),
+    editoria_g1 AS (
+    SELECT
+      DISTINCT userId AS globo_id,
+      'Editoria_g1' AS segmento
+    FROM
+      ${ref("g1", "pgt_*")}
+      --`valiant-circuit-129220.g1.pgt_*`
+    WHERE
+      (_TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY))
+        AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) )
+      AND provider = 'cadun'
+      AND userid IS NOT NULL
+      AND object LIKE '%g1.globo.com/%' ),
+    editoria_gshow AS(
+    SELECT
+      DISTINCT userid AS globo_id,
+      'Editoria_gshow' AS segmento
+    FROM
+      ${ref("gshow", "pgt_*")}
+      --`valiant-circuit-129220.gshow.pgt_*`
+    WHERE
+      (_TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY))
+        AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) )
+      AND provider = 'cadun'
+      AND userid IS NOT NULL
+      AND object LIKE '%gshow.globo.com/%' ),
+    access_last_15d_GE AS (
+    SELECT
+      DISTINCT ge.globoid AS globo_id,
+      'Editoria_ge' AS segmento
+    FROM
+      editoria_ge ge
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY) ),
+    assistiu_2h_free_15d AS (
+    SELECT
+      DISTINCT userId AS globo_id,
+      SUM(imp.hours_watched) AS hrs,
+      clu.segmento
+    FROM
+      ${ref("consumo_enriched", "impression")} AS imp
+      --`gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` imp
+    INNER JOIN
+      clusters AS clu
+    ON
+      (imp.userId = clu.globo_id)
+    JOIN
+      ${ref("usuarios", "free_users_all")} AS fu
+      --`gglobo-mkt-ins-hdg-prd.usuarios.Free users` fu
+    ON
+      clu.globo_id = fu.globo_id
+    WHERE
+      imp.date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+    GROUP BY
+      imp.userId,
+      clu.segmento
+    HAVING
+      hrs >= 2 ),
+    acessou_editorias_g1_ge_gshow_15d AS(
+    SELECT
+      DISTINCT sub.globo_id,
+      sub.segmento
+    FROM (
+      SELECT
+        DISTINCT ge.globo_id,
+        ge.segmento
+      FROM
+        access_last_15d_GE ge
+      UNION DISTINCT
+      SELECT
+        DISTINCT g.globo_id,
+        g.segmento
+      FROM
+        editoria_gshow g
+      UNION DISTINCT
+      SELECT
+        DISTINCT g1.globo_id,
+        g1.segmento
+      FROM
+        editoria_g1 g1 ) AS sub
+    INNER JOIN
+      ${ref("usuarios", "free_users_all")} AS fu
+      --`gglobo-mkt-ins-hdg-prd.usuarios.Free users` fu
+    ON
+      (sub.globo_id = fu.globo_id) ),
+    tapume_nao_assinantes_30d AS (
+    SELECT DISTINCT j.globo_id,
+      j.canal,
+      CASE
+        WHEN LOWER(j.canal) IN ('multishow', 'gnt', 'viva', 'mais na tela', 'universal', 'syfy', 'studio universal', 'megapix', 'canal brasil', 'bis') THEN 'tapume_variedades'
+        WHEN LOWER(j.canal)='globonews' THEN 'tapume_noticias'
+        WHEN LOWER(j.canal) IN ('sportv', 'canal off', 'premiere', 'sportv 2', 'off') THEN 'tapume_esporte'
+        ELSE 'tapume'
+    END
+      AS segmento
+    FROM
+      ${ref("jornadas_mkt","jornada_upgrade_categoria")} j
+    JOIN
+      ${ref("usuarios", "assinantes_e_logados_free")} f
+    ON
+      j.globo_id = f.globo_id
+    WHERE
+      ( LOWER(j.canal) LIKE "%multishow%"
+        OR LOWER(j.canal) LIKE "%gnt%"
+        OR LOWER(j.canal) LIKE "%viva%"
+        OR LOWER(j.canal) LIKE "%mais na tela%"
+        OR LOWER(j.canal) LIKE "%universal%"
+        OR LOWER(j.canal) LIKE "%syfy%"
+        OR LOWER(j.canal) LIKE "%studio universal%"
+        OR LOWER(j.canal) LIKE "%megapix%"
+        OR LOWER(j.canal) LIKE "%canal brasil%"
+        OR LOWER(j.canal) LIKE "%bis%"
+        OR LOWER(j.canal) LIKE "%globonews%"
+        OR LOWER(j.canal) LIKE "%sportv%"
+        OR LOWER(j.canal) LIKE "%off%"
+        OR LOWER(j.canal) LIKE "%premiere%"
+        AND f.tipo_usuario = "Logado Free")
+)
+  SELECT
+    DISTINCT i.globo_id,
+    STRING_AGG(DISTINCT i.segmento, '|| ') AS segmentos
+  FROM (
+    SELECT
+      y.globo_id,
+      y.segmento
+    FROM
+      assistiu_2h_free_15d y
+    UNION ALL
+    SELECT
+      z.globo_id,
+      z.segmento
+    FROM
+      acessou_editorias_g1_ge_gshow_15d z
+    UNION ALL
+    SELECT
+      v.globo_id,
+      v.segmento
+    FROM
+      tapume_nao_assinantes_30d v ) AS i
+  GROUP BY
+    globo_id
+

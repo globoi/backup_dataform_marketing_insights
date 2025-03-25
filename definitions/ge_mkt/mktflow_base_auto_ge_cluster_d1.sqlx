@@ -1,0 +1,57 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_auto_ge_cluster_d1', 'schedule_cron=55 10 * * *'],
+    name: 'mktflow_base_auto_ge_cluster_d1',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+
+WITH
+  Cluster_GE AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    DATETIME(TIMESTAMP_MILLIS(timestamp), 'America/Sao_Paulo') AS dt_acesso,
+    CASE
+      WHEN object LIKE '%ge.globo.com/' THEN 'home'
+      WHEN object LIKE '%amp%'
+    AND object LIKE '%google%' THEN SPLIT(object, '/')[SAFE_OFFSET(5)]
+      WHEN UPPER(SPLIT(object, '/')[SAFE_OFFSET(3)]) IN ( 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO') THEN SPLIT(object, '/')[SAFE_OFFSET(4)]
+      ELSE SPLIT(object, '/')[SAFE_OFFSET(3)]
+  END
+    AS editoria,
+    CASE
+      WHEN SPLIT(object, '/')[SAFE_OFFSET(4)] LIKE '%ghtml%' THEN NULL
+      WHEN object LIKE '%amp%'
+    AND object LIKE '%google%' THEN SPLIT(object, '/')[SAFE_OFFSET(6)]
+      WHEN UPPER(SPLIT(object, '/')[SAFE_OFFSET(3)]) IN ( 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO') THEN NULL
+      ELSE SPLIT(object, '/')[SAFE_OFFSET(4)]
+  END
+    AS subeditoria
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com%'
+    AND _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) )
+SELECT
+  p.globo_id,
+  MAX(p.dt_acesso) AS dt_acesso,
+  p.editoria AS editoria,
+  p.subeditoria AS subeditoria
+FROM
+  Cluster_GE AS p
+GROUP BY
+  p.globo_id,
+  p.editoria,
+  p.subeditoria

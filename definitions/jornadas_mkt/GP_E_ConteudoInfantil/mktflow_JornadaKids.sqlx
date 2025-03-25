@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  name: "mktflow_JornadaKids",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_ConteudoInfantil",'schedule_tag=jornadas_mkt_mktflow_JornadaKids']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT b.globo_id, CURRENT_DATE() AS dt_proc
+FROM ${ref("consumo_enriched", "impression")} AS i
+INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS b ON b.globo_id=i.userid
+WHERE i.program_subset='kids' AND b.tipo_assinante !='trial' AND cast(i.timestamp AS date) >= DATE_SUB(current_date(), INTERVAL 30 DAY)
+GROUP BY 1
+HAVING sum(i.hours_watched) >= 0.66

@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  name: "mktflow_agrupador_series_LF2",
+  schema: "jornadas_mkt",
+  tags: ["GP_A_TitulosLiberados",'schedule_tag=jornadas_mkt_mktflow_agrupador_series_LF2']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH impression AS (
+  SELECT 
+  userid, timestamp
+  FROM ${ref("consumo_enriched", "all_impression")}
+  WHERE timestamp >= TIMESTAMP("2020-04-20 00:00:00-03")
+  AND program_id IN (10510,2536,5221,2512,3292,10943,11822,11111,11960,11152)
+),
+
+join_users AS (
+  SELECT imp.*
+  FROM impression imp
+  JOIN ${ref("usuarios", "Free users")} fu
+  ON (imp.userid = fu.globo_id)
+)
+
+SELECT 
+userid AS globo_id,
+CURRENT_DATE() AS dt_proc
+FROM join_users
+QUALIFY ROW_NUMBER() OVER (PARTITION BY userid ORDER BY timestamp ASC) = 1

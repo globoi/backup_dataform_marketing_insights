@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_25",
+  name: "historico_gshow_bbb",
+  description: ""
+}

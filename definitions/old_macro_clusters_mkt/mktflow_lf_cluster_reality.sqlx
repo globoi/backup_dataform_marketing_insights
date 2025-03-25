@@ -1,0 +1,19 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_reality",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_reality']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 'named_user' as identifier_type,
+    userid AS globo_id
+FROM ${ref("consumo_enriched", "all_impression")} imp
+INNER JOIN ${ref("usuarios", "Free users")} fu
+ON (imp.userid = fu.globo_id)
+WHERE
+    program_subset = 'realities'

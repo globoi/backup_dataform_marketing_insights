@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_22",
+  name: "Raiox_BBB_22_Agrupado_historico",
+  description: ""
+}

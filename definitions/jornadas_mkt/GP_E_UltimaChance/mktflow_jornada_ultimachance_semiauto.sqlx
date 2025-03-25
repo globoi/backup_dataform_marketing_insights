@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    schema: "jornadas_mkt",
+    name: "mktflow_jornada_ultimachance_semiauto",
+    tags: [],
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+SELECT
+  globo_id,
+  program_id,
+  program_title,
+  "Programa completo" AS cenario,
+  "" AS temporadas_expirando,
+  "14 de setembro de 2022" AS data_expiracao_conteudo,
+  media_kit_resource__poster,
+  url_for_consumption
+FROM
+  ${ref("consumo", "base_ponto_parada_series")} AS bpps
+INNER JOIN (
+  SELECT
+    id,
+    title,
+    media_kit_resource__poster,
+    url_for_consumption
+  FROM
+    ${ref("conteudo_enriched", "program")}
+  WHERE
+    id = 12900) AS prog
+ON
+  bpps.program_id = prog.id

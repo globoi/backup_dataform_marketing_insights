@@ -1,0 +1,19 @@
+
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'ultimo_consumo_internacional',
+  tags: ['perfil_internacional',
+          'schedule_tag=internacional_ultimo_consumo_internacional',
+          'schedule_cron=0 12 * * *']
+}
+SELECT
+  a.globo_id,
+  id_do_item_da_cesta as assetid,
+  ultimo_consumo,
+  data_ultimo_consumo,
+  ultimo_consumo_subset
+FROM
+    ${ref('consumo', 'ultimo_consumo')} AS a
+  INNER JOIN ${ref('internacional', 'base_ativa_internacional')} AS i ON i.globo_id = a.globo_id
+

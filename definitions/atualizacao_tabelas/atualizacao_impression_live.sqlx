@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  name: 'atualizacao_impression_live',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_impression_live',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+SELECT
+  COUNT(DISTINCT userId) AS qtd_usuarios,
+  sum(hours_watched) as qtd_hrs,
+  date,
+  is_live
+FROM
+  ${ref('consumo_enriched', 'impression')}WHERE date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  and is_live
+GROUP BY
+  3,
+  4
+ORDER BY
+  3 asc

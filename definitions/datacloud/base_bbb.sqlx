@@ -1,0 +1,241 @@
+config {
+    type: "table",
+    name: "base_bbb",
+    schema: 'datacloud',
+    tags: ['schedule_tag=datacloud_base_bbb',
+        "schedule_cron=45 11 * * *"
+    ]
+}
+
+WITH
+  usuarios AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    `gglobo-mkt-ins-hdg-prd.datacloud.base_datacloud` ),
+  base_rein AS (
+  SELECT
+    DISTINCT id,
+    TIMESTAMP(subscription_at) AS data_hora_compra,
+    product_name,
+    ( subscription_at BETWEEN '2020-01-01'
+      AND '2020-04-30' )
+    AND ( unsubscribe_at BETWEEN '2020-04-01'
+      AND '2020-05-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2020 ) AS assinou_cancelou_bbb_20,
+    ( subscription_at BETWEEN '2021-01-01'
+      AND '2021-04-30' )
+    AND ( unsubscribe_at BETWEEN '2021-04-01'
+      AND '2021-05-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2021 ) AS assinou_cancelou_bbb_21,
+    ( subscription_at BETWEEN '2022-01-01'
+      AND '2022-04-30' )
+    AND ( unsubscribe_at BETWEEN '2022-04-01'
+      AND '2022-05-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2022 ) AS assinou_cancelou_bbb_22,
+    ( subscription_at BETWEEN '2023-01-01'
+      AND '2023-04-30' )
+    AND ( unsubscribe_at BETWEEN '2023-04-01'
+      AND '2023-05-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2023 ) AS assinou_cancelou_bbb_23,
+    ( subscription_at BETWEEN '2024-01-01'
+      AND '2024-04-30' )
+    AND ( unsubscribe_at BETWEEN '2024-04-01'
+      AND '2024-05-31' )
+    AND ( EXTRACT( YEAR
+      FROM
+        end_cycle_at ) = 2024 ) AS assinou_cancelou_bbb_24,
+    subscription_status,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at
+  FROM
+    `gglobo-vendas-hdg-prd.sales_gold.subscription_details` ),
+  base_rein2 AS (
+  SELECT
+    *
+  FROM
+    base_rein
+  JOIN
+    `gglobo-foundation-psd-hdg-prd.sales_gold.last_subscription_state` AS s
+  ON
+    s.object_id = base_rein.id
+  WHERE
+    LOWER(product_name) LIKE '%globoplay%' ),
+  base_rein3 AS (
+  SELECT
+    globo_id,
+    COALESCE(MAX(assinou_cancelou_bbb_20), FALSE) AS assinou_cancelou_bbb_20,
+    COALESCE(MAX(assinou_cancelou_bbb_21), FALSE) AS assinou_cancelou_bbb_21,
+    COALESCE(MAX(assinou_cancelou_bbb_22), FALSE) AS assinou_cancelou_bbb_22,
+    COALESCE(MAX(assinou_cancelou_bbb_23), FALSE) AS assinou_cancelou_bbb_23,
+    COALESCE(MAX(assinou_cancelou_bbb_24), FALSE) AS assinou_cancelou_bbb_24
+  FROM
+    base_rein2
+  GROUP BY
+    1 )
+SELECT
+  * EXCEPT( assistiu_bbb20,
+    assistiu_bbb21,
+    assistiu_bbb22,
+    assistiu_bbb23,
+    assistiu_bbb24,
+    assinou_cancelou_bbb_20,
+    assinou_cancelou_bbb_21,
+    assinou_cancelou_bbb_22,
+    assinou_cancelou_bbb_23,
+    assinou_cancelou_bbb_24,
+    cluster_share_bbb21_total,
+    cluster_bbb21_acumulado,
+    cluster_share_bbb22_total,
+    cluster_bbb22_acumulado,
+    cluster_bbb23_acumulado,
+    cluster_share_bbb23_total,
+    cluster_conteudo_bbb23,
+    cluster_conteudo_reduzido_bbb23,
+    cluster_bbb24_acumulado,
+    cluster_share_bbb24_total,
+    cluster_conteudo_bbb24,
+    cluster_conteudo_reduzido_bbb24 ),
+  cluster_share_bbb21_total,
+  cluster_share_bbb22_total,
+  cluster_share_bbb23_total,
+  cluster_share_bbb24_total,
+  cluster_bbb21_acumulado,
+  cluster_bbb22_acumulado,
+  cluster_bbb23_acumulado,
+  cluster_bbb24_acumulado,
+  cluster_conteudo_bbb23,
+  cluster_conteudo_bbb24,
+  cluster_conteudo_reduzido_bbb23,
+  cluster_conteudo_reduzido_bbb24,
+  IFNULL(assistiu_bbb20, FALSE) AS assistiu_bbb20,
+  IFNULL(assinou_cancelou_bbb_20, FALSE) AS assinou_cancelou_bbb_20,
+  IFNULL(assistiu_bbb21, FALSE) AS assistiu_bbb21,
+  IFNULL(assinou_cancelou_bbb_21, FALSE) AS assinou_cancelou_bbb_21,
+  IFNULL(assistiu_bbb22, FALSE) AS assistiu_bbb22,
+  IFNULL(assinou_cancelou_bbb_22, FALSE) AS assinou_cancelou_bbb_22,
+  IFNULL(assistiu_bbb23, FALSE) AS assistiu_bbb23,
+  IFNULL(assinou_cancelou_bbb_23, FALSE) AS assinou_cancelou_bbb_23,
+  IFNULL(assistiu_bbb24, FALSE) AS assistiu_bbb24,
+  IFNULL(assinou_cancelou_bbb_24, FALSE) AS assinou_cancelou_bbb_24
+FROM
+  usuarios
+LEFT JOIN (
+  SELECT
+    globo_id,
+    TRUE AS assistiu_bbb20
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_20.status_Erick_historico` )
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb21,
+    Cluster_Share_BBB_Total AS cluster_share_bbb21_total,
+    Cluster_BBB_Acumulado AS cluster_bbb21_acumulado
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_21.raiox_bbb_21_propensao_churn` QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1 )
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb22,
+    Cluster_Share_BBB_Total AS cluster_share_bbb22_total,
+    Cluster_BBB_Acumulado AS cluster_bbb22_acumulado
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico` QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1 )
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb23,
+    cluster_bbb_acumulado AS cluster_bbb23_acumulado,
+    cluster_share_bbb_total AS cluster_share_bbb23_total,
+    cluster_conteudo AS cluster_conteudo_bbb23,
+    cluster_conteudo_reduzido AS cluster_conteudo_reduzido_bbb23
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado` QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb23,
+    cluster_bbb_acumulado AS cluster_bbb23_acumulado,
+    cluster_share_bbb_total AS cluster_share_bbb23_total,
+    cluster_conteudo AS cluster_conteudo_bbb23,
+    cluster_conteudo_reduzido AS cluster_conteudo_reduzido_bbb23
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_LF_Agrupado`
+  FULL OUTER JOIN (
+    SELECT
+      globo_id
+    FROM
+      `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_LF_Simulcast`
+    GROUP BY
+      1 QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1 )
+  USING
+    (globo_id) )
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb24,
+    cluster_bbb_acumulado AS cluster_bbb24_acumulado,
+    cluster_share_bbb_total AS cluster_share_bbb24_total,
+    cluster_conteudo AS cluster_conteudo_bbb24,
+    cluster_conteudo_reduzido AS cluster_conteudo_reduzido_bbb24
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_24.raiox_bbb_24_assinantes_agrupado` QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1
+  UNION DISTINCT
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS assistiu_bbb24,
+    cluster_bbb_acumulado AS cluster_bbb24_acumulado,
+    cluster_share_bbb_total AS cluster_share_bbb24_total,
+    cluster_conteudo AS cluster_conteudo_bbb24,
+    cluster_conteudo_reduzido AS cluster_conteudo_reduzido_bbb24
+  FROM
+    `gglobo-mkt-ins-hdg-prd.bbb_24.raiox_bbb_24_lf_agrupado` )
+USING
+  (globo_id)
+LEFT JOIN
+  base_rein3
+USING
+  (globo_id)
+WHERE
+  (cluster_share_bbb21_total IS NOT NULL
+    OR cluster_share_bbb22_total IS NOT NULL
+    OR cluster_share_bbb23_total IS NOT NULL
+    OR cluster_share_bbb24_total IS NOT NULL
+    OR cluster_bbb21_acumulado IS NOT NULL
+    OR cluster_bbb22_acumulado IS NOT NULL
+    OR cluster_bbb23_acumulado IS NOT NULL
+    OR cluster_bbb24_acumulado IS NOT NULL
+    OR cluster_conteudo_bbb23 IS NOT NULL
+    OR cluster_conteudo_bbb24 IS NOT NULL
+    OR cluster_conteudo_reduzido_bbb23 IS NOT NULL
+    OR cluster_conteudo_reduzido_bbb24 IS NOT NULL
+    OR assistiu_bbb20 IS NOT NULL
+    OR assinou_cancelou_bbb_20 IS NOT NULL
+    OR assistiu_bbb21 IS NOT NULL
+    OR assinou_cancelou_bbb_21 IS NOT NULL
+    OR assistiu_bbb22 IS NOT NULL
+    OR assinou_cancelou_bbb_22 IS NOT NULL
+    OR assistiu_bbb23 IS NOT NULL
+    OR assinou_cancelou_bbb_23 IS NOT NULL
+    OR assistiu_bbb24 IS NOT NULL
+    OR assinou_cancelou_bbb_24 IS NOT NULL) QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1
+ORDER BY
+  assistiu_bbb24 DESC

@@ -1,0 +1,35 @@
+config {
+  type: "incremental",
+  name: "base_resumo_do_mes_email_2022_inc",
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_R_ResumoDoMes"],
+  description: '',
+  bigquery: {
+    partitionBy: "dt_proc"
+  },
+  uniqueKey: ["globo_id", "dt_proc"]
+}
+
+SELECT 
+globo_id	,
+mes	,
+Ao_Vivaco	,
+Apegado	,
+Cinefilo	,
+Ecletico	,
+Humorista	,
+Ligeirinho	,
+Maratonista	,
+Noveleiro	,
+Reporter	,
+Tecnologico	,
+Viciado	,
+Vipao	,
+program_id_mais_assistido	,
+programa_mais_assistido	,
+Horas_Assistidas	,
+Programas_assistidos	,
+Midias_Assistidas	,
+Flag_Abriu_Email_30D	,
+CURRENT_DATE() AS dt_proc
+FROM ${ref("jornadas_mkt", "mktflow_base_resumo_do_mes_email_2022")}

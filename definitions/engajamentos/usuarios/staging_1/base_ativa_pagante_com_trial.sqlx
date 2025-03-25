@@ -1,0 +1,343 @@
+config {
+  type: "table",
+  name: "base_ativa_pagante_com_trial",
+  schema: "usuarios",
+  /*tags: ["usuarios_staging_1",
+        "schedule_tag=usuarios_base_ativa_pagante_com_trial"
+  ],*/
+  description: 'Tabela de usuários pagante com trial.',
+    columns: {
+      globo_id: 'Código de identificação do usuário.',
+      id_asset: 'Identifica o código do produto adquirido.',
+      tipo_assinante: 'Identifica se o usuário é Títular, Dependente ou Logado Free.',
+      sistema: 'Identifica o sistema de registro do assinante (Ex: SalesForce).',
+      mais_canais: 'Identifica se tem mais canais no pacote de assinatura do usuário.',
+      addon_disney: 'Identifica se o usuário possui addon disney vinculado à sua assinatura.',
+      addon_deezer: 'Identifica se o usuário possui addon deezer vinculado à sua assinatura.',
+      Produto_Contratado: 'Identifica o produto contratado (Ex: Globoplay, Globoplay + canais ao vivo e Disney.)',
+      em_ativacao: 'Identifica se o plano do usuário está em ativação ou não.',
+      dt_assinatura_comeco: 'Identifica a data de assinatura do usuário.',
+      canal_compra: 'Identifica o canal de aquisição da assinatura (Ex: WEB, Inaap, Google etc.)',
+      data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+      produto: 'Identifica a periodicidade da cobrança do produto adquirido.(Ex: Anual, bianual ou mensal.)',
+      origem: 'Identifica a origem da assinatura do usuário.(Ex: Venda direta, Trial, Upgrade.)',
+      assinatura_gplay: 'Identifica se a assinatura é nacional ou internacional.',
+      tempo_de_base_agrupado: 'Identifica o tempo de base agrupado do usuario.(Ex: 1. Até 1 mês)',
+}}
+
+WITH usuarios_em_trial AS (
+  SELECT
+    globo_id,
+    AssetId AS id_asset,
+    'trial' AS tipo_assinante,
+    'Salesforce' AS sistema,
+    LOWER(AssetName) LIKE '%canais%' AS mais_canais,
+    CASE
+      WHEN (
+        AssetName LIKE '%Premiere%'
+        and LOWER(AssetName) NOT LIKE '%canais%'
+      ) THEN 'Globoplay + Premiere'
+      WHEN (
+        AssetName LIKE '%Telecine%'
+        and LOWER(AssetName) NOT LIKE '%canais%'
+      ) THEN 'Globoplay + Telecine'
+      ELSE AssetName
+    END AS Produto_Contratado,
+    CASE
+      WHEN LOWER(ProductCode) LIKE '%bianual%' THEN 'bianual'
+      WHEN ProductCodeUnique__c LIKE 'Pro-0130' THEN 'anual'
+      WHEN LOWER(ProductCode) LIKE '%anual%' THEN 'anual'
+      ELSE 'mensal'
+    END AS produto
+  FROM
+    ${ref("sales_enriched", "base_ativa_trial")}
+),
+titular_sf AS (
+  SELECT
+    globo_id,
+    AssetId AS id_asset,
+    'titular' AS tipo_assinante,
+    'Salesforce' AS sistema,
+    LOWER(AssetName) LIKE '%canais%' AS mais_canais,
+    CASE
+      WHEN (
+        AssetName LIKE '%Premiere%'
+        and LOWER(AssetName) NOT LIKE '%canais%'
+      ) THEN 'Globoplay + Premiere'
+      WHEN (
+        AssetName LIKE '%Telecine%'
+        and LOWER(AssetName) NOT LIKE '%canais%'
+      ) THEN 'Globoplay + Telecine'
+      ELSE AssetName
+    END AS Produto_Contratado,
+    CASE
+      WHEN LOWER(ProductCode) LIKE '%bianual%' THEN 'bianual'
+      WHEN ProductCodeUnique__c LIKE 'Pro-0130' THEN 'anual'
+      WHEN LOWER(ProductCode) LIKE '%anual%' THEN 'anual'
+      ELSE 'mensal'
+    END AS produto,
+    CASE
+      WHEN LOWER(tipo_de_aquisicao) LIKE '%upgrade%' THEN 'Upgrade'
+      WHEN LOWER(tipo_de_aquisicao) LIKE '%downgrade%' THEN 'Downgrade'
+      WHEN NOT teve_degustacao THEN 'Venda direta'
+      ELSE 'Trial'
+    END AS origem
+  FROM
+    ${ref("sales_enriched", "asset_v2")}
+  where
+    (
+      globo_id is not NULL
+      and lower(AssetName) like '%globoplay%'
+      and (
+        base_ativa_pagante
+        or base_ativa_cupom
+        or base_ativa_trial
+        or base_ativa_disney_combo
+        or base_ativa_discovery_combo
+        or base_ativa_starz_combo
+        or base_ativa_disney_addon
+        or base_ativa_discovery_addon
+        or base_ativa_starz_addon
+      )
+      or status = 'Ativo'
+    )
+    and lower(AssetName) like '%globoplay%'
+),
+relacionamento AS (
+  SELECT
+    D2C_Dependent_GloboID__c AS globo_id_dependente,
+    D2C_Parent__c AS AccountId,
+    globo_id
+  FROM
+    ${ref("sales_clean", "d2c_account_dependent")}
+    INNER JOIN (
+      SELECT
+        AccountId,
+        globo_id
+      FROM
+        ${ref("sales_clean", "account")}
+      WHERE
+        table_suffix > '2019-01-01'
+    ) ON (AccountId = D2C_Parent__c)
+  WHERE
+    LOWER(D2C_Status__c) = 'active'
+    AND D2C_Dependent_GloboID__c IS NOT NULL
+),
+dependentes_sf AS (
+  SELECT
+    DISTINCT (r.globo_id_dependente) AS globo_id,
+    t.id_asset,
+    'dependente' AS tipo_assinante,
+    'Salesforce' AS sistema,
+    t.produto,
+    t.mais_canais,
+    t.Produto_Contratado,
+    t.origem
+  FROM
+    relacionamento AS r
+    INNER JOIN titular_sf AS t ON r.globo_id = t.globo_id
+),
+data_comeco AS (
+  SELECT
+    AssetId AS id_assinatura,
+    COALESCE(
+      data_conversao_efetiva,
+      CAST(data_hora_compra AS DATE)
+    ) AS dt_assinatura_comeco,
+    data_hora_compra,
+    canal_compra,
+    CASE
+      WHEN sinal_status_da_assinatura LIKE '%ativação%' THEN TRUE
+      ELSE FALSE
+    END AS em_ativacao
+  FROM
+    ${ref("sales_enriched", "asset_v2")}
+  where
+    (
+      globo_id is not NULL
+      and lower(AssetName) like '%globoplay%'
+      and (
+        base_ativa_pagante
+        or base_ativa_cupom
+        or base_ativa_trial
+        or base_ativa_disney_combo
+        or base_ativa_discovery_combo
+        or base_ativa_starz_combo
+        or base_ativa_disney_addon
+        or base_ativa_discovery_addon
+        or base_ativa_starz_addon
+      )
+      or status = 'Ativo'
+    )
+    and lower(AssetName) like '%globoplay%'
+),
+inicio_assinatura_assinantes AS (
+  SELECT
+    DISTINCT id_assinatura,
+    canal_compra,
+    dt_assinatura_comeco,
+    tempo_de_base,
+    data_hora_compra,
+    em_ativacao,
+    CASE
+      WHEN tempo_de_base <= 30 THEN '1. Até 1 mês'
+      WHEN tempo_de_base <= 60 THEN '2. Entre 1 e 2 Meses'
+      WHEN tempo_de_base <= 90 THEN '3. Entre 2 e 3 Meses'
+      WHEN tempo_de_base <= 180 THEN '4. Entre 3 e 6 Meses'
+      WHEN tempo_de_base <= 360 THEN '5. Entre 6 e 12 Meses'
+      WHEN tempo_de_base <= 720 THEN '6. Entre 12 e 24 Meses'
+      ELSE '7. Mais de 24 Meses'
+    END AS tempo_de_base_agrupado
+  FROM
+    (
+      SELECT
+        id_assinatura,
+        dt_assinatura_comeco,
+        canal_compra,
+        data_hora_compra,
+        em_ativacao,
+        DATE_DIFF(CURRENT_DATE(), dt_assinatura_comeco, DAY) AS tempo_de_base
+      FROM
+        data_comeco
+    ) AS a
+),
+globoplay_internacional AS (
+  SELECT
+    *,
+    'internacional' AS assinatura_gp
+  FROM
+    (
+      SELECT
+        a.globo_id
+      FROM
+        ${ref("sales_enriched", "trial")} AS a
+      WHERE
+        a.assinatura_internacional
+      UNION ALL
+      SELECT
+        b.globo_id
+      FROM
+        ${ref("sales_enriched", "salesforce_venda_direta")} AS b
+      WHERE
+        b.assinatura_internacional
+      UNION ALL
+      SELECT
+        globo_id
+      FROM
+        ${ref("sales_enriched", "user")}
+      WHERE
+        status LIKE 'Ativo'
+        AND GP_internacional_ind LIKE 'globo-play-%'
+    )
+),
+addon_disney AS (
+  SELECT
+    DISTINCT globo_id,
+    'addon_disney' AS addon_disney
+  FROM
+    ${ref("sales_enriched", "base_ativa_disney_addon")}
+),
+addon_deezer AS (
+  SELECT
+    DISTINCT(globo_id),
+    AssetName,
+    is_addon,
+    status_calculado,
+    'addon_deezer' AS addon_deezer
+  FROM
+    ${ref("sales_enriched", "asset_v2")}
+  WHERE
+    is_addon
+    AND LOWER(status_calculado) LIKE '%ativo%'
+    AND data_hora_cancelamento IS NULL
+    AND data_da_suspensao IS NULL
+),
+final AS (
+  SELECT
+    a.globo_id,
+    id_asset,
+    tipo_assinante,
+    sistema,
+    mais_canais,
+    CASE
+      WHEN ad1.addon_disney IS NULL THEN FALSE
+      ELSE TRUE
+    END AS addon_disney,
+    CASE
+      WHEN ad2.addon_deezer IS NULL THEN FALSE
+      ELSE TRUE
+    END AS addon_deezer,
+    case
+      when Produto_Contratado = 'Globoplay Mais Canais ao Vivo' then 'Globoplay + canais ao vivo'
+      else Produto_Contratado
+    end as Produto_Contratado,
+    em_ativacao,
+    dt_assinatura_comeco,
+    canal_compra,
+    data_hora_compra,
+    produto,
+    origem,
+    COALESCE(assinatura_gp, 'nacional') AS assinatura_gplay,
+    CASE
+      WHEN tipo_assinante = 'trial' THEN 'Trial'
+      ELSE tempo_de_base_agrupado
+    END AS tempo_de_base_agrupado
+  FROM
+    (
+      SELECT
+        globo_id,
+        id_asset,
+        mais_canais,
+        tipo_assinante,
+        sistema,
+        produto,
+        Produto_Contratado,
+        'Trial' AS origem
+      FROM
+        usuarios_em_trial
+      UNION ALL
+      SELECT
+        globo_id,
+        id_asset,
+        mais_canais,
+        tipo_assinante,
+        sistema,
+        produto,
+        Produto_Contratado,
+        origem
+      FROM
+        dependentes_sf
+      UNION ALL
+      SELECT
+        globo_id,
+        id_asset,
+        mais_canais,
+        tipo_assinante,
+        sistema,
+        produto,
+        Produto_Contratado,
+        origem
+      FROM
+        titular_sf
+      UNION ALL
+      SELECT
+        '663be12a-b5ea-44fc-86d6-4a79d92aa354' AS globo_id,
+        NULL AS id_asset,
+        True AS mais_canais,
+        'titular' AS tipo_assinante,
+        'Erick' AS sistema,
+        'mensal' AS produto,
+        'Globoplay + canais ao vivo' AS Produto_Contratado,
+        'Legado' AS origem
+    ) AS a
+    LEFT JOIN inicio_assinatura_assinantes ON inicio_assinatura_assinantes.id_assinatura = a.id_asset
+    LEFT JOIN globoplay_internacional ON globoplay_internacional.globo_id = a.globo_id
+    LEFT JOIN addon_disney ad1 ON ad1.globo_id = a.globo_id
+    LEFT JOIN addon_deezer ad2 ON ad2.globo_id = a.globo_id
+  WHERE
+    LOWER(Produto_Contratado) LIKE "%globoplay%"
+)
+SELECT
+  DISTINCT *
+FROM
+  final

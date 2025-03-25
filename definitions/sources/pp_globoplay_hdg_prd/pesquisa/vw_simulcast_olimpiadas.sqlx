@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-pp-globoplay-hdg-prd",
+  schema: "pesquisa",
+  name: "vw_simulcast_olimpiadas",
+  description: ""
+}

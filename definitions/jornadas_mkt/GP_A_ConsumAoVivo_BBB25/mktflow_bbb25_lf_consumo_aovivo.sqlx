@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+    schema: 'jornadas_mkt',
+    tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_bbb25_lf_consumo_aovivo"
+    ],
+  name: 'mktflow_bbb25_lf_consumo_aovivo',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+with base1 as (
+SELECT DISTINCT globoid, programa
+FROM ${ref("simulcast", "consumo_ibope")} 
+--`gglobo-pp-globoplay-hdg-prd.simulcast.consumo_ibope`
+WHERE data_consumo = DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+and programa like "BIG BROTHER%")
+
+select distinct globoid
+from ${ref("comunicacao", "ultima_comunicacao_geral")} as a 
+--`gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral` as a
+inner join base1 as b
+on a.globo_id = b.globoid
+where tipo_cadastro = 'Logado Free'

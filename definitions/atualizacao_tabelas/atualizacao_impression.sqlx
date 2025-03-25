@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  name: 'atualizacao_impression',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_impression',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+with tabelas as (
+  SELECT
+    COUNT(DISTINCT userId) AS qtd_usuarios,
+    SUM(hours_watched) AS qtd_hrs,
+    date,
+    max(timestamp) as max_date
+  FROM
+    ${ref('consumo_enriched', 'impression')}WHERE date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY
+    3
+  ORDER BY
+    3 asc
+)
+select
+  *
+except(max_date),
+  DATETIME(max_date, "America/Sao_Paulo") as max_date
+from
+  tabelas

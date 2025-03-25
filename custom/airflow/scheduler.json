@@ -1,0 +1,546 @@
+{
+   "mkt_jornadas_mkt_consumo": {
+      "tag": "jornadas_mkt_consumo",
+      "depends_on": [
+         "foundation_consumo_clean_ga"
+      ]
+   },
+   "mkt_jornadas_mkt_conteudo": {
+      "tag": "jornadas_mkt_conteudo",
+      "depends_on": [
+         "foundation_conteudo_enriched"
+      ]
+   },
+
+   "mkt_GP_A_TodasAsFlores": {
+      "tag": "GP_A_TodasAsFlores",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_consumo_staging_1"
+      ]
+   },
+
+   "mkt_GP_E_R_ResumoDoMes": {
+      "tag": "GP_E_R_ResumoDoMes",
+      "depends_on": [
+         "mkt_usuarios_staging_1",
+         "mkt_usuarios_staging_3",
+         "mkt_consumo_staging_3",
+         "mkt_consumo_staging_1",
+         "mkt_comunicacao_staging_8",
+         "foundation_conteudo_derived",
+         "foundation_conteudo_enriched"
+      ]
+   },
+
+   "mkt_base_midia_inatividade": {
+      "tag": "base_midia_inatividade",
+      "depends_on": [
+         "mkt_usuarios_staging_3"
+      ]
+   },
+
+   "mkt_cluster_mais_canais": {
+      "tag": "cluster_mais_canais",
+      "depends_on": [
+         "mkt_consumo_staging_2",
+         "mkt_usuarios_staging_1",
+         "foundation_conteudo_enriched",
+         "foundation_sales_enriched"
+      ]
+   },
+
+  "mkt_lf_cluster":{
+      "tag": "lf_cluster",
+      "depends_on": [
+         "foundation_consumo_derived",
+         "foundation_sales_enriched",
+         "mkt_GP_A_AvisaQueTaBombando",
+         "mkt_jornadas_mkt_consumo",
+         "foundation_consumo_enriched_hz",
+         "mkt_usuarios_staging_2"
+      ]
+   },
+
+   "mkt_GP_E_BoasVindasDependentes":{
+      "tag": "GP_E_BoasVindasDependentes",
+      "depends_on": [
+         "foundation_sales_clean",
+         "foundation_sales_enriched",
+         "mkt_consumo_staging_1"
+      ]
+   },
+
+   "mkt_GP_E_NovaTemporada": {
+      "tag": "GP_E_NovaTemporada",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_usuarios_staging_1",
+         "mkt_consumo_staging_1",
+         "mkt_consumo_staging_1_history",
+         "foundation_sales_enriched",
+         "foundation_conteudo_enriched"
+      ]
+   },
+   "mkt_GP_E_ConteudoInfantil": {
+      "tag": "GP_E_ConteudoInfantil",
+      "depends_on": [
+         "mkt_usuarios_staging_1",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_GP_A_TitulosLiberados": {
+      "tag": "GP_A_TitulosLiberados",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+   "mkt_GP_A_AvisaQueTaBombando":{
+      "tag": "GP_A_AvisaQueTaBombando",
+      "depends_on": [
+         "mkt_jornadas_mkt_consumo",
+         "mkt_usuarios_staging_2",
+         "foundation_consumo_enriched_hz",
+         "foundation_sales_enriched"
+      ]
+   },
+   "mkt_GP_E_S_PesquisaCancelados":{
+      "tag": "GP_E_S_PesquisaCancelados",
+      "depends_on": [
+         "mkt_usuarios_staging_2"
+      ]
+   },
+   "mkt_GP_E_S_BoasVindasTier1":{
+      "tag": "GP_E_S_BoasVindasTier1",
+      "depends_on": [
+         "mkt_consumo_staging_1",
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz",
+         "mkt_conteudo_staging_1"
+      ]
+   },
+
+   "mkt_GPCN_E_BoasVindas2": {
+      "tag": "GPCN_E_BoasVindas2",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "mkt_consumo_staging_1"
+      ]
+   },
+   "mkt_GP_E_ContinueAssistindo": {
+      "tag": "GP_E_ContinueAssistindo",
+      "depends_on": [
+         "foundation_consumo_enriched_hz",
+         "mkt_usuarios_staging_1",
+         "mkt_consumo_staging_1",
+         "mkt_consumo_staging_1_history"
+      ]
+   },
+   "mkt_GP_A_ChegaDeTrecho": {
+      "tag": "GP_A_ChegaDeTrecho",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "mkt_usuarios_staging_2",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_GP_A_BaixouOApp": {
+      "tag": "GP_A_BaixouOApp",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "mkt_usuarios_staging_2",
+         "foundation_consumo_derived",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+   "mkt_GP_A_AproveiteMaisFree": {
+      "tag": "GP_A_AproveiteMaisFree",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_jornadas_mkt_consumo",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_mktflow_mais_assistidos": {
+      "tag": "mktflow_mais_assistidos",
+      "depends_on": [
+         "foundation_conteudo_derived",
+         "mkt_jornadas_mkt_conteudo",
+         "foundation_consumo_derived"
+      ]
+   },
+   "mkt_mktflow_logados_free_v2": {
+      "tag": "mktflow_logados_free_v2",
+      "depends_on": [
+         "foundation_consumo_enriched_hz",
+         "mkt_usuarios_staging_2"
+      ]
+   },
+   "mkt_mktflow_novidades_v2": {
+      "tag": "mktflow_novidades_v2",
+      "depends_on": [
+         "mkt_consumo_staging_1",
+         "foundation_conteudo_enriched",
+         "mkt_jornadas_mkt_conteudo",
+         "foundation_consumo_derived"
+      ]
+   },
+   "mkt_GP_A_UpgradeCategoria": {
+      "tag": "GP_A_UpgradeCategoria",
+      "depends_on": [
+         "foundation_consumo_clean_ga",
+         "mkt_usuarios_staging_1"
+      ]
+   },
+   "mkt_GP_E_Inatividade": {
+      "tag": "GP_E_Inatividade",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "mkt_consumo_staging_2",
+         "mkt_usuarios_staging_3",
+         "mkt_usuarios_staging_1"
+      ]
+   },
+
+   "mkt_GP_E_Aniversariantes": {
+      "tag": "GP_E_Aniversariantes",
+      "depends_on": [
+         "foundation_conteudo_enriched"
+      ]
+   },
+   "mkt_assinantes_adimplente_com_trial": {
+      "tag": "assinantes_adimplente_com_trial",
+      "depends_on": [
+         "mkt_usuarios_staging_1"
+      ]
+   },
+   "mkt_GP_A_Novelas": {
+      "tag": "GP_A_Novelas",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+   "mkt_GP_E_AcabouSeries": {
+      "tag": "GP_E_AcabouSeries",
+      "depends_on": [
+         "mkt_consumo_staging_1",
+         "mkt_consumo_staging_1_history",
+         "mkt_comunicacao_staging_1",
+         "mkt_usuarios_staging_1",
+         "foundation_consumo_enriched_hz",
+         "foundation_conteudo_enriched"
+      ]
+   },
+
+   "mkt_consumo_copa": {
+      "tag": "consumo_copa",
+      "cron_expression": "40 18 * * *"
+   },
+
+   "mkt_conteudo_staging_1":{
+      "tag": "conteudo_staging_1",
+      "cron_expression": "0 7 * * *"
+
+   },
+
+
+   "mkt_consumo_staging_1": {
+      "tag": "consumo_staging_1",
+      "depends_on": [
+         "foundation_sales_enriched",
+         "foundation_consumo_derived",
+         "foundation_conteudo_enriched",
+         "foundation_globoid_enriched",
+         "mkt_conteudo_staging_1"
+      ]
+   },
+
+   "mkt_consumo_staging_1_history": {
+      "tag": "consumo_staging_1_history",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+   "mkt_consumo_staging_2": {
+      "tag": "consumo_staging_2",
+      "depends_on": [
+         "mkt_usuarios_staging_1",
+         "mkt_consumo_staging_1",
+         "mkt_consumo_staging_1_history",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_consumo_staging_3": {
+      "tag": "consumo_staging_3",
+      "depends_on": [
+         "mkt_consumo_staging_2",
+         "mkt_consumo_staging_1_history",
+         "mkt_usuarios_staging_2"
+      ]
+   },
+   "mkt_consumo_staging_5": {
+      "tag": "consumo_staging_5",
+      "depends_on": [
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz",
+         "mkt_comunicacao_staging_4",
+         "mkt_usuarios_staging_2"
+      ]
+   },
+   "mkt_consumo_staging_9": {
+      "tag": "consumo_staging_9",
+      "depends_on": [
+         "mkt_consumo_staging_1",
+         "mkt_consumo_staging_1_history",
+         "mkt_comunicacao_staging_8"
+      ]
+   },
+
+   
+   "mkt_usuarios_staging_1": {
+      "tag": "usuarios_staging_1",
+      "depends_on": [
+         "foundation_sales_enriched"
+      ]
+   },
+   "mkt_usuarios_staging_2": {
+      "tag": "usuarios_staging_2",
+      "depends_on": [
+         "mkt_usuarios_staging_1",
+         "mkt_consumo_staging_1",
+         "foundation_globoid_enriched",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_usuarios_staging_3": {
+      "tag": "usuarios_staging_3",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_consumo_staging_3",
+         "mkt_consumo_staging_2",
+         "mkt_conteudo_staging_1"
+      ]
+   },
+   "mkt_usuarios_staging_4": {
+      "tag": "usuarios_staging_4",
+      "depends_on": [
+         "mkt_usuarios_staging_3",
+         "mkt_conteudo_staging_1"
+      ]
+   },
+    "mkt_usuarios_staging_5": {
+      "tag": "usuarios_staging_5",
+      "depends_on": [
+         "mkt_usuarios_staging_4",
+         "foundation_mkt_enriched",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+   "mkt_usuarios_staging_9": {
+      "tag": "usuarios_staging_9",
+      "depends_on": [
+         "mkt_usuarios_staging_3",
+         "mkt_comunicacao_staging_8",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+
+   "mkt_pesquisas_staging_3": {
+      "tag": "pesquisas_staging_3",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_usuarios_staging_3",
+         "foundation_consumo_enriched_hz",
+         "foundation_globoid_enriched"
+      ]
+   },
+   "mkt_pesquisas_staging_9": {
+      "tag": "pesquisas_staging_9",
+      "depends_on": [
+         "mkt_comunicacao_staging_8"
+      ]
+   },
+   "mkt_pesquisas_staging_10": {
+      "tag": "pesquisas_staging_10",
+      "depends_on": [
+         "mkt_pesquisas_staging_3",
+         "mkt_comunicacao_staging_8",
+         "mkt_usuarios_staging_9"
+      ]
+   },
+
+
+   "mkt_comunicacao_staging_1": {
+      "tag": "comunicacao_staging_1",
+      "depends_on": [
+         "foundation_mkt_derived",
+         "foundation_consumo_enriched_hz",
+         "foundation_mktcloud_derived"
+      ]
+   },
+   "mkt_comunicacao_staging_2": {
+      "tag": "comunicacao_staging_2",
+      "depends_on": [
+         "mkt_comunicacao_staging_1",
+         "mkt_usuarios_staging_2",
+         "foundation_consumo_clean_ga",
+         "foundation_mkt_clean",
+         "mkt_usuarios_staging_3"
+      ]
+   },
+   "mkt_comunicacao_staging_4": {
+      "tag": "comunicacao_staging_4",
+      "depends_on": [
+         "mkt_usuarios_staging_2",
+         "mkt_usuarios_staging_3",
+         "mkt_comunicacao_staging_1",
+         "foundation_mkt_clean",
+         "foundation_mkt_derived",
+         "foundation_mktcloud_derived",
+         "foundation_consumo_clean_ga"
+      ]
+   },
+   "mkt_comunicacao_staging_5": {
+      "tag": "comunicacao_staging_5",
+      "depends_on": [
+         "mkt_usuarios_staging_3",
+         "mkt_comunicacao_staging_4",
+         "mkt_comunicacao_staging_1"
+      ]
+   },
+   "mkt_comunicacao_staging_7": {
+      "tag": "comunicacao_staging_7",
+      "depends_on": [
+         "foundation_mkt_derived",
+         "foundation_consumo_enriched_hz",
+         "mkt_usuarios_staging_1",
+         "mkt_usuarios_staging_4"
+      ]
+   },
+   "mkt_comunicacao_staging_8": {
+      "tag": "comunicacao_staging_8",
+      "depends_on": [
+         "mkt_comunicacao_staging_7",
+         "mkt_comunicacao_staging_5",
+         "mkt_comunicacao_staging_4",
+         "mkt_comunicacao_staging_1",
+         "mkt_usuarios_staging_3",
+         "foundation_mkt_clean"
+      ]
+   },
+   "mkt_comunicacao_staging_9": {
+      "tag": "comunicacao_staging_9",
+      "depends_on": [
+         "mkt_comunicacao_staging_8"
+      ]
+   },
+   "mkt_metas_conteudos_staging_1": {
+      "tag": "metas_conteudos_staging_1",
+      "depends_on": [
+         "foundation_consumo_derived",
+         "foundation_consumo_enriched_hz"
+      ]
+   },
+
+   "mkt_bbb_23":{
+      "tag":"bbb_23",
+      "depends_on":[
+         "mkt_comunicacao_staging_8",
+         "mkt_comunicacao_staging_4",
+         "mkt_usuarios_staging_2",
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz",
+         "foundation_sales_enriched"
+      ]
+
+   },
+
+
+   "mkt_bbb_23_simulcast":{
+      "tag":"bbb_23_simulcast",
+      "cron_expression": "30 18 * * *"
+   },
+
+
+   "mkt_atualizacao_tabelas":{
+      "tag":"atualizacao_tabelas",
+      "cron_expression": "00 10 * * *"
+  
+   },
+
+   "mkt_atualizacao_tabelas_2":{
+   "tag":"atualizacao_tabelas_2",
+   "cron_expression": "00 13 * * *"
+  
+   },
+
+   "mkt_jornada_inatividade":{
+      "tag":"jornada_inatividade",
+      "depends_on":[
+         "mkt_comunicacao_staging_4",
+         "mkt_consumo_staging_1"
+      ]
+      
+   },
+
+   "mkt_jornada_consumo":{
+      "tag":"jornada_consumo",
+      "depends_on":[
+         "mkt_comunicacao_staging_4",
+         "foundation_consumo_enriched_hz"
+      ]   
+   },
+
+   "mkt_indice_de_marketing":{
+      "tag": "indice_de_marketing",
+      "depends_on":[
+         "mkt_usuarios_staging_4",
+         "mkt_comunicacao_staging_8"
+      ]
+   },
+
+   "mkt_gplay_int":{
+      "tag": "gplay_int",
+      "depends_on":[
+         "foundation_sales_derived",
+         "foundation_conteudo_derived",
+         "foundation_conteudo_enriched",
+         "foundation_consumo_enriched_hz",
+         "mkt_usuarios_staging_2",
+         "mkt_consumo_staging_1_history"
+      ]
+   },
+
+   "mkt_trilho_rec":{
+      "tag": "trilho_rec",
+      "depends_on":[
+         "foundation_conteudo_enriched",
+         "mkt_usuarios_staging_1",
+         "mkt_usuarios_staging_2",
+         "foundation_sales_enriched",
+         "foundation_consumo_enriched_hz",
+         "mkt_comunicacao_staging_9",
+         "mkt_consumo_staging_1_history",
+         "mkt_consumo_staging_2",
+         "mkt_comunicacao_staging_8",
+         "mkt_usuarios_staging_3",
+         "mkt_GP_E_AcabouSeries"
+      ]
+   },
+
+   "mkt_perfil_internacional":{
+   "tag":"perfil_internacional",
+   "cron_expression": "00 12 * * *"
+  
+   }
+
+}

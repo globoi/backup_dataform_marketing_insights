@@ -1,0 +1,51 @@
+config {
+  type: 'table',
+  name: 'hi_novelas_v2_grupos_da_semana',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+-- Tabela que separa os noveleiros da semana atual
+-- tem que rodar DEPOIS da rotina hi_novelas_v2_relacao_grupos
+
+-- CREATE OR REPLACE TABLE ${ref("experimentos", "hi_novelas_v2_grupos_da_semana")} AS
+
+WITH
+  raiox_semana AS (
+  SELECT
+    globo_id,
+    MAX(total_horas) AS total_horas
+  FROM
+    ${ref("usuarios", "RaioXAssinante")}
+  WHERE
+    semana = DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7
+    AND Cluster_Conteudo_Mais_Assistido = 'Novelas'
+  GROUP BY
+    globo_id,
+    semana,
+    Cluster_Conteudo_Mais_Assistido
+  HAVING
+    total_horas <= (1.8 * 7) -- garantir a regra de desengajamento da plataforma de <=1,8h por dia (*7 para semana)
+  ),
+
+  base_pre_final as (
+  SELECT
+    aa.globo_id,
+    aa.grupo_n
+  FROM
+    ${ref("experimentos", "hi_novelas_v2_relacao_grupos")} as aa
+  INNER JOIN raiox_semana as bb ON aa.globo_id = bb.globo_id
+  WHERE
+    aa.globo_id <> '663be12a-b5ea-44fc-86d6-4a79d92aa354' -- olimpo z
+    AND aa.globo_id <> 'c66f0dd5-6349-4de9-8c3d-0c7a0b3952d0' -- olimpo h
+  )
+
+SELECT
+  * 
+FROM
+  base_pre_final
+UNION ALL SELECT '2962e5c3-7003-48f3-bdea-adba3668c34c' AS globo_id, 1 AS grupo_n
+UNION ALL SELECT 'da1fcd50-5b17-4260-9116-622e94034176' AS globo_id, 2 AS grupo_n
+UNION ALL SELECT '1c459be8-347c-493a-87ab-56594c8ee3ed' AS globo_id, 3 AS grupo_n

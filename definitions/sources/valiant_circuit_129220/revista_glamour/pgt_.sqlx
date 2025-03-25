@@ -1,0 +1,6 @@
+config { 
+    type: "declaration", 
+    database: "valiant-circuit-129220", 
+    schema: "revista_glamour", 
+    name: "pgt_*", 
+    description: ""}

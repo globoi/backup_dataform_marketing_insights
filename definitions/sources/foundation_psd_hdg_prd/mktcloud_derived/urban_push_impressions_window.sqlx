@@ -1,0 +1,7 @@
+config {
+    type: "declaration",
+    database: dataform.projectConfig.vars.foundationDatabase,
+    schema: "mkt_derived",
+    name: "urban_push_impressions_window",
+    description: ""
+}

@@ -1,0 +1,17 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_trial_nao_convertido",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_trial_nao_convertido']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id
+FROM ${ref("usuarios", "Free users")}
+INNER JOIN ${ref("consumo_derived", "trial_user")}
+USING (globo_id)
+WHERE NOT convertido

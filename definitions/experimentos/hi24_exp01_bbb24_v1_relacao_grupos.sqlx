@@ -1,0 +1,81 @@
+config {
+  type: 'incremental',
+  tags: ['schedule_tag=experimentos_hi24_exp01_bbb24_v1_relacao_grupos'],
+  uniqueKey: ["globo_id"],
+  name: 'hi24_exp01_bbb24_v1_relacao_grupos',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+-- Primeira etapa
+-- Query para fazer atribuir novos noso usuarios aos seus grupos na hi24_exp01_bbb24_v1_relacao_grupos 
+-- Tem que rodar ANTES da hi24_exp01_bbb24_v1_usuarios_da_semana
+
+-- Filtros Trabalhados
+-- (1) Assinou para BBB24
+-- (2) Plano Mensal
+-- (3) cluster_bbb -> Heavy user (primeiro play não é BBB, mas ele é heavy user BBB) (intensidade no consumo em BBB)
+-- (4) cluster_share_bbb (se é concentrado ou diversificado na plataforma)
+-- (5) Plano Globoplay Básico (Tier 1)
+-- (6) Cluster dinâmico (assumir pessoas entrantes ao longo do experimento)
+
+WITH 
+dado_assinatura AS ( -- tabela com dados referentes a assinatura dos usuários necessários para alguns filtros
+  SELECT
+    DISTINCT globo_id
+  FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")} t, t.info 
+  -- FROM `gglobo-mkt-ins-hdg-prd.usuarios.base_ativa_pagante_com_trial_new` t, t.info 
+  WHERE 
+    info.produto = 'Mensal' -- (2)
+    AND info.Produto_Contratado = 'Globoplay' -- (5)
+),
+
+grupo_experimento AS( -- aplica os filtros relacionados a BBB e adiciona referencia do tipo do experimento 
+  SELECT
+    a.globo_id,
+    DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7 as semana_experimento, -- Para dar referencia de data do usuário no experimento
+  FROM ${ref("bbb_24", "raiox_bbb_24_assinantes")} AS a
+  -- FROM `gglobo-mkt-ins-hdg-prd.bbb_24.raiox_bbb_24_assinantes` AS a
+  INNER JOIN dado_assinatura AS b ON a.globo_id = b.globo_id
+  WHERE
+    assinou_2024 = true -- (1)
+  --  AND cluster_bbb = '4. Heavy User' -- (3)
+    AND cluster_share_bbb = '81%-100%' -- (4)
+    AND semana = DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7 -- (6) pegar a ultima segunda feira, referencia da ultima semana fechada
+),
+
+  -- etapa para atribuir a grupos apenas os novos entrantes
+  novos_usuarios_distribuidos AS (
+  SELECT
+    aa.globo_id,
+    NTILE(2) OVER (ORDER BY RAND()) AS grupo,
+    FROM grupo_experimento AS aa
+    
+    -- pedaço que faz pegar apenas os novos entrantes
+    -- na primera iteração, não confere com ela mesma
+    ${when(incremental(), 
+    `LEFT JOIN ${self()} AS bb ON aa.globo_id = bb.globo_id WHERE bb.globo_id IS NULL`,
+    ` `)
+    }
+    
+  ),
+  
+  -- nomear os grupos 
+  novos_usuarios_organizados AS (
+  SELECT
+    globo_id,
+    IF (grupo = 2, 0, grupo) AS grupo_n, -- geralmente atribuo grupo_n = 0 para o grupo controle
+    IF (grupo = 2, 'grupo controle', 'grupo teste') AS grupo_tipo
+    FROM novos_usuarios_distribuidos
+  )
+
+SELECT
+  globo_id,
+  grupo_n,
+  grupo_tipo
+  FROM novos_usuarios_organizados
+
+
+  

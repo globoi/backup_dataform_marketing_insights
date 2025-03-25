@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old', 'schedule_tag=macro_clusters_mkt_mktflow_base_automatica_torcedores_atleticomg_2'],
+  name: 'mktflow_base_automatica_torcedores_atleticomg_2',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+-- Base de torcedores do Atlético-MG, sejam usuários assinantes ou LF 
+-- Nova fonte de times do coração, snapshot diário
+-- estrutura-esportes.Cartola.TimeCoracao_Cart18_20_GE
+
+SELECT distinct 'named_user' as identifier_type, globoid AS globo_id
+FROM ${ref("Cartola", "TimeCoracao_Cart18_20_GE")} a
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} b
+ON a.globoid = b.globo_id
+WHERE time_aferido = 'Atletico-MG'

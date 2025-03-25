@@ -1,0 +1,64 @@
+config {
+  type: 'table',
+  name: 'Wpp_Lst_Rec_T5_Pivoted',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_AcabouSeries','schedule_tag=jornadas_mkt_Wpp_Lst_Rec_T5_Pivoted'],
+  description: ' ',
+  columns: {
+
+  }
+}
+WITH optin_ativos AS(
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")}
+    INNER JOIN ${ref("comunicacao", "base_opt_in_whatsapp")} USING (globo_id)
+),
+trilho_principal AS (
+  SELECT
+    globo_id,
+    rank_1,
+    rank_2,
+    rank_3,
+    rank_4,
+    rank_5,
+    personalizado
+  FROM
+    ${ref("jornadas_mkt", "Lst_Rec_Pers_Genero_T5_Pivoted")}
+    INNER JOIN optin_ativos USING (globo_id)
+),
+trilho_alt AS (
+  SELECT
+    globo_id,
+    rank_1,
+    rank_2,
+    rank_3,
+    rank_4,
+    rank_5,
+    personalizado
+  FROM
+    ${ref("jornadas_mkt", "Trilho_rec_genero_t5_alt_pivoted")} --Trilho_rec_genero_t5_alt_pivoted
+    INNER JOIN optin_ativos USING (globo_id)
+),
+trilho_final AS (
+  SELECT
+    *
+  FROM
+    trilho_principal
+  UNION ALL
+  SELECT
+    *
+  FROM
+    trilho_alt
+)
+SELECT
+  DISTINCT globo_id,
+  rank_1,
+  rank_2,
+  rank_3,
+  rank_4,
+  rank_5,
+  personalizado
+FROM
+  trilho_final

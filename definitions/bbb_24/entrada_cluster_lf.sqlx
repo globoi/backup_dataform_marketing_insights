@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech"
+    }
+  },
+  description: 'Tabela com os LFs do raiox_bbb_24_lf e a semana em que entraram no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    min_semana: 'Semana em que o usuário entrou no raiox_bbb_24_lf.'
+  }
+
+}
+
+WITH Entrada_Cluster AS (
+  SELECT
+    DISTINCT globo_id,
+    MIN(semana) AS min_semana
+  FROM
+    ${ref("bbb_24", "raiox_bbb_24_lf")}
+  GROUP BY
+    1
+)
+SELECT
+  *
+FROM
+  Entrada_Cluster

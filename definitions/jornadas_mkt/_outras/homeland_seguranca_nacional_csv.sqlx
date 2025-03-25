@@ -1,0 +1,40 @@
+config {
+  type: "incremental",  
+  schema: "jornadas_mkt",
+  name: "homeland_seguranca_nacional_csv",
+  tags: ["jornadas_mkt"],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+WITH
+program AS (
+    SELECT DISTINCT
+        id AS program_id,
+        media_kit_resource__poster,
+        'https://globoplay.globo.com/homeland-seguranca-nacional/t/nfLNbjw6dY/' AS url_for_consumption
+    FROM
+        ${ref("conteudo_enriched","program")}
+    WHERE
+        id = 11750
+),
+
+base_ponto AS (
+    SELECT
+        globo_id,
+        program_id,
+        program_title,
+        'Programa Completo' AS cenario,
+        '' AS temporadas_expirando,
+        '08 de maio de 2022' AS data_expiracao_conteudo
+    FROM
+        ${ref("consumo", "base_ponto_parada_series")}
+        INNER JOIN program
+        USING(program_id)
+    WHERE
+        program_id = 11750
+        AND Ultimo_Episodio >= 2 
+        AND Dias_Ultimo_Consumo <= 60
+)
+
+SELECT * FROM base_ponto

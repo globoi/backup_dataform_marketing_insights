@@ -1,0 +1,85 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_automatica_tier1_sem_telecine',
+  schema: 'macro_clusters_mkt',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_base_automatica_tier1_sem_telecine']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+with tier1 as (
+select distinct globo_id
+from ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) AS info 
+where info.mais_canais = false),
+-- 3976695
+
+telecine as (
+  WITH subs_order AS (
+    SELECT 
+      subs.id,
+      cust.globo_id,
+      IF(
+        LOWER(unsubscribe_channel) = 'minha conta' AND (subscription_status = 'Em cancelamento' OR end_cycle_at >= DATE_SUB(CURRENT_DATE("America/Sao_Paulo"), INTERVAL 1 DAY)),
+        'Ativo',subscription_status
+        ) AS status_calculado,
+      trial_period > 0 AS teve_degustacao,
+      subs.effective_conversion_at IS NOT NULL AND subs.effective_conversion_at < CURRENT_DATE("America/Sao_Paulo") AS foi_convertido_ate_ontem  
+    FROM
+      ${ref('sales_gold', 'subscription_details')} subs 
+      LEFT JOIN ${ref('sales_gold', 'order_details')} ord ON subs.order_id = ord.id
+      LEFT JOIN ${ref('sales_gold', 'product_details')} prd ON subs.product_id = prd.id
+      LEFT JOIN ${ref('sales_gold', 'customer_details')} cust ON subs.customer_id = cust.id
+    WHERE
+      LOWER(subs.product_name) LIKE '%telecine%'
+      AND LOWER(prd.id) NOT LIKE '%cort%'
+      AND LOWER(subs.subscription_payment_method) NOT LIKE '%cortesia%'
+      AND LOWER(ord.Status) = 'activated'
+      AND DATE(subs.subscription_at) < CURRENT_DATE("America/Sao_Paulo")
+      AND (
+        subs.subscription_type IS NULL
+        OR LOWER(subs.subscription_type) NOT LIKE 'cupom'
+        OR DATE(subs.subscription_at) < '2021-01-09'
+        OR subs.effective_conversion_at IS NOT NULL
+        OR NOT subs.full_discount
+      )
+    )
+
+  ,events_classified AS (
+    SELECT
+      object_id,
+      DATE(event_at) = CURRENT_DATE("America/Sao_Paulo") AND (event = 'unsubscription' OR event = 'subscription_on_hold')   AS foi_desativado_hoje,
+      DATE(event_at) = CURRENT_DATE("America/Sao_Paulo") AND (event = 'subscription' OR event = 'reactivation') AS  foi_ativado_hoje,
+    FROM
+      ${ref('sales_gold', 'customer_events')}
+  )
+
+  ,events_grouped AS (
+    SELECT
+      object_id,
+      COALESCE(MAX(foi_desativado_hoje), FALSE) AS foi_desativado_hoje,
+      COALESCE(MAX(foi_ativado_hoje), FALSE) AS foi_ativado_hoje
+    FROM
+      events_classified
+    GROUP BY
+      object_id
+  )
+
+  SELECT
+    DISTINCT globo_id
+  FROM
+    subs_order so
+    LEFT JOIN events_grouped eg ON so.id = eg.object_id
+  WHERE
+    (so.status_calculado = 'Ativo' OR (eg.foi_desativado_hoje AND so.status_calculado != 'Ativo'))
+    AND (NOT (so.status_calculado = 'Ativo' AND eg.foi_ativado_hoje))
+    AND ((so.teve_degustacao AND so.foi_convertido_ate_ontem) OR NOT so.teve_degustacao)
+)
+
+select 'named_user' as identifier_type, tier1.globo_id
+from tier1 
+left join telecine 
+on tier1.globo_id = telecine.globo_id
+where telecine.globo_id is null

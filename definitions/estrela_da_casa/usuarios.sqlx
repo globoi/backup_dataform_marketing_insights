@@ -1,0 +1,128 @@
+config {
+    type: 'table',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "estrela_da_casa",
+            owner: "martech",
+            horario: "11h00min"
+        }
+    },
+    name: 'usuarios',
+    schema: 'estrela_da_casa',
+    description: 'Tabela com os LFs/Ex-Assinantes que assinaram/cancelaram ou não a partir de 13/08/2024.',
+    columns: {
+        globo_id: "Código que identifica o usuário.",
+        dt_assinatura_comeco: "Identifica a data mínima de assinatura do usuário.",
+        tipo_usuario: "Classifica se o usuário é um Assinante, Ex-Assinante ou Logado Free.",
+        base_ativa: "Última data em que o assinante apareceu na base ativa pagante com trial.",
+        assinou_2024: "Identifica se o usuário assinou no período de 13/08/2024 a 24/10/2024.",
+        sol_cancel_vol_24: "Identifica se o usuário solicitou cancelamento no período de 13/08/2024 a 24/10/2024."
+    },
+}
+
+WITH
+  assinantes AS (
+  SELECT
+    DISTINCT globo_id,
+    MIN(dt_assinatura_comeco) OVER(PARTITION BY globo_id) AS dt_assinatura_comeco,
+    MAX(dt_proc) OVER(PARTITION BY id_asset, globo_id) AS base_ativa
+  FROM
+    ${ref('usuarios', 'base_ativa_incremental_new')}
+  WHERE
+    dt_proc >= '2024-08-13'
+    AND tipo_assinante != 'trial' ),
+  assinantes2 AS (
+  SELECT
+    globo_id,
+    base_ativa,
+    dt_assinatura_comeco,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, base_ativa, dt_assinatura_comeco ORDER BY globo_id, base_ativa, dt_assinatura_comeco ) AS rm,
+  FROM
+    assinantes
+  QUALIFY
+    rm = 1 ),
+  usuarios_geral AS (
+  SELECT
+    DISTINCT globoid AS globo_id
+  FROM
+    ${ref('public_globoid', 'users')}
+  WHERE
+    DATE(partition_date) = DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+    AND status IN ('ACTIVE',
+      'PENDING')),
+  assinantes_atuais AS (
+  SELECT
+    DISTINCT globo_id,
+    'Assinante' AS tipo_usuario
+  FROM
+    ${ref('usuarios', 'base_ativa_pagante_com_trial_new')}),
+  ex_assinantes AS (
+  SELECT
+    *EXCEPT(tipo_usuario),
+    IFNULL(tipo_usuario,'Ex-Assinante') AS tipo_usuario
+  FROM
+    assinantes2
+  LEFT JOIN
+    assinantes_atuais
+  USING
+    (globo_id) ),
+  base_rein AS (
+  SELECT
+    DISTINCT id,
+    TIMESTAMP(subscription_at) AS data_hora_compra,
+    CASE
+      WHEN subscription_at >= '2024-08-13' THEN TRUE
+  END
+    AS assinou_2024,
+    CASE
+      WHEN unsubscribe_at >= '2024-08-13' THEN TRUE
+  END
+    AS sol_cancel_vol_24,
+    product_name,
+    subscription_status,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at
+  FROM
+    ${ref('sales_gold', 'subscription_details')}),
+  base_rein2 AS (
+  SELECT
+    *
+  FROM
+    base_rein
+  JOIN
+    ${ref('sales_gold', 'last_subscription_state')} AS s
+  ON
+    s.object_id = base_rein.id
+  WHERE
+    LOWER(product_name) LIKE '%globoplay%' ),
+  base_rein3 AS (
+  SELECT
+    globo_id,
+    COALESCE(MAX(assinou_2024), FALSE) AS assinou_2024,
+    COALESCE(MAX(sol_cancel_vol_24), FALSE) AS sol_cancel_vol_24
+  FROM
+    base_rein2
+  GROUP BY
+    1 )
+SELECT
+  globo_id,
+  IFNULL(tipo_usuario,'Logado Free') AS tipo_usuario,
+  dt_assinatura_comeco,
+  base_ativa,
+  IFNULL(assinou_2024, FALSE) AS assinou_2024,
+  IFNULL(sol_cancel_vol_24, FALSE) AS sol_cancel_vol_24
+FROM
+  usuarios_geral
+LEFT JOIN
+  ex_assinantes
+USING
+  (globo_id)
+LEFT JOIN
+  base_rein3
+USING
+  (globo_id)
+GROUP BY
+  ALL
+  having tipo_usuario!="Assinante"

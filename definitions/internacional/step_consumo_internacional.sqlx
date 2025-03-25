@@ -1,0 +1,126 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'step_consumo_internacional',
+  tags: ['perfil_internacional',
+         'schedule_tag=internacional_step_consumo_internacional',
+         'schedule_cron=0 12 * * *']
+}
+
+WITH
+  resumo_3meses_step1 AS (
+  SELECT
+    p.date AS date_timestamp,
+    CURRENT_DATE() AS date_current,
+    i.globo_id,
+    id_do_item_da_cesta AS assetid,
+    hours_watched,
+    environment,
+    sessionId,
+    mediaid,
+    program_subset,
+    program_id,
+    program_title
+  FROM    
+    ${ref('internacional','base_ativa_internacional')} AS i
+  INNER JOIN (
+    SELECT
+      userId,
+      date,
+      hours_watched,
+      environment,
+      sessionId,
+      mediaid,
+      globo_id,
+      assetid,
+      program_subset,
+      program_id,
+      program_title,
+      is_full_content
+    FROM
+      ${ref('consumo_enriched','all_impression')} 
+    WHERE
+      --program_id != 8426
+      is_full_content and
+      date >= CURRENT_DATE - 30 ) p
+  ON
+    i.globo_id=p.userId ),
+  resumo_3meses_step2 AS (
+  SELECT
+    date_timestamp,
+    date_current,
+    hours_watched,
+    environment,
+    sessionId,
+    mediaid,
+    globo_id,
+    assetid,
+    program_subset,
+    program_id,
+    program_title
+  FROM
+    resumo_3meses_step1
+  --WHERE
+    --DATE_DIFF(date_current, date_timestamp, DAY) <= 30
+     ),
+  resumo_3meses_step3 AS (
+  SELECT
+    globo_id,
+    assetid,
+    hours_watched,
+    COUNT(DISTINCT environment) OVER (PARTITION BY globo_id) AS quantidade_dispositivos_utilizados,
+    sessionId,
+    mediaid,
+    program_subset,
+    program_id,
+    program_title
+  FROM
+    resumo_3meses_step2 ),
+  resumo_3meses_step4 AS (
+  SELECT
+    globo_id,
+    assetid,
+    SUM(hours_watched) AS horas,
+    quantidade_dispositivos_utilizados,
+    COUNT(DISTINCT sessionId) AS plays,
+    COUNT(DISTINCT mediaid) AS midias_distintas,
+    program_subset,
+    program_id,
+    program_title
+  FROM
+    resumo_3meses_step3
+  GROUP BY
+    globo_id,
+    assetid,
+    program_subset,
+    program_id,
+    program_title,
+    quantidade_dispositivos_utilizados )
+SELECT
+  p.globo_id,
+  p.assetid,
+  p.first_play,
+  p.first_play_subset,
+  p.data_first_play,
+  r.quantidade_dispositivos_utilizados,
+  r.program_subset,
+  r.program_id,
+  r.program_title,
+  r.horas,
+  r.plays,
+  r.midias_distintas,
+  u.ultimo_consumo,
+  u.ultimo_consumo_subset,
+  u.data_ultimo_consumo
+FROM
+  ${ref('internacional','primeiro_play_internacional')}    p
+LEFT JOIN
+  resumo_3meses_step4 r
+USING
+  (globo_id,
+    assetid)
+LEFT JOIN
+  ${ref('internacional','ultimo_consumo_internacional')}    u
+USING
+  (globo_id,
+    assetid)

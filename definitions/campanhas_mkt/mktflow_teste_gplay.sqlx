@@ -1,0 +1,17 @@
+config {
+  type: 'table',
+  tags: ['comunicacao'],
+  name: 'mktflow_teste_gplay',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+select distinct globo_id
+from `gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral`

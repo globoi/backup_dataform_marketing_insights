@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  name: 'lf_trecho_30d',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AproveiteMaisFree','schedule_tag=jornadas_mkt_lf_trecho_30d'],
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  userid AS globo_id,
+  SUM(CAST(pci.program_subset = 'news' AS INT64)) AS noticia,
+  SUM(CAST(pci.program_subset = 'novelas' AS INT64)) AS novela,
+  SUM(CAST(pci.program_subset = 'sports' AS INT64)) AS esporte
+
+FROM
+  ${ref("consumo_enriched", "partial_content_impression")} pci
+  INNER JOIN ${ref("usuarios", "Free users")} fu
+  ON pci.userid = fu.globo_id
+WHERE
+  pci.program_subset IN ('sports', 'novelas', 'news')
+  AND DATE(pci.`timestamp`) >= DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)
+GROUP BY 1

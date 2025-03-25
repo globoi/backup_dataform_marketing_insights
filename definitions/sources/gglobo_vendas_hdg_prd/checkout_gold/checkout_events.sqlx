@@ -1,0 +1,7 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-vendas-hdg-prd", 
+    schema: "checkout_gold", 
+    name: "checkout_events", 
+    description: ""
+    }

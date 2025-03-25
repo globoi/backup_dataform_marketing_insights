@@ -1,0 +1,14 @@
+config {
+  type: "table",  
+  name: 'Segment_Trilho Rec Pers por Genero T5',
+  schema: 'trilho',
+  tags: ['trilho_rec', 'schedule_tag=trilho_Segment_Trilho_Rec_Pers_por_Genero_T5']
+}
+
+
+
+SELECT 
+  *
+FROM
+  ${ref("jornadas_mkt", "Trilho_Rec_Pers_por_Genero_T5")}
+WHERE rank_final <= 3

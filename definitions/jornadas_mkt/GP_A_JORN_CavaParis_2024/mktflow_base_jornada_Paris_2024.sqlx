@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_base_jornada_Paris_2024",
+        "schedule_cron=0 10 * * *"
+    ],
+    name: 'mktflow_base_jornada_Paris_2024',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {}
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT distinct globo_id
+
+FROM `gglobo-mkt-ins-hdg-prd.olimpiadas_2024.raiox_olimpiadas_2024` 
+
+
+where tipo_usuario = 'Logado Free'

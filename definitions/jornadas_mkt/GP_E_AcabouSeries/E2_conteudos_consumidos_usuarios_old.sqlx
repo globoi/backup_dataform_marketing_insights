@@ -1,0 +1,13 @@
+config {
+  type: "table",
+  name: "E2_conteudos_consumidos_usuarios_old",
+  schema: "jornadas_mkt",
+  tags: [],
+}
+
+
+SELECT DISTINCT
+  globo_id, program_id
+FROM ${ref("consumo", "series_history")} sh
+INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")} USING (globo_id)
+WHERE sh.horas_consumidas > 0.25 

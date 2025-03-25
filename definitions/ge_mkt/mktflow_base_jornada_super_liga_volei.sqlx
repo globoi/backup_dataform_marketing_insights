@@ -1,0 +1,52 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_jornada_super_liga_volei', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_jornada_super_liga_volei',
+    schema: 'ge_mkt',
+    description:'',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt",
+            mktcloud:"true",
+        }
+    }
+}
+WITH n1 AS (
+  SELECT 
+    `gglobo-prodservdig-hdg-prd.foundation_ge.udf_editoria_n1`(h.pagePath) AS editoriaN1,
+    IF(globoid IS NULL OR globoid IN ('', 'undefined'), fullVisitorId, globoid) AS globoid,
+    pagePath,
+    data
+  FROM ${ref('foundation_ge', 'foundation_ge_sessions_v3')}, --`gglobo-prodservdig-hdg-prd.foundation_ge.foundation_ge_sessions_v3` AS a, 
+    UNNEST(hits) AS h
+  INNER JOIN (
+    SELECT DISTINCT globoid
+    FROM ${ref('public_globoid', 'users')} --`gglobo-gid-dados-hdg-prd.public_globoid.users`
+    WHERE partition_date = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+
+  USING(globoid)
+ 
+WHERE data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+    AND h.tipoConsumo IN ('pageview', 'screenview')
+),
+
+-- Subquery para identificar os usuários que acessaram "Vôlei" nos últimos 3 dias
+access_last_3d AS (
+  SELECT DISTINCT globoid
+  FROM n1
+  WHERE 
+    editoriaN1 = 'Vôlei'
+    AND data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 3 DAY)
+)
+-- Filtrar usuários que acessaram "Vôlei" nos últimos 30 dias, mas NÃO nos últimos 3 dias
+SELECT DISTINCT n1.globoid AS globo_id
+FROM n1
+LEFT JOIN access_last_3d ON n1.globoid = access_last_3d.globoid
+WHERE 
+  n1.editoriaN1 = 'Vôlei'
+  AND access_last_3d.globoid IS NULL
+GROUP BY n1.globoid

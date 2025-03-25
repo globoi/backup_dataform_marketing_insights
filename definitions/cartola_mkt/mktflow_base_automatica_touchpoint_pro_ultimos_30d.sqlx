@@ -1,0 +1,158 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_touchpoint_pro_ultimos_30d','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_touchpoint_pro_ultimos_30d',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+ 
+-- Base de usuarios que clicaram em touchpoints de conversão para cartola pro nos ultimos 30d
+--e ainda nao se tornaram cartoleiros pro (nao estao na base ativa de ontem de Cartola PRO)
+ 
+WITH                                            
+HIT_LEVEL AS (                                          
+SELECT                                          
+--### GLOBOID                                        
+IFNULL((SELECT cd.value FROM UNNEST (s.customDimensions) as cd WHERE cd.index = 99), (SELECT cd.value FROM UNNEST (s.customDimensions) as cd WHERE cd.index = 97)) AS globo_id,                                        
+--### SESSAO                                          
+CONCAT(CAST(fullvisitorId AS string), "_", CAST(visitId AS string)) AS session, -- cookie/sessao                                            
+fullvisitorId,                                          
+--### INICIO VISITA                                          
+TIMESTAMP_SECONDS(visitStartTime) AS date_TIMESTAMP,                                            
+--### AMBIENTE CONSUMO                                            
+DEVICE.deviceCategory, device.operatingSystem,device.browserSize,                                          
+--### MÉTRICAS CONSUMO NÍVEL SESSÃO                                          
+TOTALS.timeOnSite, TOTALS.pageviews, TOTALS.screenviews, TOTALS.timeOnScreen, TOTALS.hits,                                          
+--### MÉTRICAS NÍVEL DE HIT - TELAS                                          
+hits.hitNumber, hits.type,hits.datasource,hits.appInfo.screenName,                                          
+--### FLAG MERCADO ABERTO                                        
+-- IF (TIMESTAMP_SECONDS(visitStartTime) BETWEEN abertura_mercado_dt AND fechamento_mercado_dt, 1, 0) AS flag_mercado_aberto,                                          
+hits.eventInfo.eventCategory, hits.eventInfo.eventAction, hits.eventInfo.eventLabel, hits.eventInfo.eventValue,                                        
+--#geolocation                                            
+geoNetwork.latitude,
+geoNetwork.longitude                                            
+FROM                                            
+${ref("423901", "ga_sessions_*")} AS s,                                        
+UNNEST(hits) AS hits                                            
+WHERE _TABLE_SUFFIX
+         BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) )
+             AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) )                                    
+AND _TABLE_SUFFIX NOT LIKE '%intraday%'                                        
+AND totals.visits = 1                                          
+-- AND TIMESTAMP_SECONDS(visitStartTime) between abertura_mercado_dt AND fim_consumo_dt #SESSÕES QUE INICIARAM ANTES DO FIM DO PROCESSAMENTO DA RODADA                                          
+),                                          
+                                           
+HIT_LEVEL_AUX as (                                          
+select                                          
+*,                                          
+MAX(GLOBO_ID) OVER (PARTITION BY fullvisitorId) AS GLOBO_ID_AUX,                                            
+CASE                                            
+WHEN operatingSystem IN ("iOS","Macintosh") AND deviceCategory in ("mobile","tablet") THEN "iOS"                                            
+WHEN operatingSystem NOT IN ("iOS","Macintosh") AND deviceCategory in ("mobile","tablet") THEN "Android"                                            
+WHEN deviceCategory = "desktop" THEN "Web"                                          
+ELSE "null" END sistema_operacional,                                            
+count(distinct globo_id) OVER (PARTITION BY fullvisitorId) AS CONTAGEM_GID,                                        
+from hit_level                                          
+),                                          
+                                           
+HIT_LEVEL_TRATADO AS (                                          
+select                                          
+CASE                                            
+WHEN GLOBO_ID IS NOT NULL THEN GLOBO_ID                                        
+WHEN GLOBO_ID IS NULL AND CONTAGEM_GID = 1 THEN GLOBO_ID_AUX                                            
+ELSE NULL                                          
+END AS GLOBO_ID_TRATADO,                                            
+*,                                          
+from hit_level_aux                                          
+),    
+ 
+BASE_ATIVA_CARTOLA AS (
+SELECT
+    DISTINCT ss.globo_id
+  FROM
+    ${ref("sales_gold", "subscription_state")} ss
+  LEFT JOIN
+    ${ref("sales_gold", "subscription_details")} sd
+  ON
+    ss.object_id = sd.id
+  LEFT JOIN
+    ${ref("sales_gold", "product_details")} pd
+  ON
+    sd.product_id = pd.id
+  WHERE
+    DATE(ss.state_date) = CURRENT_DATE() - 1
+    AND LOWER(pd.name) LIKE '%cartola%'
+    AND ss.state = 'active'
+),
+ 
+BASE_FINAL AS (                                        
+select * FROM                                          
+HIT_LEVEL_TRATADO a                                          
+left join                                          
+BASE_ATIVA_CARTOLA b                                      
+on a.GLOBO_ID_TRATADO = b.globo_id                                          
+where upper(eventCategory) like "%PRO%"
+and b.globo_id IS NULL
+),                                          
+                                           
+                                           
+BASE_CATEGORIZADA AS (                                          
+-- #USERS                                          
+SELECT                                          
+*,                                          
+CASE                                            
+WHEN (eventAction ='mercado' And eventLabel = 'minimo para valorizar') THEN 'minimo para valorizar'                                        
+WHEN (eventAction ='minimo para valorizar' And eventLabel = '91290 pro') THEN 'minimo para valorizar'                                          
+WHEN (eventAction ='minimo para valorizar' And eventLabel = 'sair') THEN 'minimo para valorizar'                                            
+WHEN (eventAction ='ordenacao' And eventLabel = 'minimo para valorizar') THEN 'minimo para valorizar'                                          
+WHEN (eventAction ='detalhes do jogador' And eventLabel = 'minimo para valorizar') THEN 'minimo para valorizar'                                        
+WHEN (eventAction ='pos rodada' And eventLabel = 'neutro android') THEN 'minimo para valorizar'                                        
+WHEN (eventAction ='detalhe de atleta') THEN 'minimo para valorizar'                                            
+WHEN (eventAction ='minimo para valorizar' And eventLabel = '91291 pro') THEN 'minimo para valorizar'                                          
+WHEN (eventAction ='ordenação' And eventLabel = 'minimo para valorizar') THEN 'minimo para valorizar'                                          
+WHEN (eventAction ='pos rodada' And eventLabel = 'valoriza android') THEN 'minimo para valorizar'                                          
+WHEN (eventAction ='pos rodada' And eventLabel = 'desvaloriza android') THEN 'minimo para valorizar'                                            
+WHEN (eventAction ='mestre kuka' And eventLabel = '(2038) juvenal') THEN 'minimo para valorizar'                                            
+WHEN (eventAction ='limite de ligas') THEN 'ligas'                                          
+WHEN (eventAction ='limite de competicoes') THEN 'ligas'                                            
+WHEN (eventAction ='limite de amigos') THEN 'ligas'                                        
+WHEN (eventAction ='liga pro') THEN 'ligas'                                        
+WHEN (eventAction ='nav bar' And eventLabel = 'quero ser pro') THEN 'generico'                                          
+WHEN (eventAction ='pirulito pro' And eventLabel = 'dashboard') THEN 'generico'                                        
+WHEN (eventAction ='clique no pirulito' ) THEN 'generico'                                          
+WHEN (eventAction ='jogos da rodada' And eventLabel = 'comparacao de times') THEN 'generico'                                            
+WHEN (eventAction ='supercards') THEN 'generico'                                            
+WHEN (eventAction ='customizacao') THEN 'customizacao'                                          
+ELSE "Outros"                                          
+END AS CATEGORIA_EVENTO                                        
+-- DISTINCT GLOBO_ID_TRATADO                                            
+FROM BASE_FINAL                                        
+),
+ 
+BASE_CATEGORIZADA_GOLD AS (                                        
+SELECT                                          
+*except(CATEGORIA_EVENTO),                                          
+CASE                                            
+WHEN CATEGORIA_EVENTO = "customizacao" then "generico"                                          
+WHEN CATEGORIA_EVENTO = "Outros" then "generico"                                            
+else CATEGORIA_EVENTO                                          
+end as CATEGORIA_EVENTO                                        
+FROM BASE_CATEGORIZADA                                          
+)                                          
+                                           
+SELECT DISTINCT
+'named_user' as identifier_type,                                     
+GLOBO_ID_TRATADO AS UUID                                         
+--CATEGORIA_EVENTO                                            
+FROM                                            
+BASE_CATEGORIZADA_GOLD  

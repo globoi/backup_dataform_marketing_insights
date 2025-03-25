@@ -1,0 +1,95 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_cinema',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_cinema',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram filmes vod ou filmes ao vivo nos ultimos 180 dias.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+--macro cluster premium cinema/filmes
+
+--assinantes premium que consumiram filmes vod ou filmes ao vivo nos ultimos 180 dias.
+
+with consumo_em_genero_cinema as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  INNER JOIN ${ref('jornadas_mkt','genero_todas_combinacoes')} b 
+    ON a.program_id = b.program_id
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND lower(a.program_subset) in ('filmes','filme','movies', 'movie')
+    AND lower(b.genero) not in ('documentário', 'música', 'infantil', 'infantojuvenil')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 1.5
+),
+
+consumo_em_programas_ao_vivo_cinema as (
+  SELECT distinct globoid as globo_id, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')}
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+  AND genero_programa in ('FILME')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 1.5
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT globo_id, 'consumo filmes' as base FROM consumo_em_genero_cinema
+
+  UNION DISTINCT
+
+  SELECT globo_id, 'consumo filmes' as base FROM consumo_em_programas_ao_vivo_cinema
+),
+
+--ex-assinantes de produtos com telecine
+ex_assinante_telecine as (
+  SELECT a.globo_id, 'ex-assinante telecine' as base
+  FROM ${ref('sales_gold', 'asset_gold')}  a
+  INNER JOIN ${ref('usuarios','base_ativa_pagante_com_trial_new')} b
+    ON a.globo_id = b.globo_id
+  CROSS JOIN UNNEST(b.info) AS info
+  WHERE info.mais_canais
+    AND lower(Produto_Contratado) not like "%telecine%"
+    AND lower(asset_name) like '%telecine%'
+    AND a.subscription_status = 'Cancelado'
+),
+
+--uniao de todos os atuais usuarios assinantes premium que:
+--consumiram filmes vod ou filmes ao vivo nos ultimos 180 dias, ou
+--são ex-assinantes de produtos com telecine
+basefinal as (
+  WITH uniao AS (
+    SELECT DISTINCT globo_id, base FROM uniao_consumo_vod_e_ao_vivo
+
+    UNION DISTINCT
+
+    SELECT DISTINCT globo_id, base FROM ex_assinante_telecine
+  ),
+
+ base_ordenada as (
+    SELECT *
+    FROM uniao
+    ORDER BY 1,2
+  )
+  
+  --tirando réplicas de GLOBO_ID da base_ordenada
+  SELECT DISTINCT globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+  FROM base_ordenada
+  GROUP BY 1
+)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+

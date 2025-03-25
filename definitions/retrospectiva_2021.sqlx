@@ -1,0 +1,598 @@
+config {
+  type: "table"
+}
+
+WITH ativos AS (
+  SELECT 
+    DISTINCT(globo_id),
+    'Ativo' AS status_assinatura
+  FROM ${ref("base_ativa_pagante_com_trial")}
+),
+
+assinantes AS (
+  SELECT
+    DISTINCT(globo_id),
+    assinatura_gplay,
+    COALESCE(status_assinatura, 'Cancelado') AS status_assinatura
+  FROM ${ref("base_ativa_incremental_old")} 
+  LEFT JOIN ativos 
+  USING(globo_id)
+  WHERE EXTRACT(YEAR FROM dt_proc)>= 2021
+),
+base_impression AS (
+    SELECT
+    userid AS globo_id,
+    mediaid,
+    date,
+    hours_watched,
+    program_subset,
+    program_id,
+    is_live
+  FROM ${ref("consumo_enriched","impression")}
+  WHERE EXTRACT(YEAR FROM date)>= 2021
+),
+base_impression_grouped AS
+(
+  SELECT
+    globo_id,
+    ROUND(SUM(hours_watched),0) AS horas_total
+  FROM base_impression
+  GROUP BY globo_id
+),
+horas_assistidas AS
+(
+
+    SELECT DISTINCT
+      *EXCEPT(status_assinatura),
+    CASE 
+      WHEN horas_total >= 10 AND status_assinatura = 'Cancelado' THEN 'Cancelado - com consumo'
+      WHEN horas_total >= 10 AND status_assinatura = 'Ativo' THEN 'Ativo - com consumo'
+      WHEN horas_total < 10 AND status_assinatura = 'Cancelado' THEN 'Cancelado - sem consumo'
+      WHEN horas_total < 10 AND status_assinatura = 'Ativo' THEN 'Ativo - sem consumo'
+      ELSE 'sem_grupo' END AS grupo
+    FROM base_impression_grouped
+    INNER JOIN assinantes
+    USING(globo_id)
+
+),
+consumo AS 
+(
+  SELECT
+    *,
+    CASE 
+      WHEN program_subset = 'novelas' THEN 'horas_novelas'
+      WHEN program_subset = 'series' THEN 'horas_series'
+      WHEN program_id = 10122 THEN 'horas_filmes'
+      WHEN program_id = 9095 THEN 'Ao_Vivo_Globo'
+      WHEN program_subset = 'live' OR is_live THEN 'horas_live'
+    ELSE 'horas_series' END AS grupo2
+  FROM base_impression
+  INNER JOIN horas_assistidas
+  USING(globo_id)
+),
+
+pivot_consumo AS (
+  SELECT * FROM (
+    SELECT 
+      globo_id,
+      hours_watched,
+      grupo2
+    FROM consumo
+  )
+
+  PIVOT(
+    SUM(hours_watched)
+    FOR grupo2 IN ('horas_novelas', 'horas_series', 'horas_filmes', 'Ao_Vivo_Globo', 'horas_live')
+  )
+),
+
+hrs_tipo AS(
+  SELECT 
+    globo_id,
+    COALESCE(horas_novelas,0) AS horas_novelas,
+    COALESCE(horas_series,0) AS horas_series,
+    COALESCE(horas_filmes,0) AS horas_filmes,
+    COALESCE(Ao_Vivo_Globo,0) AS horas_Ao_Vivo_Globo,
+    COALESCE(horas_live,0) AS horas_live,
+    CASE 
+      WHEN horas_filmes > horas_novelas AND horas_filmes > horas_series 
+       AND horas_filmes > horas_live THEN 'Filmes'
+      WHEN horas_novelas > horas_live AND horas_novelas > horas_series
+       AND horas_novelas > horas_filmes THEN 'Novelas'
+      WHEN horas_series > horas_live AND horas_series > horas_filmes
+       AND horas_series > horas_novelas THEN 'Series'
+      WHEN horas_live > horas_series AND horas_live > horas_filmes
+       AND horas_live > horas_novelas THEN 'Ao Vivo'
+    ELSE 'Series' END AS tipo_conteudo  
+  FROM pivot_consumo
+),
+
+hrs_por_tipo AS (
+  SELECT 
+    DISTINCT globo_id,
+    grupo,
+    assinatura_gplay,
+    horas_total,
+    ROUND(horas_novelas, 0) AS horas_novelas,
+    ROUND(horas_series, 0) AS horas_series,
+    ROUND(horas_filmes, 0) AS horas_filmes,
+    tipo_conteudo
+  FROM horas_assistidas LEFT JOIN hrs_tipo
+  USING(globo_id)
+),
+content_filtered AS (
+  SELECT 
+    *
+  FROM ${ref("conteudo_enriched","content")}
+  WHERE status='published'
+  AND program_title_id IS NOT NULL
+  AND program_url_for_consumption LIKE('%globoplay%')
+  AND program_url_for_consumption LIKE('%globoplay%')
+),
+
+filmes_publicados AS (
+  SELECT
+    DISTINCT id as program_id,
+    title AS program_title,
+    program_title_id,
+    status
+  FROM content_filtered
+  WHERE program_id = 10122
+),
+
+Conteudos_publicados AS (
+  SELECT DISTINCT program_id,
+    program_title,
+    program_title_id,
+    status
+  FROM content_filtered
+  WHERE program_id!=10122 AND scheduled_unpublication_in IS NULL
+),
+
+conteudos AS (
+  SELECT *
+  FROM Conteudos_publicados
+  UNION ALL
+  SELECT *
+  FROM filmes_publicados
+),
+cont AS (
+  SELECT 
+    DISTINCT(program_title_id),
+    program_id,
+    program_title  
+  FROM conteudos
+),
+top_5_filtered AS (
+  SELECT 
+    CASE WHEN program_id = 10122 THEN mediaid ELSE program_id END AS program_id,
+    hours_watched,
+    globo_id
+  FROM base_impression
+  WHERE program_id NOT IN (8426,9095,9191)
+),
+top_5_grouped AS
+(
+    SELECT 
+    program_id,
+    SUM(hours_watched) AS hrs,
+    globo_id    
+  FROM top_5_filtered
+  GROUP BY program_id, globo_id
+
+),
+top_5_rank AS
+(
+  SELECT 
+    program_id,
+    hrs,
+    globo_id,
+    ROW_NUMBER() OVER (
+      PARTITION BY globo_id
+      ORDER BY hrs DESC
+    ) AS `top`,
+    program_title,
+    program_title_id
+  FROM top_5_grouped
+  INNER JOIN cont 
+  USING(program_id)
+  WHERE cont.program_title_id IS NOT NULL
+),
+top_5 AS
+(
+    SELECT 
+      program_id,
+      hrs,
+      globo_id,
+     `top`,
+      grupo,
+      assinatura_gplay,
+      horas_total,
+      horas_novelas,
+      horas_series,
+      horas_filmes,
+      tipo_conteudo,
+      program_title_id,
+      program_title
+    FROM hrs_por_tipo
+    LEFT JOIN top_5_rank
+    USING(globo_id)
+    WHERE `top` IN (1,2,3,4,5)
+),
+pivot_top_5 AS
+(
+  SELECT * FROM
+  (
+    SELECT
+      globo_id,
+      grupo,
+      assinatura_gplay,
+      horas_total,
+      horas_novelas,
+      horas_series,
+      horas_filmes,
+      tipo_conteudo,
+      program_title_id,
+      program_title,
+      program_id,
+      `top`
+    FROM top_5
+
+  )
+  PIVOT (
+    MAX(program_title_id) AS program_title_id,
+    MAX(program_title) AS program_title,
+    MAX(program_id) AS program_id
+    FOR `top` IN (1,2,3,4,5) 
+  )
+),
+top_5_final AS (
+    SELECT
+        globo_id,
+        grupo,
+        assinatura_gplay,
+        horas_total,
+        horas_novelas,
+        horas_series,
+        horas_filmes,
+        tipo_conteudo,
+        '1_program_title_id' AS top1,
+        program_title_1 AS top1_program_title,
+        program_id_1 AS top1_program_id,
+        '2_program_title_id' AS top2,
+        program_title_2 AS top2_program_title,
+        program_id_2 AS top2_program_id,
+        '3_program_title_id' AS top3,
+        program_title_3 AS top3_program_title,
+        program_id_3 AS top3_program_id,
+        '4_program_title_id' AS top4,
+        program_title_4 AS top4_program_title,
+        program_id_4 AS top4_program_id,
+        '5_program_title_id' AS top5,
+        program_title_5 AS top5_program_title,
+        program_id_5 AS top5_program_id      
+    FROM pivot_top_5
+),
+horas_maior_step1 AS (
+  SELECT
+    globo_id,
+    COALESCE(ROUND(SUM(hours_watched),0),0) AS horas_data_maior_consumo,
+    `date` AS data_maior_consumo
+  FROM base_impression
+  GROUP BY globo_id, `date`
+),
+maior_consumo AS (
+   SELECT DISTINCT
+    globo_id,
+    grupo,
+    assinatura_gplay,
+    horas_total,
+    horas_novelas,
+    horas_series,
+    horas_filmes,
+    tipo_conteudo,
+    top1,
+    top1_program_title,
+    top1_program_id,
+    top2,
+    top2_program_title,
+    top2_program_id,
+    top3,
+    top3_program_title,
+    top3_program_id,
+    top4,
+    top4_program_title,
+    top4_program_id,
+    top5,
+    top5_program_title,
+    top5_program_id,
+    data_maior_consumo
+   FROM horas_maior_step1
+   RIGHT JOIN top_5_final
+   USING(globo_id)
+   QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY horas_data_maior_consumo DESC) = 1 
+),
+genero_programas AS
+(
+  SELECT
+    DISTINCT(program_id),
+    CASE 
+      WHEN program_id = 12082 THEN 'Reality Show' 
+      WHEN generos IN ('Artes e Cultura', 'Artes') THEN 'Variedades' 
+      ELSE generos       
+    END AS genero_favorito_programa
+  FROM ${ref("Genero programas")}
+
+),
+base_impression_grouped_globoid_programid AS(
+  SELECT  
+    globo_id,
+    SUM(hours_watched) AS horas,
+    program_id
+  FROM base_impression
+  GROUP BY globo_id, program_id
+),
+genero AS (
+  SELECT 
+    globo_id,
+    genero_favorito_programa,
+    ROUND(COALESCE(horas,0),0) AS horas_genero_programa
+  FROM base_impression_grouped_globoid_programid
+  LEFT JOIN genero_programas
+  USING(program_id)
+  WHERE genero_favorito_programa IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY horas DESC) = 1
+),
+
+mais_visto_programas AS (
+  SELECT DISTINCT
+    globo_id,
+    grupo,
+    assinatura_gplay,
+    horas_total,
+    horas_novelas,
+    horas_series,
+    horas_filmes,
+    tipo_conteudo,
+    top1,
+    top1_program_title,
+    top1_program_id,
+    top2,
+    top2_program_title,
+    top2_program_id,
+    top3,
+    top3_program_title,
+    top3_program_id,
+    top4,
+    top4_program_title,
+    top4_program_id,
+    top5,
+    top5_program_title,
+    top5_program_id,
+    data_maior_consumo,
+    genero_favorito_programa,
+    horas_genero_programa
+  FROM maior_consumo
+  LEFT JOIN genero
+  USING(globo_id)
+),
+genero_filmes AS
+(
+  SELECT
+    DISTINCT(mediaid),
+    generos AS genero_favorito_filmes
+  FROM ${ref("Genero filmes")}
+
+),
+base_impression_grouped_mediaid AS(
+  SELECT  
+    globo_id,
+    SUM(hours_watched) AS horas,
+    mediaid
+  FROM base_impression
+  GROUP BY globo_id, mediaid
+),
+genero_aux AS (
+  SELECT 
+    globo_id,
+    genero_favorito_filmes,
+    ROUND(COALESCE(horas,0),0) AS horas_genero_filmes
+  FROM base_impression_grouped_mediaid
+  LEFT JOIN genero_filmes
+  USING(mediaid)
+  WHERE genero_favorito_filmes IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY horas DESC) = 1
+),
+mais_visto_filmes AS(
+  SELECT DISTINCT
+    globo_id,
+    grupo,
+    assinatura_gplay,
+    horas_total,
+    horas_novelas,
+    horas_series,
+    horas_filmes,
+    tipo_conteudo,
+    top1,
+    top1_program_title,
+    top1_program_id,
+    top2,
+    top2_program_title,
+    top2_program_id,
+    top3,
+    top3_program_title,
+    top3_program_id,
+    top4,
+    top4_program_title,
+    top4_program_id,
+    top5,
+    top5_program_title,
+    top5_program_id,
+    data_maior_consumo,
+    genero_favorito_filmes,
+    horas_genero_filmes
+  FROM maior_consumo
+  LEFT JOIN genero_aux
+  USING(globo_id)
+),
+
+base1 AS
+(
+  SELECT DISTINCT
+    globo_id,
+    genero_favorito_programa,
+    COALESCE(horas_genero_programa,0) AS horas_genero_programa
+  FROM mais_visto_programas
+),
+base_final AS
+(
+  SELECT 
+    globo_id,  
+    CASE 
+      WHEN horas_genero_programa > horas_genero_filmes THEN genero_favorito_programa 
+      WHEN horas_genero_filmes > horas_genero_programa THEN genero_favorito_filmes 
+   END AS genero_favorito   
+  FROM base1
+  LEFT JOIN 
+  (
+    SELECT DISTINCT
+      globo_id,
+      genero_favorito_filmes,
+      COALESCE(horas_genero_filmes,0) AS horas_genero_filmes
+    FROM mais_visto_filmes
+  )
+  USING (globo_id)
+),
+
+pre_final AS
+(
+    SELECT 
+      DISTINCT(globo_id),
+      grupo,
+      assinatura_gplay,
+      horas_total,
+      horas_novelas,
+      horas_series,
+      horas_filmes,
+      tipo_conteudo,
+      top1,
+      top1_program_title,
+      top1_program_id,
+      top2,
+      top2_program_title,
+      top2_program_id,
+      top3,
+      top3_program_title,
+      top3_program_id,
+      top4,
+      top4_program_title,
+      top4_program_id,
+      top5,
+      top5_program_title,
+      top5_program_id,
+      data_maior_consumo,
+      genero_favorito
+    FROM maior_consumo
+    LEFT JOIN base_final 
+    USING(globo_id)
+),
+pivot_consumo_1 AS(
+  SELECT * FROM
+  (
+    SELECT 
+        globo_id,
+        CASE 
+          WHEN program_id = 13331 THEN 'RzJ88NMPnw'
+          WHEN program_id = 13411 THEN 'PwgfQs1FHj'
+          WHEN program_id = 13497 THEN 'c6QnpFWD2H'
+          WHEN program_id = 13605 THEN '569thVypfV'
+          WHEN program_id = 12090 THEN 'ntx7g9SGCC'
+          WHEN program_id = 13495 THEN '1z5m5PxLkK'
+          WHEN program_id = 11680 THEN 'tKTBtfZdtv'
+          WHEN program_id = 13087 THEN 'nLKzJwhZwV'
+          WHEN program_id = 11764 THEN 'DYpvss7pz5'
+          WHEN program_id = 13977 THEN 'BmH5JwC8H5'
+          WHEN program_id = 14419 THEN 'zFbf7YPkKr'
+          WHEN program_id = 11454 THEN 'KjpKbKGkxq'
+        END AS prog
+      FROM base_impression_grouped_globoid_programid
+      WHERE horas >=0.25
+    )
+    PIVOT (
+      COUNT(DISTINCT prog) prog
+      FOR prog IN ('RzJ88NMPnw','PwgfQs1FHj','c6QnpFWD2H','569thVypfV',
+                    'ntx7g9SGCC','1z5m5PxLkK','tKTBtfZdtv','nLKzJwhZwV',
+                    'DYpvss7pz5','BmH5JwC8H5','zFbf7YPkKr','KjpKbKGkxq')
+    )
+
+)
+
+SELECT
+  DISTINCT(globo_id),
+  grupo,
+  assinatura_gplay AS tipo_assinatura,
+  horas_total,
+  horas_novelas,
+  horas_series,
+  horas_filmes,
+  tipo_conteudo,
+  top1,
+  top1_program_title,
+  top1_program_id,
+  top2,
+  top2_program_title,
+  top2_program_id,
+  top3,
+  top3_program_title,
+  top3_program_id,
+  top4,
+  top4_program_title,
+  top4_program_id,
+  top5,
+  top5_program_title,
+  top5_program_id,
+  data_maior_consumo,
+  CASE 
+    WHEN genero_favorito ='Artes e Cultura' THEN 'Artes'
+    WHEN genero_favorito='Ciência e Tecnologia' THEN 'Ciência'
+    WHEN genero_favorito IN ('Comédia Romântica','Humor') THEN 'Comédia'
+    WHEN genero_favorito='Gastronomia' THEN 'Culinária'
+    WHEN genero_favorito='Série Documental' THEN 'Documentário'
+    WHEN genero_favorito='Entrevistas e Reflexões' THEN 'Entrevista'
+    WHEN genero_favorito IN ('Esportes Radicais','Surfe') THEN 'Esporte'
+    WHEN genero_favorito='Ficção Científica' THEN 'Ficção'
+    WHEN genero_favorito='História e Política' THEN 'História'
+    WHEN genero_favorito='Música' THEN 'Musical'
+    WHEN genero_favorito IN ('Investigação','Jurídico','Crime') THEN 'Policial'
+    WHEN genero_favorito='Mistério' THEN 'Suspense'
+    WHEN genero_favorito IS NULL AND grupo IN ('Cancelado - com consumo','Ativo - com consumo') THEN 'Drama'
+
+  ELSE genero_favorito END AS genero_favorito,
+  CAST(prog_1z5m5PxLkK AS BOOL) AS prog_1z5m5PxLkK,
+  CAST(prog_569thVypfV AS BOOL) AS prog_569thVypfV,
+  CAST(prog_BmH5JwC8H5 AS BOOL) AS prog_BmH5JwC8H5,
+  CAST(prog_DYpvss7pz5 AS BOOL) AS prog_DYpvss7pz5,
+  CAST(prog_KjpKbKGkxq AS BOOL) AS prog_KjpKbKGkxq,
+  CAST(prog_PwgfQs1FHj AS BOOL) AS prog_PwgfQs1FHj,
+  CAST(prog_RzJ88NMPnw AS BOOL) AS prog_RzJ88NMPnw,
+  CAST(prog_c6QnpFWD2H AS BOOL) AS prog_c6QnpFWD2H,
+  CAST(prog_nLKzJwhZwV AS BOOL) AS prog_nLKzJwhZwV,
+  CAST(prog_ntx7g9SGCC AS BOOL) AS prog_ntx7g9SGCC,
+  CAST(prog_tKTBtfZdtv AS BOOL) AS prog_tKTBtfZdtv,
+  CAST(prog_zFbf7YPkKr AS BOOL) AS prog_zFbf7YPkKr,
+  COALESCE(qtd_prog_assistidos,0) AS qtd_prog_assistidos
+FROM pre_final
+LEFT JOIN
+(
+  SELECT *,
+    (prog_RzJ88NMPnw + prog_PwgfQs1FHj + prog_c6QnpFWD2H +
+    prog_569thVypfV + prog_ntx7g9SGCC + prog_1z5m5PxLkK +
+    prog_DYpvss7pz5 + prog_BmH5JwC8H5 + prog_zFbf7YPkKr +
+    prog_KjpKbKGkxq) AS qtd_prog_assistidos
+  FROM pivot_consumo_1
+) 
+USING (globo_id)
+
+
+
+

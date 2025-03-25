@@ -1,0 +1,145 @@
+config {
+  type: "table",
+  name: "metas",
+  schema: "metas_conteudos",
+  tags: ['metas_conteudos_staging_1',
+        "schedule_tag=metas_conteudos_metas"
+  ]
+}
+
+js {
+  function aggregate_metas(output, program_id, timestamp, meta, mediaid, custom_program_title) {
+    var query = "";
+
+    if (program_id != null){
+      query = query + `${output}1 AS (
+            SELECT 
+              globo_id,
+              IFNULL(tb_tipo_usu.tipo_usuario, 'Outros') as tipo_usuario,
+              program_id,
+              program_title,
+              SUM(hours_watched) AS Horas,
+              COUNT(DISTINCT mediaid) AS Episodios,
+              COUNT(DISTINCT timestamp) AS Dias_Assistidos,
+              MIN(timestamp) AS Data_Comeco,
+              MAX(episode_rank) AS Maior_Episodio,
+            FROM
+              ${ref("metas_conteudos", "geral_metas")}
+              LEFT JOIN content USING (mediaid)
+              LEFT JOIN tb_tipo_usu USING (globo_id)
+            WHERE 
+              date >= DATE("${timestamp}")
+              AND program_id = ${program_id}
+            GROUP BY
+              globo_id,
+              tipo_usuario,
+              program_id,
+              program_title
+          ),`;
+    }
+    else{
+      query = query + `${output}1 AS (
+            SELECT 
+              globo_id,
+              IFNULL(tb_tipo_usu.tipo_usuario, 'Outros') as tipo_usuario,
+              program_id,
+              "${custom_program_title}" AS program_title,
+              SUM(hours_watched) AS Horas,
+              COUNT(DISTINCT mediaid) AS Episodios,
+              COUNT(DISTINCT timestamp) AS Dias_Assistidos,
+              MIN(timestamp) AS Data_Comeco,
+              MAX(episode_rank) AS Maior_Episodio
+            FROM
+              ${ref("metas_conteudos", "geral_metas")}
+              LEFT JOIN content USING (mediaid)
+              LEFT JOIN tb_tipo_usu USING (globo_id)
+            WHERE 
+              date >= DATE("${timestamp}")
+              AND mediaid IN (${mediaid})
+            GROUP BY
+              globo_id,
+              tipo_usuario,
+              program_id,
+              program_title
+          ),`;
+    }
+
+    
+    return query + `${output}2 AS (
+                      SELECT
+                        program_id,
+                        program_title,
+                        COUNT(DISTINCT globo_id) AS Usuarios,
+                        SUM(Horas) AS Horas,
+                        AVG(Horas) AS Media_Horas,
+                        AVG(Episodios) AS Qtd_Episodios,
+                        AVG(Dias_Assistidos) AS Media_Dias_Assistidos,
+                        MIN(Data_Comeco) AS Data_Comeco,
+                        AVG(Maior_Episodio) AS Episodio_Medio,
+                        COUNT(CASE WHEN tipo_usuario = 'Logado Free' THEN 1 END) AS qtd_logado_free,
+                        COUNT(CASE WHEN tipo_usuario = 'Outros' THEN 1 END) AS qtd_outros,
+                        COUNT(CASE WHEN tipo_usuario = 'Assinante' THEN 1 END) AS qtd_assinante
+                      FROM
+                        ${output}1
+                      GROUP BY
+                        program_id,
+                        program_title
+                    ),
+
+                    ${output} AS (
+                      SELECT
+                        DATE_DIFF(CURRENT_DATE(), Data_Comeco, DAY) AS Dias_Contemplados,
+                        program_title,
+                        Usuarios as Usuarios_Totais,
+                        qtd_logado_free as Usuarios_Logado_Free,
+                        qtd_assinante as Usuarios_Assinantes,
+                        qtd_outros as Usuarios_Nao_Identificados,
+                          ${meta} AS Meta,
+                          ROUND(IFNULL(SAFE_DIVIDE(qtd_assinante, ${meta}), 0)*100, 0) AS Porcentagem_Meta,
+                          Usuarios >= ${meta} AND DATE_DIFF(CURRENT_DATE(), Data_Comeco, DAY) <= 30 AND ${meta} > 0 AS Meta_Batida,
+                          ROUND(Horas, 0) AS Horas,
+                          Data_Comeco,
+                          ROUND(Media_Horas, 1) AS Media_Horas,
+                          ROUND(Qtd_Episodios, 1) AS Qtd_Episodios,
+                          ROUND(Media_Dias_Assistidos, 1) AS Media_Dias_Assistidos,
+                          ROUND(Episodio_Medio, 1) AS Episodio_Medio
+                        FROM 
+                          ${output}2
+                      )`;
+  }
+}
+
+WITH content AS (
+  SELECT
+    id AS mediaid,
+    episode_rank,
+    season
+  FROM ${ref("consumo_derived", "content")}
+), 
+
+tb_tipo_usu AS (
+  SELECT 
+    globo_id,
+    tipo_usuario,
+  FROM ${ref("usuarios", "assinantes_e_logados_free")}
+),
+
+
+${aggregate_metas("hercai", 20496, "2023-04-01",0)},
+
+${aggregate_metas("hercai_t2", null, "2024-04-01", 250000, 
+
+                    '11713524,11712816,11713499,11713286,11712712,11728258,11738913,11725965,11732504,11713405,11731277,11713818,11713798,11713799,11713581,11728304,11735624,11712308,11728217,11725943,11732365,11715943,11713250,11712832,11712698,11728212,11725917,11712761,11735690,11712642,11725898,11732381,11732414,11713647,11728211,11712546,11713681,11713336,11713814,11713785,11735670,11713634,11713781,11716179,11713790,11713610,11725942,11751221,11728311,11712760',
+
+
+                    'Hercai - Temporada 2')}
+
+
+
+SELECT * FROM (
+  SELECT * FROM hercai
+  UNION ALL SELECT * FROM hercai_t2)
+
+WHERE
+  Dias_Contemplados <= 30
+ORDER BY Dias_Contemplados DESC

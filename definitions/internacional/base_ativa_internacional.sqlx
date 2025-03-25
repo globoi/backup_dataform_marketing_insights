@@ -1,0 +1,85 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'base_ativa_internacional',
+  tags: ['perfil_internacional',
+         'schedule_tag=internacional_base_ativa_internacional',
+         'schedule_cron=0 12 * * *']
+
+}
+
+SELECT
+  ss.object_id AS id_do_item_da_cesta,
+  ss.globo_id,
+  sd.currency_price,
+  CASE
+    WHEN sd.currency_price LIKE '%USD%' THEN 'globo-play-us'
+    WHEN sd.currency_price LIKE '%GBP%' THEN 'globo-play-eu'
+    WHEN sd.currency_price LIKE '%CHF%' THEN 'globo-play-eu'
+    WHEN sd.currency_price LIKE '%CAD%' THEN 'globo-play-us'
+    WHEN sd.currency_price LIKE '%DKK%' THEN 'globo-play-eu'
+    WHEN sd.currency_price LIKE '%NOK%' THEN 'globo-play-eu'
+    WHEN sd.currency_price LIKE '%SEK%' THEN 'globo-play-eu'
+    WHEN sd.currency_price = 'EUR 8.99' THEN 'globo-play-pt'
+    WHEN sd.currency_price = 'EUR 5.99' THEN 'globo-play-pt'
+    WHEN sd.currency_price = 'EUR 4.49' THEN 'globo-play-pt'
+    WHEN sd.currency_price = '13.99' THEN 'globo-play-us'
+    WHEN sd.currency_price = 'EUR 9.99' THEN 'globo-play-eu'
+    WHEN sd.currency_price = 'EUR 4.99' THEN 'globo-play-eu'
+    WHEN sd.currency_price LIKE '%AUD%' THEN 'globo-play-as'
+    WHEN sd.currency_price LIKE '%JPY%' THEN 'globo-play-as'
+    WHEN cd.name IN ('Estados Unidos', 'Canadá') THEN 'globo-play-us'
+    WHEN cd.name = 'Portugal' THEN 'globo-play-pt'
+    WHEN cd.name IN (
+      'Espanha',
+      'França',
+      'Itália',
+      'Alemanha',
+      'Suíça',
+      'Dinamarca',
+      'Suécia',
+      'Noruega',
+      'Bélgica',
+      'Países Baixos',
+      'Irlanda',
+      'Áustria',
+      'Luxemburgo',
+      'Grécia',
+      'Finlândia',
+      'Reino Unido',
+      'Suécia'
+    ) THEN 'globo-play-eu'
+    WHEN cd.name IN ('Japão', 'Austrália') THEN 'globo-play-as'
+    ELSE 'other'
+  END AS oferta_consumo,
+  CASE
+    WHEN sd.currency_price LIKE '%USD%' THEN 'Estados Unidos'
+    WHEN sd.currency_price LIKE '%GBP%' THEN 'Reino Unido'
+    WHEN sd.currency_price LIKE '%CHF%' THEN 'Suiça'
+    WHEN sd.currency_price LIKE '%CAD%' THEN 'Canadá'
+    WHEN sd.currency_price LIKE '%DKK%' THEN 'Dinamarca'
+    WHEN sd.currency_price LIKE '%NOK%' THEN 'Noruega'
+    WHEN sd.currency_price LIKE '%SEK%' THEN 'Suécia'
+    WHEN sd.currency_price LIKE '%AUD%' THEN 'Austrália'
+    WHEN sd.currency_price LIKE '%JPY%' THEN 'Japão'
+    WHEN sd.currency_price = 'EUR 8.99' THEN 'Portugal'
+    WHEN sd.currency_price = 'EUR 5.99' THEN 'Portugal'
+    WHEN sd.currency_price = 'EUR 4.49' THEN 'Portugal'
+    WHEN sd.currency_price = '13.99' THEN 'Estados Unidos'
+    ELSE cd.name
+  END AS country,
+  ss.state AS status,
+  DATE(sd.subscription_at) AS data_de_conversao,
+  ss.state_date AS dia,
+  sd.purchase_channel AS device
+FROM
+  ${ref('sales_gold', 'subscription_state')} ss
+  JOIN ${ref('sales_gold', 'subscription_details')} sd ON ss.object_id = sd.id
+  JOIN ${ref('sales_gold', 'product_details')} pd ON sd.product_id = pd.id
+  LEFT JOIN ${ref('sales_gold', 'order_details')} od ON sd.order_id = od.id
+  LEFT JOIN ${ref('sales_gold', 'country_details')} cd ON od.country_id = cd.id
+WHERE
+  DATE(ss.state_date) = CURRENT_DATE -1
+  AND ss.state = 'active'
+  AND LOWER(pd.name) LIKE '%globoplay%'
+  AND pd.is_international = TRUE

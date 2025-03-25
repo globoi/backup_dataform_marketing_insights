@@ -1,0 +1,146 @@
+config {
+  type: 'table',
+  name: 'inatividade_consumo_15D_old',
+  schema: 'consumo',
+  tags: ['consumo_staging_1'],
+  description: 'Dataset com dados de inatividade de consumo expandidos por globo_id e período de inatividade. Aplica-se ao Assinante (Titular e Dependente) e usuário LF. Considera-se inatividade intervalos de consumo que excedam 15 dias. Considerar consultar documentação: https://globo.atlassian.net/wiki/spaces/MIC/pages/403849838841/Base+de+inatividade+consumo',
+  columns: {
+     'globo_id': 'Identificador do usuário'
+    ,'inatividade_periodo': 'Identificar do período de inatividade do usuário. Intervalos que o usuário fica mais de 15 sem consumo de conteúdo são contabilizados como um período.'
+    ,'inatividade_status': 'Para todos períodos históricos, este valor será uma constante "Inativo". Trazemos sempre a ultima mídia consumida pelo usuário (id, timestamp e hours_watched), deste cenário, verificamos o intervalo do consumo, onde inferior a 15 dias é "Ativo", senão "Inativo".'
+    ,'ultimo_mediaid': 'Última mídia (id) consumida até a entreada no período de inatividade'
+    ,'ultimo_hours_watched': 'Horas de consumo da ultima mídia consumida até a entreada no período de inatividade'
+    ,'ultimo_timestamp': 'Data da ultima mídia consumida até a entreada no período de inatividade'
+    ,'primeiro_pos_mediaid': 'Primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.'
+    ,'primeiro_pos_hours_watched': 'Total de horas de consumo da Primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.'
+    ,'primeiro_pos_timestamp': 'Data da primeira midia consumida após o periodo de inatividade. Caso nulo, significa que o usuário não consumiu nada posteriormente.'
+    ,'inatividade_intervalo': 'Diferença, em dias, da ultimo_timestamp e o primeiro_pos_timestamp. Caso primeiro_pos_timestamp seja nulo, considera-se a data de processamento do pipeline'
+    ,'paid_ultimo_mediaid': 'Última mídia paga (impression.assinante_only) consumida até o momento de inatividade.'
+    ,'paid_ultimo_hours_watched': 'Horas de consumo da última mídia paga (impression.assinante_only) consumida até o momento de inatividade.'
+    ,'paid_ultimo_timestamp': 'Data da última mídia paga (impression.assinante_only) consumida até o momento de inatividade.'
+    ,'inatividade_pre_qtd_plays': 'Quantidade de play (contagem de midia_ids) até o momento de inatividade'
+    ,'inatividade_pre_sum_hours_watched': 'Soma das horas de play até o momento de inatividade'
+    ,'cadastro_tipo_assinante': 'Identifica o cadastro do usuário {Titular, dependente ou Logado Free}. Considerar consultar pipeline para entender as atribuições.'
+    ,'cadastro_status': 'Identifica o status do usuário {Ativo, Cancelado, Suspenso}. Considerar consultar pipeline para entender as atribuições.'
+    ,'cadastro_produto': 'Identifica o produto contratado do usuário'
+    ,'cadastro_data_init': 'Identifica a data de criação do globo_id. Considerar consultar pipeline para entender as atribuições.'
+    ,'cadastro_data_fim': 'Identifica a data final de cadastro do globo_id, engloba: data_cancelamento, data_suspensão, data_atual etc. Considerar consultar pipeline para entender as atribuições.'
+  }
+}
+
+WITH
+
+assinantes AS (
+  SELECT
+     globo_id 
+    ,'Titular'         AS cadastro_tipo_assinante
+    ,`status`          AS cadastro_status
+    ,ProductName       AS cadastro_produto
+    ,DATE(CreatedDate) AS cadastro_data_init
+    ,COALESCE(
+       DATE_SUB(LEAD(DATE(CreatedDate)) OVER (PARTITION BY globo_id ORDER BY DATE(CreatedDate) ASC), INTERVAL 1 DAY)
+      ,DATE(data_da_suspensao)
+      ,DATE(data_hora_cancelamento)
+      ,CURRENT_DATE()
+    ) AS cadastro_data_fim
+  FROM ${ref("sales_enriched", "asset_v2")}
+  WHERE is_globoplay AND assinatura_internacional IS NOT TRUE
+),
+
+dependentes AS (
+  SELECT
+     Acc.globo_id 
+    ,'Dependente' AS cadastro_tipo_assinante
+    ,IF(EVA_Data_Hora_Fim_Relacionamento__c IS NULL, `status`, EVA_Status_Relacionamento__c) AS cadastro_status
+    ,`Name`            AS cadastro_produto
+    ,DATE(CreatedDate) AS cadastro_data_init
+    ,COALESCE(
+       DATE_SUB(LEAD(DATE(CreatedDate)) OVER (PARTITION BY globo_id ORDER BY DATE(CreatedDate) ASC), INTERVAL 1 DAY)
+      ,DATE(EVA_Data_Hora_Fim_Relacionamento__c)
+      ,DATE(data_hora_cancelamento)
+      ,CURRENT_DATE()
+    ) AS cadastro_data_fim
+  FROM ${ref("sales_clean", "relacionamento")} AS R
+  INNER JOIN ${ref("sales_clean", "account")} AS Acc
+    ON R.EVA_Dependente__c = Acc.AccountId
+    AND table_suffix > '2019-01-01'
+  INNER JOIN (SELECT AssetId, data_hora_cancelamento, status FROM ${ref("sales_enriched", "asset_v2")}) AS v2
+    ON R.EVA_Item_da_Cesta__c = v2.AssetId
+),
+
+users AS (SELECT * FROM assinantes UNION ALL SELECT * FROM dependentes),
+
+/*Estrutura/Lógica de Inatividade*/
+
+impression AS (
+  SELECT
+     userid             AS globo_id
+    ,`timestamp`        AS timestamp_media
+    ,DATE(`timestamp`)  AS date_media
+    ,hours_watched
+    ,mediaid
+    ,assinante_only
+  FROM ${ref("consumo_enriched", "impression")}
+  WHERE
+    `date` >= DATE_SUB(CURRENT_DATE(), INTERVAL 730 DAY)
+),
+
+inatividade_1 AS (
+  SELECT
+     globo_id
+    ,mediaid          AS ultimo_mediaid
+    ,hours_watched    AS ultimo_hours_watched
+    ,timestamp_media  AS ultimo_timestamp
+    ,assinante_only
+    ,LEAD(mediaid)          OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS primeiro_pos_mediaid
+    ,LEAD(hours_watched)    OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS primeiro_pos_hours_watched
+    ,LEAD(timestamp_media)  OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS primeiro_pos_timestamp
+    ,DATE_DIFF(COALESCE(LEAD(timestamp_media) OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC), CURRENT_TIMESTAMP()), timestamp_media, DAY)  AS inatividade_intervalo
+    ,LAST_VALUE(IF(assinante_only, mediaid, NULL) IGNORE NULLS)         OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS paid_ultimo_mediaid
+    ,LAST_VALUE(IF(assinante_only, hours_watched, NULL) IGNORE NULLS)   OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS paid_ultimo_hours_watched
+    ,LAST_VALUE(IF(assinante_only, timestamp_media, NULL) IGNORE NULLS) OVER (PARTITION BY globo_id ORDER BY timestamp_media ASC) AS paid_ultimo_timestamp
+  FROM impression
+),
+
+inatividade_2 AS (
+  SELECT 
+     *
+    ,FIRST_VALUE(IF(inatividade_intervalo >= 15, ultimo_timestamp, NULL) IGNORE NULLS)
+      OVER(PARTITION BY globo_id ORDER BY ultimo_timestamp ASC
+        ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS TEMP_inatividade_range
+  FROM inatividade_1
+),
+
+inatividade_3 AS (
+  SELECT
+     *
+    ,COUNT(ultimo_mediaid)      OVER (PARTITION BY globo_id, TEMP_inatividade_range) AS inatividade_pre_qtd_plays
+    ,SUM(ultimo_hours_watched)  OVER (PARTITION BY globo_id, TEMP_inatividade_range) AS inatividade_pre_sum_hours_watched
+  FROM inatividade_2
+)
+
+SELECT 
+   i.globo_id
+  ,ROW_NUMBER() OVER (PARTITION BY i.globo_id ORDER BY i.ultimo_timestamp ASC) AS inatividade_periodo
+  ,IF(i.inatividade_intervalo >= 15, 'Inativo', 'Ativo') AS inatividade_status
+  ,i.ultimo_mediaid
+  ,i.ultimo_hours_watched
+  ,i.ultimo_timestamp
+  ,i.primeiro_pos_mediaid
+  ,i.primeiro_pos_hours_watched
+  ,i.primeiro_pos_timestamp
+  ,i.inatividade_intervalo
+  ,i.paid_ultimo_mediaid
+  ,i.paid_ultimo_hours_watched
+  ,i.paid_ultimo_timestamp
+  ,i.inatividade_pre_qtd_plays
+  ,i.inatividade_pre_sum_hours_watched
+  ,COALESCE(u.cadastro_tipo_assinante, "Logado Free") AS cadastro_tipo_assinante
+  ,COALESCE(u.cadastro_status, "Ativo")               AS cadastro_status
+  ,COALESCE(u.cadastro_produto, "Globoplay Free")     AS cadastro_produto
+  ,u.cadastro_data_init
+  ,u.cadastro_data_fim
+FROM inatividade_3 i
+LEFT JOIN users u
+  ON i.globo_id = u.globo_id AND DATE(i.ultimo_timestamp) BETWEEN u.cadastro_data_init AND u.cadastro_data_fim
+WHERE IF(inatividade_intervalo >= 15 OR primeiro_pos_mediaid IS NULL, TRUE, FALSE)

@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  name: 'mktflow_lf_novela_tr',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AproveiteMaisFree','schedule_tag=jornadas_mkt_mktflow_lf_novela_tr'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+    DISTINCT(globo_id)
+FROM
+    ${ref("jornadas_mkt", "lf_trecho_30d")}
+WHERE
+    novela >= 5

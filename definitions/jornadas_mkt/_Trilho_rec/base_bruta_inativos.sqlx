@@ -1,0 +1,33 @@
+config {
+  type: 'table',
+  name: 'base_bruta_inativos',
+  schema: 'trilho',
+  tags: ['trilho_rec', 'schedule_tag=trilho_base_bruta_inativos'],
+  description: ''
+}
+
+WITH 
+perfil_assinantes_ativo AS (
+  SELECT
+    *,
+    CAST(data_ultimo_consumo AS DATE) AS data_tratada_ultimo_consumo,
+    DATE_DIFF(current_date(), CAST(data_ultimo_consumo AS DATE), DAY) AS tempo_de_inatividade_em_dias
+  FROM 
+    ${ref("usuarios", "perfil_assinantes_ativo_reduzido")}
+  WHERE 
+    inativo IS TRUE
+    AND dt_assinatura_comeco <= '2022-05-24'
+
+)
+
+SELECT 
+  *,
+  CASE
+    WHEN tempo_de_inatividade_em_dias >=45 and tempo_de_inatividade_em_dias <=90 THEN 'Inativo entre 45 e 90 dias'
+    WHEN tempo_de_inatividade_em_dias >=30 and tempo_de_inatividade_em_dias <=44 THEN 'Inativo entre 30 e 44 dias'
+    WHEN tempo_de_inatividade_em_dias >=91 THEN 'Inativo a mais de 90 dias'
+    WHEN tempo_de_inatividade_em_dias IS NULL THEN 'Nunca consumiu'
+    ELSE 'Ativo'
+  END AS cluster_inatividade
+FROM 
+  perfil_assinantes_ativo

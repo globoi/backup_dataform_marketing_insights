@@ -1,0 +1,40 @@
+
+
+-- Declara uma segunda variável para checkpoint
+  DECLARE event_timestamp_checkpoint TIMESTAMP;
+ 
+  -- Calcula o checkpoint
+  SET event_timestamp_checkpoint = (
+    SELECT DATETIME_SUB(MAX(publish_time), INTERVAL 30 MINUTE)
+    FROM `gglobo-vendas-hdg-prd.jvevents.messages_history`
+  );
+ 
+  -- Cria a tabela temporária com os dados
+  CREATE OR REPLACE TABLE `gglobo-mkt-ins-hdg-prd.jornadas_mkt.carrinho_ultimos_30min_temp`
+  OPTIONS(labels=[("tags", "jornadas_mkt"), ("mktcloud", ""), ("owner", "martech")])
+  AS
+  SELECT
+    message_id AS id,
+    publish_time AS event_date,
+    CASE
+      WHEN JSON_VALUE(JSON_EXTRACT(data, "$.payload"), '$.payload.channel.name') IS NULL THEN
+        JSON_VALUE(JSON_EXTRACT(data, "$.payload"), '$.payload.channel')
+      ELSE
+        JSON_VALUE(JSON_EXTRACT(data, "$.payload"), '$.payload.channel.name')
+    END AS channel,
+    JSON_VALUE(data, "$.timestamp") AS timestamp,
+    LOWER(JSON_VALUE(data, "$.uri")) AS uri,
+    LOWER(JSON_VALUE(attributes, "$.environment")) AS environment,
+    LOWER(JSON_VALUE(attributes, "$.domain")) AS domain,
+    LOWER(JSON_VALUE(attributes, "$.event")) AS event,
+    JSON_VALUE(attributes, "$.context") AS context,
+    JSON_EXTRACT(data, "$.headers") AS headers,
+    JSON_EXTRACT(data, "$.payload") AS payload
+  FROM `gglobo-vendas-hdg-prd.jvevents.messages_history`
+  WHERE publish_time > event_timestamp_checkpoint
+    AND (
+      LOWER(JSON_VALUE(attributes, "$.domain")) = 'checkout-api' OR
+      LOWER(JSON_VALUE(attributes, "$.domain")) = 'checkout' OR
+      LOWER(JSON_VALUE(attributes, "$.domain")) = 'jv-sales-api'
+    )
+

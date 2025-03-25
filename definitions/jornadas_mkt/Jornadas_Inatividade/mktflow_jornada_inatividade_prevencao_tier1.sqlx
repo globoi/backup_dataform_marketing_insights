@@ -1,0 +1,24 @@
+
+config {
+  type: 'table',
+  tags: ['jornada_inatividade', 'schedule_tag=jornadas_mkt_mktflow_jornada_inatividade_prevencao_tier1'],
+  name: 'mktflow_jornada_inatividade_prevencao_tier1',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT distinct i.globo_id, i.ultimo_timestamp, i.inatividade_intervalo, c.mais_canais
+FROM ${ref("consumo", "inatividade_consumo_15D")} i
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} c
+ON i.globo_id = c.globo_id
+WHERE i.primeiro_pos_timestamp IS NULL
+AND i.inatividade_status = 'Inativo'
+AND i.inatividade_intervalo BETWEEN 15 AND 29
+AND c.mais_canais = false

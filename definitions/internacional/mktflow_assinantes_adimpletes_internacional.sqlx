@@ -1,0 +1,25 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'mktflow_assinantes_adimpletes_internacional',
+  tags: ['schedule_tag=internacional_mktflow_assinantes_adimpletes_internacional.',
+         'schedule_cron=0 13 * * *'],
+   bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "internacional",
+            owner: "martech",
+            mktcloud: "true"
+    }
+}}
+SELECT 
+    globo_id, *,
+    CASE  
+      WHEN oferta_consumo = 'globo-play-us' THEN 'EUA'
+      WHEN oferta_consumo = 'globo-play-pt' THEN 'Portugal'
+      WHEN oferta_consumo = 'globo-play-eu' THEN 'Europa'
+      WHEN oferta_consumo = 'globo-play-as'THEN 'Asia'
+      ELSE 'outro'
+    END AS regiao
+  FROM ${ref('internacional', 'base_ativa_internacional')}
+ 

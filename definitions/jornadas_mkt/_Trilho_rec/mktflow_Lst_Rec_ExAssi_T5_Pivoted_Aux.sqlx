@@ -1,0 +1,15 @@
+config {
+  type: "view",
+  name: "mktflow_Lst_Rec_ExAssi_T5_Pivoted_Aux",
+  schema: "trilho",
+  tags: ['trilho_rec', 'schedule_tag=trilho_mktflow_Lst_Rec_ExAssi_T5_Pivoted_Aux']
+}
+
+SELECT DISTINCT
+    program_title,
+    title_url_for_consumption,
+    media_kit_resource__poster,
+    program_id,
+    title_id
+FROM 
+    ${ref("trilho", "Lst_Rec_ExAssi_Rank_Conteudos_Por_Genero_T5")}

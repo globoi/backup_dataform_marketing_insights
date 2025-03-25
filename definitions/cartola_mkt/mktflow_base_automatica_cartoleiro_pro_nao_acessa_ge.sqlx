@@ -1,0 +1,39 @@
+config {
+ 
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_cartoleiro_pro_nao_acessa_ge','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_cartoleiro_pro_nao_acessa_ge',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+  
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+---usuarios cartoleiro PRO na temporada de 2024 que nao acessaram ge no ultimo ano
+with acessos_ge as (
+select distinct globoId as globo_id
+from ${ref("foundation_ge", "foundation_ge_sessions")} s,
+unnest (s.hits) h
+where s.data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 365 DAY)
+and h.provider = 'cadun'),
+
+cartoleiros_free as (
+select distinct globo_id
+from ${ref("report_staging", "report_temporada")} a 
+where a.temporada = 2024
+and pro_em is not null
+)
+
+select distinct 'named_user' as identifier_type, p.globo_id as UUID
+from cartoleiros_free p 
+left join acessos_ge q
+on p.globo_id = q.globo_id
+where q.globo_id is null

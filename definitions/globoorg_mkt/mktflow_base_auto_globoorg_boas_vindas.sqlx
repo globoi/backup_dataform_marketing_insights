@@ -1,0 +1,28 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=globoorg_mkt_mktflow_base_auto_globoorg_boas_vindas', 'schedule_cron=0 9 * * 5'],
+    name: 'mktflow_base_auto_globoorg_boas_vindas',
+    schema: 'globoorg_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "globoorg_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT userid AS globo_id
+FROM
+  -- `valiant-circuit-129220.home.pgt_*`
+  ${ref("home", "pgt_*")}
+WHERE
+  ( _TABLE_SUFFIX BETWEEN FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 8 DAY) )
+    AND FORMAT_DATE( '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) ) )
+  AND provider = 'cadun'
+  AND userid IS NOT NULL
+  AND object LIKE '%globo.com/'

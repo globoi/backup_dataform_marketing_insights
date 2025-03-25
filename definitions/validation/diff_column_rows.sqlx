@@ -1,0 +1,19 @@
+config {
+  type: "view",
+  disabled: true
+}
+
+js {
+  const table_gcp = ref(validation.schema_gcp, validation.table_name_gcp);
+  const table_export = ref(validation.schema_export, validation.table_name_export);
+  const join_key = validation.join_key;
+  const columns = validation.row_check_columns;
+  const incremental_condition = validation.incremental_condition;
+}
+
+WITH input_table AS (
+  SELECT * FROM ${table_gcp} ${incremental_condition} 
+)
+
+${validation.show_different_values(columns, 'input_table', table_export, join_key)}
+LIMIT 100

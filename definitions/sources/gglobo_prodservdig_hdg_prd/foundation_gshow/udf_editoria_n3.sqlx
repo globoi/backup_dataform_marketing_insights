@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-prodservdig-hdg-prd",
+  schema: "foundation_gshow",
+  name: "udf_editoria_n3",
+  description: ""
+}

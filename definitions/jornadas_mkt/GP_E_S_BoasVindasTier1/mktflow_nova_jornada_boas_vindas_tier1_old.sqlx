@@ -1,0 +1,180 @@
+config {
+    type: 'table',
+    name: 'mktflow_nova_jornada_boas_vindas_tier1_old',
+    schema: 'jornadas_mkt',
+    tags: [],
+    description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+  depentes_legado AS (
+  SELECT
+    DISTINCT CAST(leg.ASSINATURA_ID AS STRING) AS id_asset
+  FROM
+    ${ref("legado", "legado_user")} leg
+  INNER JOIN
+    ${ref("sales_enriched", "sales")} sal
+  USING
+    (assinatura_id)
+  WHERE
+    sal.sistema = 'Legado'
+    AND sal.status = 'Ativo'
+    AND TIPO_ASSINANTE_ID = 1
+    AND ASSINATURA_ID IS NOT NULL ),
+  titular_sf AS (
+  SELECT
+    globo_id,
+    AssetId AS id_asset,
+  FROM
+    ${ref("sales_enriched", "asset_v2")}
+  WHERE
+    ( globo_id IS NOT NULL
+      AND LOWER(AssetName) LIKE '%globoplay%'
+      AND ( base_ativa_pagante
+        OR base_ativa_cupom
+        OR base_ativa_trial
+        OR base_ativa_disney_combo
+        OR base_ativa_discovery_combo
+        OR base_ativa_starz_combo
+        OR base_ativa_disney_addon
+        OR base_ativa_discovery_addon
+        OR base_ativa_starz_addon )
+      OR status ='Ativo' )
+    AND LOWER(AssetName) LIKE '%globoplay%' ),
+  relacionamento AS (
+  SELECT
+    globo_id
+  FROM
+    ${ref("sales_clean", "d2c_account_dependent")}
+  INNER JOIN (
+    SELECT
+      AccountId,
+      globo_id
+    FROM
+      ${ref("sales_clean", "account")}
+    WHERE
+      table_suffix <= CURRENT_DATE())
+  ON
+    (AccountId = D2C_Parent__c)
+  WHERE
+    LOWER(D2C_Status__c) = 'active'
+    AND D2C_Dependent_GloboID__c IS NOT NULL ),
+  dependentes_sf AS (
+  SELECT
+    CAST(id_asset AS STRING) AS id_asset
+  FROM
+    relacionamento
+  INNER JOIN
+    titular_sf
+  USING
+    (globo_id) ),
+  base_ativa_dependente AS (
+  SELECT
+    CAST(id_asset AS STRING) AS id_asset,
+    globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")} ),
+  dependente_union AS (
+  SELECT
+    DISTINCT id_asset
+  FROM
+    dependentes_sf
+  UNION ALL
+  SELECT
+    DISTINCT CAST(id_asset AS STRING) AS id_asset
+  FROM
+    depentes_legado ),
+  dependente AS (
+  SELECT
+    DISTINCT(globo_id),
+    id_asset,
+    TRUE AS possui_dependente
+  FROM
+    dependente_union
+  INNER JOIN
+    base_ativa_dependente
+  USING
+    (id_asset) ),
+  base_ativa_jornada AS (
+  SELECT
+    globo_id,
+    Produto_Contratado,
+    CASE
+      WHEN Produto_Contratado = 'Globoplay' THEN FALSE
+      WHEN Produto_Contratado = 'Globoplay e Disney+'
+    OR Produto_Contratado = 'Globoplay + Telecine'
+    OR Produto_Contratado = 'Globoplay + Premiere' THEN TRUE
+  END
+    AS tem_combo,
+    LOWER(Produto_Contratado) LIKE '%disney%' AS tem_disney,
+    LOWER(Produto_Contratado) LIKE '%telecine%' AS tem_telecine,
+    LOWER(Produto_Contratado) LIKE '%premiere%' AS tem_premiere,
+    LOWER(Produto_Contratado) LIKE '%combate%' AS tem_combate
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  WHERE
+    NOT mais_canais
+    AND NOT em_ativacao
+    AND LOWER(Produto_Contratado) NOT LIKE '%legado%'
+    AND DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) <= DATE(data_hora_compra) QUALIFY ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY data_hora_compra DESC) = 1 ),
+  impression_jornada AS (
+  SELECT
+    DISTINCT(userid) AS globo_id,
+    SUM(CAST(environment LIKE '%tv%' AS INT64)) >=1 AS play_smart_tv,
+    SUM(
+      CASE
+        WHEN DATE_SUB(CURRENT_DATE(), INTERVAL 5 DAY) <= DATE(timestamp) AND NOT is_live THEN 1
+      ELSE
+      0
+    END
+      ) >= 1 AS play_5_dias
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) <= date
+  GROUP BY
+    userid ),
+  base AS (
+  SELECT
+    *
+  FROM
+    base_ativa_jornada
+  LEFT JOIN
+    dependente
+  USING
+    (globo_id) ),
+  consumo AS (
+  SELECT
+    globo_id,
+    MAX(diversidade) OVER(PARTITION BY globo_id) >=2 AS consumo_diversificado,
+    MAX(Cluster_Engajamento) OVER(PARTITION BY globo_id) != '1. Light Users' AS usuario_engajado
+  FROM
+    ${ref("usuarios", "RaioXAssinante")} )
+SELECT
+  DISTINCT globo_id,
+  Produto_Contratado,
+  tem_combo,
+  tem_disney,
+  tem_telecine,
+  tem_premiere,
+  tem_combate,
+  COALESCE(possui_dependente, FALSE) AS possui_dependente,
+  COALESCE(play_smart_tv, FALSE) AS play_smart_tv,
+  COALESCE(play_5_dias, FALSE) AS play_5_dias,
+  COALESCE(consumo_diversificado, FALSE) AS consumo_diversificado,
+  COALESCE(usuario_engajado, FALSE) AS usuario_engajado
+FROM
+  base
+LEFT JOIN
+  impression_jornada
+USING
+  (globo_id)
+LEFT JOIN
+  consumo
+USING
+  (globo_id)

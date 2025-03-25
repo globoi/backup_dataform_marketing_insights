@@ -1,0 +1,146 @@
+config {
+  type: 'table',
+  name: 'series_history',
+  schema: 'consumo',
+  tags: ['consumo_staging_1_history',
+        "schedule_tag=consumo_series_history"
+  ],
+  description: '',
+  columns: {}
+}
+
+WITH rank_series_step_1 AS (
+  SELECT
+    program_id,
+    program_subset,
+    id AS mediaid,
+    season,
+    episode,
+    DENSE_RANK() OVER(
+      PARTITION BY program_id
+      ORDER BY
+        season,
+        episode
+    ) AS episode_rank,
+    RANK() OVER(
+      PARTITION BY program_id,
+      season
+      ORDER BY
+        episode,
+        id
+    ) AS season_episode_rank
+  FROM
+    ${ref('conteudo_enriched', 'content')}
+  WHERE
+    `status` != 'unpublished'
+    AND (
+      (
+        season IS NOT NULL
+        AND episode IS NOT NULL
+        AND episode != 0
+        AND season != 0
+        and program_subset = 'series'
+        AND program_id != 8450
+      )
+      OR program_id = 12081
+    )
+),
+rank_series_step_2 AS (
+  SELECT
+    rank_step_1.*,
+    MAX(rank_step_1.episode_rank) OVER(PARTITION BY rank_step_1.program_id) AS program_max_episode_rank,
+    MAX(rank_step_1.season_episode_rank) OVER(
+      PARTITION BY rank_step_1.program_id,
+      rank_step_1.season
+    ) AS season_max_episode_rank
+  FROM
+    rank_series_step_1 rank_step_1
+),
+content_agg AS (
+  SELECT
+    rank_step_2.*,
+  FROM
+    rank_series_step_2 rank_step_2
+  WHERE
+    rank_step_2.program_subset = 'series'
+),
+series_history_step_1 AS (
+  SELECT
+    content_final.*,
+    impression_final.globo_id,
+    impression_final.program_title,
+    impression_final.primeiro_consumo,
+    impression_final.ultimo_consumo,
+    impression_final.history_sum,
+    impression_final.completude_tempo,
+    impression_final.horas_consumidas,
+    impression_final.terminou_episodio,
+    CASE
+      WHEN terminou_episodio
+      AND episode_rank = program_max_episode_rank THEN TRUE
+      ELSE FALSE
+    END AS terminou_serie,
+    CASE
+      WHEN terminou_episodio
+      AND season_episode_rank = season_max_episode_rank THEN TRUE
+      ELSE FALSE
+    END AS terminou_temporada,
+    FIRST_VALUE(ultimo_consumo) OVER (
+      PARTITION BY impression_final.globo_id,
+      impression_final.program_id
+      ORDER BY
+        ultimo_consumo DESC
+    ) AS ultimo_consumo_do_programa,
+    LAG(episode_rank) OVER (
+      PARTITION BY impression_final.program_id,
+      impression_final.globo_id
+      ORDER BY
+        episode_rank DESC
+    ) AS `Next`,
+    LAG(episode_rank) OVER (
+      PARTITION BY impression_final.program_id,
+      impression_final.globo_id
+      ORDER BY
+        episode_rank ASC
+    ) AS Previous
+  FROM
+    content_agg content_final
+    INNER JOIN ${ref("consumo", "series_history_imp_aux")} impression_final USING(mediaid)
+),
+series_his_rownumber_step_final AS (
+  SELECT
+    series_step_1.*,
+    (episode_rank - Previous = 1) AS assistiu_anterior,
+    (`Next` - episode_rank = 1) AS assistiu_posterior,
+    ROW_NUMBER () OVER (
+      PARTITION BY globo_id,
+      program_id
+      ORDER BY
+        episode_rank DESC
+    ) AS RowNumber
+  FROM
+    series_history_step_1 series_step_1
+)
+SELECT
+  program_id,
+  mediaid,
+  globo_id,
+  program_title,
+  primeiro_consumo,
+  ultimo_consumo,
+  history_sum,
+  ROUND(completude_tempo, 2) as completude_tempo,
+  horas_consumidas,
+  terminou_episodio,
+  season,
+  season_episode_rank,
+  episode_rank,
+  terminou_serie,
+  terminou_temporada,
+  ultimo_consumo_do_programa,
+  COALESCE(assistiu_anterior, FALSE) AS assistiu_anterior,
+  COALESCE(assistiu_posterior, FALSE) AS assistiu_posterior,
+  IF(RowNumber = 1, True, False) AS maior_episodio_assistido,
+  ultimo_consumo_do_programa = ultimo_consumo as ultimo_episodio_assistido
+FROM
+  series_his_rownumber_step_final step_final

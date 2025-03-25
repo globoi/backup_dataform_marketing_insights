@@ -1,0 +1,23 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_time_unificado_ge', 'schedule_cron=30 9 * * *'],
+    name: 'mktflow_time_unificado_ge',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+SELECT distinct nome_popular
+  , USERID as globo_id
+FROM ${ref('ge_growth_time_coracao', 'time_unificado')} --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.time_unificado`
+LEFT JOIN ${ref('ge_growth_time_coracao', 'soccer_team_sde_info')} --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.soccer_team_sde_info`
+  ON(ge_declared_team_id = clube_id)
+WHERE REGEXP_CONTAINS(USERID, r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$')
+AND nome_popular is not null

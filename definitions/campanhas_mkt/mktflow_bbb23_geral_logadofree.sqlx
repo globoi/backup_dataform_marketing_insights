@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  tags: ['bbb_23'],
+  name: 'mktflow_bbb23_geral_logadofree',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT distinct a.globo_id
+FROM ${ref("bbb_22", "Raiox_BBB_22_Agrupado_historico")} as a
+inner join ${ref("comunicacao", "ultima_comunicacao_geral")} as b
+on a.globo_id = b.globo_id
+where b.tipo_cadastro = 'Logado Free'
+union distinct
+select distinct b.globo_id
+from ${ref("bbb_23", "Raiox_BBB_23_LF")} as b

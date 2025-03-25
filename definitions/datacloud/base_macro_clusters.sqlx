@@ -1,0 +1,501 @@
+config {
+  type: "table",
+  name: "base_macro_clusters",
+  schema: 'datacloud',
+  tags: ['schedule_tag=datacloud_base_macro_clusters',
+    "schedule_cron=0 12 * * *"
+  ]
+}
+
+
+with base as (
+
+--clusters antigos
+  select
+    globo_id,
+    'acao' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_acao')}
+  union all
+  select
+    globo_id,
+    'cinema' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_cinema')}
+  union all
+  select
+    globo_id,
+    'cinema' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_cinema')}
+  union all
+  select
+    globo_id,
+    'cinema' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_assinante_cluster_cinema')}
+  union all
+  select
+    globo_id,
+    'cinema' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_lf_cluster_cinema')}
+  union all
+  select
+    globo_id,
+    'documentario' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_documentarios')}
+  union all
+  select
+    globo_id,
+    'documentario' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_documentarios')}
+  union all
+  select
+    globo_id,
+    'documentario' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_documentarios')}
+  union all
+  select
+    globo_id,
+    'esportes' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_esportes')}
+  union all
+  select
+    globo_id,
+    'esportes' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_esportes')}
+  union all
+  select
+    globo_id,
+    'esportes' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_assinante_cluster_esportes')}
+  union all
+  select
+    globo_id,
+    'esportes' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_lf_cluster_esportes')}
+  union all
+  select
+    globo_id,
+    'futebol' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_futebol')}
+  union all
+  select
+    globo_id,
+    'globonews' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_globonews')}
+  union all
+  select
+    globo_id,
+    'gnt' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_gnt')}
+  union all
+  select
+    globo_id,
+    'humor' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_humor')}
+  union all
+  select
+    globo_id,
+    'humor' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_humor')}
+  union all
+  select
+    globo_id,
+    'humor' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_humor')}
+  union all
+  select
+    globo_id,
+    'infantil' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_infantil')}
+  union all
+  select
+    globo_id,
+    'infantil' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_infantil')}
+  union all
+  select
+    globo_id,
+    'medicina' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_medicina')}
+  union all
+  select
+    globo_id,
+    'misterio' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_misterio')}
+  union all
+  select
+    globo_id,
+    'multishow' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_multishow')}
+  union all
+  select
+    globo_id,
+    'musica' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_musica')}
+  union all
+  select
+    globo_id,
+    'musica' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_musica')}
+  union all
+  select
+    globo_id,
+    'musica' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_musica')}
+  union all
+  select
+    globo_id,
+    'nostalgicos' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_nostalgicos')}
+  union all
+  select
+    globo_id,
+    'nostalgicos' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_nostalgicos')}
+  union all
+  select
+    globo_id,
+    'nostalgicos' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_nostalgicos')}
+  union all
+  select
+    globo_id,
+    'noticias' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_noticias')}
+  union all
+  select
+    globo_id,
+    'novela' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_novela')}
+  union all
+  select
+    globo_id,
+    'novela' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_novela')}
+  union all
+  select
+    globo_id,
+    'novela' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_assinante_cluster_novela')}
+  union all
+  select
+    globo_id,
+    'novela' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_lf_cluster_novela')}
+  union all
+  select
+    globo_id,
+    'novela' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_novela')}
+  union all
+  select
+    globo_id,
+    'realities' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_realities')}
+  union all
+  select
+    globo_id,
+    'realities' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_realities')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_seriesmedicas')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_seriespoliciais')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_seriesmedicas')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_seriespoliciais')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_assinante_cluster_series')}
+  union all
+  select
+    globo_id,
+    'series' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_lf_cluster_series')}
+  union all
+  select
+    globo_id,
+    'sportv' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_sportv')}
+  union all
+  select
+    globo_id,
+    'teen' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_teen')}
+  union all
+  select
+    globo_id,
+    'teen' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_teen')}
+  union all
+  select
+    globo_id,
+    'teen' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_teen')}
+  union all
+  select
+    globo_id,
+    'truecrime' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_truecrime')}
+  union all
+  select
+    globo_id,
+    'truecrime' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_truecrime')}
+  union all
+  select
+    globo_id,
+    'tvg' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_assinante_cluster_tvg')}
+  union all
+  select
+    globo_id,
+    'tvg' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_internacional_lf_cluster_tvg')}
+  union all
+  select
+    globo_id,
+    'tvg' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_tvg_ao_vivo')}
+  union all
+  select
+    globo_id,
+    'universal' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_universal')}
+  union all
+  select
+    globo_id,
+    'variedades' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier1_cluster_variedades')}
+  union all
+  select
+    globo_id,
+    'variedades' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_assinante_tier2_cluster_variedades')}
+  union all
+  select
+    globo_id,
+    'variedades' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_lf_cluster_variedades')}
+  union all
+  select
+    globo_id,
+    'viva' as macro_cluster
+  from
+    ${ref('macro_clusters_mkt', 'mktflow_base_automatica_viva')}
+    ),
+base2 as (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        globo_id,
+        macro_cluster
+      FROM
+        base
+    ) PIVOT(
+      MAX(macro_cluster) macro_cluster FOR macro_cluster IN(
+        'acao',
+        'cinema',
+        'documentario',
+        'esportes',
+        'futebol',
+        'globonews',
+        'gnt',
+        'humor',
+        'infantil',
+        'medicina',
+        'misterio',
+        'multishow',
+        'musica',
+        'nostalgicos',
+        'noticias',
+        'novela',
+        'realities',
+        'series',
+        'sportv',
+        'teen',
+        'truecrime',
+        'tvg',
+        'universal',
+        'variedades',
+        'viva'
+      )
+    )
+)
+select
+  globo_id,
+  case
+    when macro_cluster_acao is not null then true
+    else false
+  end as macro_cluster_acao,
+  case
+    when macro_cluster_cinema is not null then true
+    else false
+  end as macro_cluster_cinema,
+  case
+    when macro_cluster_documentario is not null then true
+    else false
+  end as macro_cluster_documentario,
+  case
+    when macro_cluster_esportes is not null then true
+    else false
+  end as macro_cluster_esportes,
+  case
+    when macro_cluster_futebol is not null then true
+    else false
+  end as macro_cluster_futebol,
+  case
+    when macro_cluster_globonews is not null then true
+    else false
+  end as macro_cluster_globonews,
+  case
+    when macro_cluster_gnt is not null then true
+    else false
+  end as macro_cluster_gnt,
+  case
+    when macro_cluster_humor is not null then true
+    else false
+  end as macro_cluster_humor,
+  case
+    when macro_cluster_infantil is not null then true
+    else false
+  end as macro_cluster_infantil,
+  case
+    when macro_cluster_medicina is not null then true
+    else false
+  end as macro_cluster_medicina,
+  case
+    when macro_cluster_misterio is not null then true
+    else false
+  end as macro_cluster_misterio,
+  case
+    when macro_cluster_multishow is not null then true
+    else false
+  end as macro_cluster_multishow,
+  case
+    when macro_cluster_musica is not null then true
+    else false
+  end as macro_cluster_musica,
+  case
+    when macro_cluster_nostalgicos is not null then true
+    else false
+  end as macro_cluster_nostalgicos,
+  case
+    when macro_cluster_noticias is not null then true
+    else false
+  end as macro_cluster_noticias,
+  case
+    when macro_cluster_novela is not null then true
+    else false
+  end as macro_cluster_novela,
+  case
+    when macro_cluster_realities is not null then true
+    else false
+  end as macro_cluster_realities,
+  case
+    when macro_cluster_series is not null then true
+    else false
+  end as macro_cluster_series,
+  case
+    when macro_cluster_sportv is not null then true
+    else false
+  end as macro_cluster_sportv,
+  case
+    when macro_cluster_teen is not null then true
+    else false
+  end as macro_cluster_teen,
+  case
+    when macro_cluster_truecrime is not null then true
+    else false
+  end as macro_cluster_truecrime,
+  case
+    when macro_cluster_tvg is not null then true
+    else false
+  end as macro_cluster_tvg,
+  case
+    when macro_cluster_universal is not null then true
+    else false
+  end as macro_cluster_universal,
+  case
+    when macro_cluster_variedades is not null then true
+    else false
+  end as macro_cluster_variedades,
+  case
+    when macro_cluster_viva is not null then true
+    else false
+  end as macro_cluster_viva
+from
+  base2
+  inner join ${ref('datacloud', 'base_datacloud')} using(globo_id)
+

@@ -1,0 +1,40 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_truecrime',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_truecrime',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram pelo menos 20min qualquer um dos programas vod: O Caso Celso Daniel, Marielle, O Documentário, Gabriel Monteiro – Herói Fake, Flordelis: Questiona ou Adora, High: Confissões De Uma Traficante, Vítimas Digitais, Relatos do Front – A Outra Face Do Cartão Postal, Não Saia Hoje, Confronting a Serial Killer, Dr. Death: The Undoctored Story, SEDUCED: INSIDE THE NXIVM CULT, Linha Direta, Boate Kiss, cade o amarildo?, o caso Robinho, Rio-Paris: Voo 447, Vale o Escrito, Vale dos isolados, Mc daleste nos ultimos 180 dias.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+
+
+--macro cluster premium true crime
+--assinantes premium que consumiram pelo menos 20min qualquer um dos programas vod: O Caso Celso Daniel, Marielle, O Documentário, Gabriel Monteiro – Herói Fake, Flordelis: Questiona ou Adora, High: Confissões De Uma Traficante, Vítimas Digitais, Relatos do Front – A Outra Face Do Cartão Postal, Não Saia Hoje, Confronting a Serial Killer, Dr. Death: The Undoctored Story, SEDUCED: INSIDE THE NXIVM CULT, Linha Direta, Boate Kiss, cade o amarildo?, o caso Robinho, Rio-Paris: Voo 447, Vale o Escrito, Vale dos isolados, Mc daleste nos ultimos 180 dias.
+
+with consumo_em_genero_true_crime as (
+    SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas, 'consumo true crime' as base
+    FROM ${ref("consumo_enriched", "impression")} a
+    INNER JOIN ${ref('jornadas_mkt','genero_todas_combinacoes')} b
+        ON a.program_id = b.program_id
+    WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+        AND (lower(genero) in ('Crime') or b.program_id in (16289,12265,23898,23265,20527,12603,20048,21502,19817,19920,19813,25113,24046,25644,28259,27327,26189,25211,26848))
+    GROUP BY ALL
+    HAVING hrs_consumidas >= 0.32
+)
+
+SELECT 'named_user' as identifier_type, e.globo_id
+FROM consumo_em_genero_true_crime d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+    ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+    AND e.mais_canais = true

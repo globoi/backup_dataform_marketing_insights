@@ -1,0 +1,43 @@
+config {
+    type: "table",
+    name: "Pre_lista_trilho_rec_alt_series",
+    schema: "jornadas_mkt",
+    tags: ["GP_E_AcabouSeries", 'schedule_tag=jornadas_mkt_Pre_lista_trilho_rec_alt_series'],
+}
+
+WITH
+  top_conteudos AS (
+  SELECT
+    program_id,
+    E1_rank_conteudos
+  FROM
+    ${ref("jornadas_mkt", "E1_conteudos_consumidos")}
+  WHERE
+    E1_rank_conteudos <= 20 ),
+  gid_com_rec AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("jornadas_mkt", "Trilho_Rec_Pers_por_Genero_T5")} ),
+  gdi_sem_rec AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} a
+  LEFT JOIN
+    gid_com_rec b
+  USING
+    (globo_id)
+  WHERE
+    b.globo_id IS NULL ),
+  df_cross AS (
+  SELECT
+    *
+  FROM
+    gdi_sem_rec
+  CROSS JOIN
+    top_conteudos )
+SELECT
+  *
+FROM
+  df_cross

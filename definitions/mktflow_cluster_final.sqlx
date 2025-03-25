@@ -1,0 +1,1100 @@
+config {
+    type: 'table',
+    name: 'mktflow_cluster_final',
+    tags: [''],
+    schema: 'retrospectiva_2022',
+    description: '',
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+WITH
+  gid_exass AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("usuarios", "Free users")}
+  INNER JOIN
+    ${ref("sales_enriched", "asset_v2")} asset
+  USING
+    (globo_id)
+  WHERE
+    asset.status = "Cancelado" ),
+  impression_retro_22 AS (
+  SELECT
+    userid AS globo_id,
+    program_id,
+    hours_watched,
+    date,
+    is_live,
+    program_subset,
+    CASE
+      WHEN DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) <= `date` THEN 5
+      WHEN DATE_SUB(CURRENT_DATE(), INTERVAL 120 DAY) <= `date` THEN 3
+    ELSE
+    1
+  END
+    AS peso
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      `date`) >= 2022
+    AND program_id NOT IN (12082,
+      16280,
+      16281,
+      14907,
+      16284) ),
+  e2_rec_retro_22_rank_conteudos_por_genero_2 AS (
+  SELECT
+    DISTINCT program_id
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    service_id != 6807
+    AND `status` = "published"
+    AND program_subset = "series" ),
+  e2_rec_retro_22_rank_conteudos_por_genero_3 AS (
+  SELECT
+    COUNT(DISTINCT globo_id) AS cont_distintos,
+    program_id,
+    genero,
+    peso
+  FROM
+    impression_retro_22
+  INNER JOIN
+    ${ref("jornadas_mkt", "genero_todas_combinacoes")}
+  USING
+    (program_id)
+  GROUP BY
+    program_id,
+    genero,
+    peso ),
+  e2_rec_retro_22_rank_conteudos_por_genero_4 AS (
+  SELECT
+    program_id,
+    genero,
+    SUM(cont_distintos) AS soma_peso
+  FROM
+    e2_rec_retro_22_rank_conteudos_por_genero_3
+  INNER JOIN
+    e2_rec_retro_22_rank_conteudos_por_genero_2
+  USING
+    (program_id)
+  WHERE
+    genero IS NOT NULL
+    AND genero != "Erótico"
+  GROUP BY
+    program_id,
+    genero ),
+  e2_rec_retro_22_rank_conteudos_por_genero AS (
+  SELECT
+    program_id,
+    genero,
+    ROW_NUMBER() OVER(PARTITION BY genero ORDER BY soma_peso) AS E2_rank_conteudo
+  FROM
+    e2_rec_retro_22_rank_conteudos_por_genero_4 ),
+  e1_rec_retro_22_generos_assistidos_1 AS (
+  SELECT
+    globo_id,
+    SUM(peso * hours_watched) AS horas_peso_sum,
+    genero
+  FROM
+    impression_retro_22
+  LEFT JOIN
+    ${ref("jornadas_mkt", "genero_todas_combinacoes")}
+  USING
+    (program_id)
+  WHERE
+    NOT is_live
+    AND program_subset NOT IN ('news',
+      'disclosure',
+      'live',
+      'lutas',
+      'globo_negocios')
+    AND hours_watched >= 0.15
+    AND genero IS NOT NULL
+    AND genero != "Erótico"
+  GROUP BY
+    globo_id,
+    genero
+  HAVING
+    horas_peso_sum >= 0.5 ),
+  e1_rec_retro_22_generos_assistidos AS (
+  SELECT
+    DISTINCT *,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY horas_peso_sum DESC) AS E1_rank_genero
+  FROM
+    e1_rec_retro_22_generos_assistidos_1 ),
+  e3_lst_rec_conteudos_assistidos_1 AS (
+  SELECT
+    globo_id,
+    program_id
+  FROM
+    ${ref("consumo", "series_history")}
+  WHERE
+    horas_consumidas > 0.25
+  UNION ALL
+  SELECT
+    globo_id,
+    program_id
+  FROM
+    ${ref("consumo", "novela_history")}
+  WHERE
+    horas_consumidas > 0.25 ),
+  e3_lst_rec_conteudos_assistidos AS (
+  SELECT
+    DISTINCT globo_id,
+    program_id
+  FROM
+    e3_lst_rec_conteudos_assistidos_1
+  INNER JOIN
+    ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  USING
+    (globo_id)
+  INNER JOIN
+    ${ref("jornadas_mkt", "genero_todas_combinacoes")}
+  USING
+    (program_id) ),
+  usuarios_retrospectiva_2022_1 AS (
+  SELECT
+    DISTINCT(globo_id),
+    "Ativo" AS status_assinatura,
+    EXTRACT(YEAR
+    FROM
+      MAX(dt_assinatura_comeco)) AS ano_assinatura,
+    assinatura_gplay
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  GROUP BY
+    globo_id,
+    status_assinatura,
+    assinatura_gplay ),
+  usuarios_retrospectiva_2022_2 AS (
+  SELECT
+    DISTINCT(globo_id),
+    assinatura_gplay AS assinatura_gplay2,
+    EXTRACT(YEAR
+    FROM
+      MAX(dt_assinatura_comeco)) AS ano_assinatura_2
+  FROM
+    ${ref("usuarios", "base_ativa_incremental_old")}
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      dt_proc) >= 2022
+  GROUP BY
+    globo_id,
+    assinatura_gplay ),
+  usuarios_retrospectiva_2022_3 AS (
+  SELECT
+    globo_id,
+    COALESCE(status_assinatura, "Cancelado") AS status_assinatura,
+    COALESCE(assinatura_gplay, assinatura_gplay2) AS assinatura_gplay,
+    COALESCE(ano_assinatura, ano_assinatura_2) AS ano_assinatura
+  FROM
+    usuarios_retrospectiva_2022_2
+  LEFT JOIN
+    usuarios_retrospectiva_2022_1
+  USING
+    (globo_id)
+  WHERE
+    LOWER(assinatura_gplay) NOT LIKE "%internacional%" ),
+  usuarios_retrospectiva_2022_4 AS (
+  SELECT
+    userid AS globo_id,
+    ROUND(SUM(hours_watched),0) AS horas_total
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      `date`) >= 2022
+  GROUP BY
+    userid ),
+  usuarios_retrospectiva_2022 AS (
+  SELECT
+    DISTINCT * EXCEPT(status_assinatura,
+      horas_total,
+      assinatura_gplay),
+    CASE
+      WHEN horas_total >= 20 AND status_assinatura = "Cancelado" THEN "Cancelado - com consumo"
+      WHEN horas_total >= 20
+    AND status_assinatura = "Ativo" THEN "Ativo - com consumo"
+      WHEN horas_total < 20 AND status_assinatura = "Cancelado" THEN "Cancelado - sem consumo"
+      WHEN horas_total < 20
+    AND status_assinatura = "Ativo" THEN "Ativo - sem consumo"
+    ELSE
+    "sem_grupo"
+  END
+    AS grupo
+  FROM
+    usuarios_retrospectiva_2022_3
+  INNER JOIN
+    usuarios_retrospectiva_2022_4
+  USING
+    (globo_id) ),
+  top_5_1 AS (
+  SELECT
+    DISTINCT id AS program_id,
+    media_kit_resource__poster AS program_poster_url
+  FROM
+    ${ref("conteudo_enriched", "program")}
+  WHERE
+    media_kit_resource__poster IS NOT NULL ),
+  top_5_2 AS (
+  SELECT
+    * EXCEPT(program_title,
+      program_id),
+    CASE
+      WHEN program_id = 10122 THEN title
+    ELSE
+    program_title
+  END
+    AS program_title,
+    CASE
+      WHEN program_id = 10122 THEN mediaid
+    ELSE
+    program_id
+  END
+    AS program_id
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    program_id NOT IN (8426,
+      9095,
+      9191)
+    AND EXTRACT(YEAR
+    FROM
+      date) >= 2022 ),
+  top_5_3 AS (
+  SELECT
+    userid AS globo_id,
+    program_id,
+    program_title,
+    SUM(hours_watched) AS hrs,
+    ROW_NUMBER() OVER(PARTITION BY userid ORDER BY SUM(hours_watched) DESC) AS top
+  FROM
+    top_5_2
+  INNER JOIN
+    top_5_1
+  USING
+    (program_id)
+  GROUP BY
+    userid,
+    program_id,
+    program_title QUALIFY top IN (1,
+      2,
+      3) ),
+  top_5_4 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      ano_assinatura,
+      grupo,
+      top,
+      program_title,
+      program_id,
+      program_poster_url
+    FROM
+      usuarios_retrospectiva_2022
+    LEFT JOIN
+      top_5_3
+    USING
+      (globo_id)
+    INNER JOIN
+      top_5_1
+    USING
+      (program_id) ) PIVOT( MAX(program_title) program_title,
+      MAX(program_id) program_id,
+      MAX(program_poster_url) program_poster_url FOR top IN(1,
+        2,
+        3) ) ),
+  top_5 AS (
+  SELECT
+    globo_id,
+    ano_assinatura,
+    grupo,
+    program_title_1 AS top1_program_title,
+    program_id_1 AS top1_program_id,
+    program_poster_url_1 AS top1_program_poster_url,
+    program_title_2 AS top2_program_title,
+    program_id_2 AS top2_program_id,
+    program_poster_url_2 AS top2_program_poster_url,
+    program_title_3 AS top3_program_title,
+    program_id_3 AS top3_program_id,
+    program_poster_url_3 AS top3_program_poster_url
+  FROM
+    top_5_4 ),
+  genero_retrospectiva_prep AS (
+  SELECT
+    CASE
+      WHEN program_id = 10122 THEN id
+    ELSE
+    program_id
+  END
+    AS program_id,
+    CASE
+      WHEN program_id = 10122 THEN title
+    ELSE
+    program_title
+  END
+    AS program_title,
+    genre_names
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    status = "published"
+    AND LOWER(program_url_for_consumption) LIKE '%globoplay%'
+    AND genre_names IS NOT NULL
+    AND NOT ARRAY_TO_STRING(genre_names, "") = "" ),
+  genero_retrospectiva_2022_1 AS (
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    1 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(1)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 1
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    2 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(2)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 2
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    3 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(3)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 3
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    4 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(4)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 4
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    5 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(5)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 5
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    6 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(6)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 6
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    7 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(7)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 7
+  UNION ALL
+  SELECT
+    program_id,
+    program_title,
+    genre_names,
+    8 AS gen_index,
+    ARRAY_LENGTH(genre_names) AS qtd_genero,
+    genre_names[ORDINAL(8)] AS genero
+  FROM
+    genero_retrospectiva_prep
+  WHERE
+    ARRAY_LENGTH(genre_names) >= 8 ),
+  genero_retrospectiva_2022_2 AS (
+  SELECT
+    * EXCEPT(genero),
+    CASE
+      WHEN program_id = 12082 THEN "Reality Show"
+      WHEN genero IN ('Ficção Científica',
+      'Ficção-Científica') THEN 'Ficção Científica'
+      WHEN genero IN ('Jornalismo', 'Jornalismo/Current Affairs') THEN 'Jornalismo'
+      WHEN genero IN ('Terror',
+      'Terror/Horror') THEN 'Terror'
+      WHEN genero IN ('Ciência', 'Ciências') THEN 'Ciência'
+      WHEN genero IN ('Suspense',
+      'Thriller/Suspense') THEN 'Suspense'
+      WHEN genero = 'Comportamento/estilo De Vida' THEN 'Comportamento'
+    ELSE
+    genero
+  END
+    AS genero
+  FROM
+    genero_retrospectiva_2022_1
+  WHERE
+    genero != "Genero Indefinido"
+    AND genero IS NOT NULL
+    AND genero != "" QUALIFY ROW_NUMBER() OVER(PARTITION BY program_id ORDER BY gen_index, qtd_genero) = 1 ),
+  genero_retrospectiva_2022 AS (
+  SELECT
+    DISTINCT genero,
+    program_id
+  FROM
+    genero_retrospectiva_2022_2 ),
+  generos_mais_assistidos_retrospectiva_1 AS (
+  SELECT
+    userid AS globo_id,
+    genero,
+    ROUND(SUM(hours_watched),0) AS hrs
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  LEFT JOIN
+    genero_retrospectiva_2022
+  USING
+    (program_id)
+  WHERE
+    program_id NOT IN (8426,
+      9095,
+      9191)
+    AND EXTRACT(YEAR
+    FROM
+      date) >= 2022
+    AND genero IS NOT NULL
+  GROUP BY
+    globo_id,
+    genero QUALIFY ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY hrs DESC) = 1 ),
+  generos_mais_assistidos_retrospectiva AS (
+  SELECT
+    DISTINCT(globo_id),
+    ano_assinatura,
+    grupo,
+    top1_program_title,
+    top1_program_id,
+    top1_program_poster_url,
+    top2_program_title,
+    top2_program_id,
+    top2_program_poster_url,
+    top3_program_title,
+    top3_program_id,
+    top3_program_poster_url,
+    genero AS genero_mais_consumido,
+    hrs AS hrs_genero_mais_consumido
+  FROM
+    top_5
+  LEFT JOIN
+    generos_mais_assistidos_retrospectiva_1
+  USING
+    (globo_id) ),
+  originais AS (
+  SELECT
+    *
+  FROM
+    ${ref("retrospectiva_2022", "originais_historico")} ),
+  originais_retrospectiva_1 AS (
+  SELECT
+    DISTINCT program_id,
+    program_title
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    ( LOWER(program_title) LIKE "%onde está meu coração%"
+      OR LOWER(program_title) LIKE "%rensga hits%"
+      OR LOWER(program_title) LIKE "%rota 66%"
+      OR LOWER(program_title) LIKE "%as five%"
+      OR LOWER(program_title) LIKE "%flordelis%"
+      OR LOWER(program_title) LIKE "%marielle%"
+      OR LOWER(program_title) LIKE "%todos os cantos%"
+      OR LOWER(program_title) LIKE "%o canto livre de nara leão%"
+      OR LOWER(program_title) LIKE "%o caso prevent senior%"
+      OR LOWER(program_title) LIKE "%o clube do%"
+      OR LOWER(program_title) LIKE "%terapia%"
+      OR LOWER(program_title) LIKE "%sob pressão%"
+      OR LOWER(program_title) LIKE "%turma da mônica%"
+      OR LOWER(program_title) LIKE "%clube do araújo%" )
+    AND program_id IN (20481,
+      23265,
+      12265,
+      10189,
+      11680,
+      12090,
+      20256,
+      11873,
+      11807,
+      22275,
+      14881,
+      14698,
+      14416) ),
+  originais_retrospectiva_2 AS (
+  SELECT
+    DISTINCT originais.program_title,
+    program_id
+  FROM
+    originais
+  LEFT JOIN
+    ${ref("conteudo_enriched", "content")} content
+  USING
+    (program_title)
+  WHERE
+    ( (program_id IS NOT NULL
+        AND CAST(program_id AS STRING) != "")
+      OR program_id = 11626 )
+    AND program_id NOT IN (13004,
+      15856,
+      13005,
+      23303,
+      11020,
+      5325) ),
+  originais_retrospectiva_3 AS (
+  SELECT
+    program_title,
+    program_id
+  FROM
+    originais_retrospectiva_2
+  UNION ALL
+  SELECT
+    program_title,
+    program_id
+  FROM
+    originais_retrospectiva_1 ),
+  originais_retrospectiva AS (
+  SELECT
+    DISTINCT *
+  FROM
+    originais_retrospectiva_3 ),
+  program_redux AS (
+  SELECT
+    DISTINCT id AS program_id,
+    media_kit_resource__poster AS program_poster_url,
+    title AS program_title
+  FROM
+    ${ref("conteudo_enriched", "program")}
+  WHERE
+    media_kit_resource__poster IS NOT NULL ),
+  base_originais_1 AS (
+  SELECT
+    userid,
+    program_id,
+    originais.program_title,
+    hours_watched,
+    date,
+    COUNT(DISTINCT program_id) OVER(PARTITION BY userid) AS qtd_originais_assistidos,
+    SUM(hours_watched) OVER(PARTITION BY userid) AS horas_assistidas_originais
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  INNER JOIN
+    originais_retrospectiva originais
+  USING
+    (program_id)
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      date) >= 2022 ),
+  base_originais_2 AS (
+  SELECT
+    userid,
+    program_id,
+    program_title,
+    SUM(hours_watched) AS hrs,
+    date,
+    qtd_originais_assistidos,
+    horas_assistidas_originais
+  FROM
+    base_originais_1
+  GROUP BY
+    userid,
+    program_id,
+    program_title,
+    date,
+    qtd_originais_assistidos,
+    horas_assistidas_originais ),
+  cluster_originais AS (
+  SELECT
+    userid AS globo_id,
+    program_id AS program_id_original_mais_assistido,
+    originais.program_title AS program_title_original_mais_assistido,
+    ROUND(hrs,0) AS hrs_original_mais_assistido,
+    date,
+    qtd_originais_assistidos,
+    ROUND(horas_assistidas_originais,0) AS horas_assistidas_originais,
+    program_poster_url AS program_poster_url_original_mais_assistido,
+    ano_assinatura,
+    grupo,
+    top1_program_title,
+    top1_program_id,
+    top1_program_poster_url,
+    top2_program_title,
+    top2_program_id,
+    top2_program_poster_url,
+    top3_program_title,
+    top3_program_id,
+    top3_program_poster_url,
+    genero_mais_consumido,
+    hrs_genero_mais_consumido,
+  FROM
+    base_originais_2 originais
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  RIGHT JOIN
+    generos_mais_assistidos_retrospectiva retro
+  ON
+    retro.globo_id = originais.userid QUALIFY ROW_NUMBER() OVER(PARTITION BY userid ORDER BY hrs DESC) = 1 ),
+  impression_redux AS (
+  SELECT
+    userid,
+    program_id,
+    CASE
+      WHEN program_subset = 'novelas' THEN 'Novelas'
+      WHEN program_subset = 'series' THEN 'Séries'
+      WHEN program_subset = 'filmes' THEN 'Filmes'
+      WHEN program_subset = 'movies' THEN 'Filmes'
+      WHEN program_subset = 'realities' THEN 'Realities'
+      WHEN program_subset = 'sports' THEN 'Esportes'
+      WHEN program_subset = 'news' THEN 'News'
+      WHEN program_subset = 'varieties' THEN 'Variedades'
+      WHEN program_subset = 'kids' THEN 'Kids'
+    ELSE
+    program_subset
+  END
+    AS program_subset,
+    hours_watched,
+    date
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      date) >= 2022
+    AND hours_watched >= 0.2
+    AND program_subset IN ('novelas',
+      'series',
+      'filmes',
+      'movies',
+      'realities',
+      'sports',
+      'news',
+      'varieties',
+      'kids') ),
+  base_subset AS (
+  SELECT
+    userid,
+    program_subset,
+    COUNT(DISTINCT program_id) AS qtd_program_por_subset,
+    SUM(hours_watched) AS hrs_por_subset
+  FROM
+    impression_redux
+  GROUP BY
+    userid,
+    program_subset QUALIFY ROW_NUMBER() OVER(PARTITION BY userid ORDER BY qtd_program_por_subset, hrs_por_subset DESC) = 1 ),
+  base_subset_conteudo AS (
+  SELECT
+    userid,
+    program_subset,
+    program_id,
+    SUM(hours_watched) AS hrs_por_program_do_subset_mais_assistido
+  FROM
+    impression_redux
+  INNER JOIN
+    base_subset
+  USING
+    (userid,
+      program_subset)
+  GROUP BY
+    userid,
+    program_subset,
+    program_id QUALIFY ROW_NUMBER() OVER(PARTITION BY userid, program_subset ORDER BY hrs_por_program_do_subset_mais_assistido DESC) = 1 ),
+  cluster_subset AS(
+  SELECT
+    DISTINCT userid AS globo_id,
+    program_subset AS subset_mais_assistido,
+    program_id AS program_id_subset_mais_assistido,
+    qtd_program_por_subset AS qtd_program_por_subset_mais_assistido,
+    hrs_por_subset AS hrs_por_subset_mais_assistido,
+    program_poster_url AS subset_mais_assistido_program_poster_url,
+    program_title AS subset_mais_assistido_program_title,
+    ano_assinatura,
+    grupo,
+    top1_program_title,
+    top1_program_id,
+    top1_program_poster_url,
+    top2_program_title,
+    top2_program_id,
+    top2_program_poster_url,
+    top3_program_title,
+    top3_program_id,
+    top3_program_poster_url,
+    genero_mais_consumido,
+    hrs_genero_mais_consumido,
+    program_id_original_mais_assistido,
+    program_title_original_mais_assistido,
+    program_poster_url_original_mais_assistido,
+    hrs_original_mais_assistido,
+    qtd_originais_assistidos,
+    horas_assistidas_originais,
+    hrs_por_program_do_subset_mais_assistido
+  FROM
+    base_subset_conteudo
+  INNER JOIN
+    base_subset
+  USING
+    (userid,
+      program_subset)
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  RIGHT JOIN
+    cluster_originais
+  ON
+    base_subset_conteudo.userid = cluster_originais.globo_id ),
+  lst_rec_retro_22_pers_genero_t3_1 AS (
+  SELECT
+    DISTINCT program_id,
+    content.program_title_id AS title_id,
+    content.program_title,
+    title_url_for_consumption,
+    program_description,
+    program_poster_url AS media_kit_resource__poster,
+    CONCAT(title_url_for_consumption,'?actionType=addTitleToMyList') AS url_add_minha_lista
+  FROM
+    ${ref("conteudo_enriched", "content")} content
+  LEFT JOIN
+    ${ref("raw", "Blocklist_de_Conteudos")} block
+  USING
+    (program_id)
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  WHERE
+    status = "published"
+    AND service_id != 6807
+    AND title_url_for_consumption IS NOT NULL
+    AND program_description IS NOT NULL
+    AND content.program_subset = "series"
+    AND block.program_id IS NULL ),
+  lst_rec_retro_22_pers_genero_t3_2 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY E1_rank_genero, E2_rank_conteudo) AS pre_rank_final,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, program_id ORDER BY E1_rank_genero, E2_rank_conteudo) AS rank_aux
+  FROM
+    e1_rec_retro_22_generos_assistidos
+  LEFT JOIN
+    e2_rec_retro_22_rank_conteudos_por_genero
+  USING
+    (genero)
+  LEFT JOIN
+    e3_lst_rec_conteudos_assistidos e3
+  USING
+    (globo_id,
+      program_id)
+  INNER JOIN
+    lst_rec_retro_22_pers_genero_t3_1
+  USING
+    (program_id)
+  WHERE
+    e3.globo_id IS NULL
+    AND e3.program_id IS NULL
+    AND genero IS NOT NULL
+    AND genero != "Erótico" QUALIFY rank_aux <= 1 ),
+  lst_rec_retro_22_pers_genero_t3 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY pre_rank_final) AS rank_final
+  FROM
+    lst_rec_retro_22_pers_genero_t3_2 QUALIFY rank_final <= 3 ),
+  lst_rec_pers_genero_t3_1 AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    lst_rec_retro_22_pers_genero_t3
+  WHERE
+    rank_final = 3 ),
+  lst_rec_pers_genero_t3 AS (
+  SELECT
+    DISTINCT globo_id,
+    program_title,
+    title_url_for_consumption,
+    url_add_minha_lista,
+    media_kit_resource__poster,
+    rank_final,
+    genero,
+    program_id,
+    title_id,
+    program_description,
+    globo_id IS NOT NULL AS personalizado
+  FROM
+    lst_rec_retro_22_pers_genero_t3
+  INNER JOIN
+    lst_rec_pers_genero_t3_1
+  USING
+    (globo_id)
+  WHERE
+    rank_final <= 3 ),
+  usuarios AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  UNION ALL
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("usuarios", "Free users")} ),
+  top_conteudos AS (
+  SELECT
+    program_id,
+    E1_rank_conteudos
+  FROM
+    ${ref("jornadas_mkt", "E1_conteudos_consumidos")} ),
+  pre_lista_rec_alt_retro22 AS (
+  SELECT
+    DISTINCT globo_id,
+    top_conteudos.program_id,
+    top_conteudos.E1_rank_conteudos
+  FROM
+    usuarios
+  LEFT JOIN
+    lst_rec_pers_genero_t3
+  USING
+    (globo_id)
+  CROSS JOIN
+    top_conteudos
+  WHERE
+    lst_rec_pers_genero_t3.globo_id IS NULL ),
+  rec_alt_retro22_t3 AS (
+  SELECT
+    DISTINCT globo_id,
+    program_id,
+    program_title_id AS title_id,
+    content.program_title,
+    title_url_for_consumption,
+    program_poster_url AS media_kit_resource__poster,
+    program_description,
+    CONCAT(title_url_for_consumption,'?actionType=addTitleToMyList') AS url_add_minha_lista,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY E1_rank_conteudos) AS rank_final
+  FROM
+    ${ref("conteudo_enriched", "content")} content
+  INNER JOIN
+    program_redux
+  USING
+    (program_id)
+  INNER JOIN
+    pre_lista_rec_alt_retro22
+  USING
+    (program_id)
+  LEFT JOIN
+    e3_lst_rec_conteudos_assistidos
+  USING
+    (globo_id,
+      program_id)
+  WHERE
+    status = "published"
+    AND title_url_for_consumption IS NOT NULL
+    AND program_description IS NOT NULL
+    AND e3_lst_rec_conteudos_assistidos.globo_id IS NULL
+    AND e3_lst_rec_conteudos_assistidos.program_id IS NULL QUALIFY rank_final <= 3 ),
+  lista_final_rec_retro_22 AS (
+  SELECT
+    globo_id,
+    program_title,
+    title_url_for_consumption,
+    url_add_minha_lista,
+    media_kit_resource__poster,
+    rank_final,
+    program_id,
+    title_id,
+    program_description
+  FROM
+    lst_rec_pers_genero_t3
+  UNION ALL
+  SELECT
+    globo_id,
+    program_title,
+    title_url_for_consumption,
+    url_add_minha_lista,
+    media_kit_resource__poster,
+    rank_final,
+    program_id,
+    title_id,
+    program_description
+  FROM
+    rec_alt_retro22_t3 ),
+  rec_padrao AS (
+  SELECT
+    globo_id,
+    program_id_1 AS rec_1_program_id,
+    rec_titulo_1 AS rec_1_titulo,
+    rec_url_1 AS rec_1_url,
+    rec_poster_url_1 AS rec_1_poster,
+    program_id_2 AS rec_2_program_id,
+    rec_titulo_2 AS rec_2_titulo,
+    rec_url_2 AS rec_2_url,
+    rec_poster_url_2 AS rec_2_poster,
+    program_id_3 AS rec_3_program_id,
+    rec_titulo_3 AS rec_3_titulo,
+    rec_url_3 AS rec_3_url,
+    rec_poster_url_3 AS rec_3_poster
+  FROM (
+    SELECT
+      globo_id,
+      program_title AS rec_titulo,
+      program_id,
+      url_add_minha_lista AS rec_url,
+      media_kit_resource__poster AS rec_poster_url,
+      rank_final
+    FROM
+      lista_final_rec_retro_22) PIVOT( MAX(program_id) program_id,
+      MAX(rec_titulo) rec_titulo,
+      MAX(rec_url) rec_url,
+      MAX(rec_poster_url) rec_poster_url FOR rank_final IN (1,
+        2,
+        3) ) ),
+  pre_gid_exass AS (
+  SELECT
+    *,
+    "ex_assinante" AS ass_ex_ass
+  FROM
+    gid_exass ),
+  base_ex_ass AS (
+  SELECT
+    * EXCEPT(ass_ex_ass),
+    COALESCE(ass_ex_ass, "Assinante") AS ass_ex_ass
+  FROM
+    rec_padrao
+  LEFT JOIN
+    pre_gid_exass
+  USING
+    (globo_id) ),
+  cluster_pre_final AS (
+  SELECT
+    globo_id,
+    ano_assinatura AS cadastro_ano_assinatura,
+    grupo AS cadastro_grupo,
+    ass_ex_ass AS cadastro_ass_ex_ass,
+    top1_program_id,
+    top1_program_title,
+    top1_program_poster_url,
+    top2_program_id,
+    top2_program_title,
+    top2_program_poster_url,
+    top3_program_id,
+    top3_program_title,
+    top3_program_poster_url,
+    subset_mais_assistido AS subset_mais_assistido_nome,
+    qtd_program_por_subset_mais_assistido AS subset_mais_assistido_qtd_programas,
+    hrs_por_subset_mais_assistido AS subset_mais_assistido_hrs,
+    program_id_subset_mais_assistido AS subset_mais_assistido_program_id,
+    subset_mais_assistido_program_title AS subset_mais_assistido_program_title,
+    hrs_por_program_do_subset_mais_assistido AS subset_mais_assistido_program_hrs,
+    subset_mais_assistido_program_poster_url AS subset_mais_assistido_program_poster_url,
+    qtd_originais_assistidos AS originais_consumidos_qtd,
+    horas_assistidas_originais AS originais_consumidos_hrs,
+    program_id_original_mais_assistido AS original_mais_assistido_program_id,
+    program_title_original_mais_assistido AS original_mais_assistido_program_title,
+    hrs_original_mais_assistido AS original_mais_assistido_hrs,
+    program_poster_url_original_mais_assistido AS original_mais_assistido_program_poster_url,
+    genero_mais_consumido AS genero_mais_consumido_nome,
+    hrs_genero_mais_consumido AS genero_mais_consumido_hrs,
+    Rec_1_program_id,
+    COALESCE(Rec_1_titulo,'Transplant: Uma Nova Vida') AS Rec_1_titulo,
+    COALESCE(Rec_1_url, 'https://globoplay.globo.com/transplant-uma-nova-vida/t/RzJ88NMPnw/') AS Rec_1_url,
+    COALESCE(Rec_1_poster, 'https://s2.glbimg.com/d8M4Qg_rZOq6XyAMUTiftQh6kFc=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2022/F/C/rz18Q3RH6pC0tvWw40lw/2022-2796-transplant-poster.jpg') AS Rec_1_poster,
+    Rec_2_program_id,
+    COALESCE(Rec_2_titulo, 'Walker') AS Rec_2_titulo,
+    COALESCE(Rec_2_url, 'http://globoplay.globo.com/walker/t/kPDbbckVzr/') AS Rec_2_url,
+    COALESCE(Rec_2_poster, 'ttps://s2.glbimg.com/qdLTI0RfqwkA5osSzkFU6VhAjxE=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2022/9/3/tsjBdDRAmoJgo1bzQYng/2021-2565-walker-t2-poster-globoplay.jpg') AS Rec_2_poster,
+    Rec_3_program_id,
+    COALESCE(Rec_3_titulo, 'Walker') AS Rec_3_titulo,
+    COALESCE(Rec_3_url, 'http://globoplay.globo.com/the-handmaids-tale-o-conto-da-aia/t/QDFNw11dPX/') AS Rec_3_url,
+    COALESCE(Rec_3_poster, 'https://s2.glbimg.com/M_hoiKRLj_vGyHj5ljXyCbseC20=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2022/9/C/KfbxV4TBSaLkRHt0BImQ/2022-2760-the-handmais-tale-poster.jpg') AS Rec_3_poster
+  FROM
+    cluster_subset
+  LEFT JOIN
+    base_ex_ass
+  USING
+    (globo_id) )
+SELECT
+  *
+FROM
+  cluster_pre_final
+WHERE
+  cadastro_grupo IS NOT NULL
+  AND top1_program_title IS NOT NULL
+  AND top1_program_poster_url IS NOT NULL
+  AND top2_program_title IS NOT NULL
+  AND top2_program_poster_url IS NOT NULL
+  AND top3_program_title IS NOT NULL
+  AND top3_program_poster_url IS NOT NULL
+  AND subset_mais_assistido_nome IS NOT NULL
+  AND subset_mais_assistido_qtd_programas IS NOT NULL
+  AND subset_mais_assistido_hrs IS NOT NULL
+  AND subset_mais_assistido_program_title IS NOT NULL
+  AND subset_mais_assistido_program_hrs IS NOT NULL
+  AND subset_mais_assistido_program_poster_url IS NOT NULL
+  AND genero_mais_consumido_nome IS NOT NULL
+  AND genero_mais_consumido_hrs IS NOT NULL
+  AND Rec_1_titulo IS NOT NULL
+  AND Rec_1_url IS NOT NULL
+  AND Rec_1_poster IS NOT NULL
+  AND Rec_2_titulo IS NOT NULL
+  AND Rec_2_url IS NOT NULL
+  AND Rec_2_poster IS NOT NULL
+  AND Rec_3_titulo IS NOT NULL
+  AND Rec_3_url IS NOT NULL
+  AND Rec_3_poster IS NOT NULL
+  AND subset_mais_assistido_qtd_programas >=1
+  AND subset_mais_assistido_hrs >=1
+  AND subset_mais_assistido_program_hrs >=1
+  AND genero_mais_consumido_hrs >=1
+  AND cadastro_grupo IN ('Ativo - com consumo',
+    'Cancelado - com consumo')

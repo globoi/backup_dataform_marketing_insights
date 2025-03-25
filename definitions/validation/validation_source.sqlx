@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  database: validation.database_export,
+  schema: validation.schema_export,
+  name: validation.table_name_export
+}

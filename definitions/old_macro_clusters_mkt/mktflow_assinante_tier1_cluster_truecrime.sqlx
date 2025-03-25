@@ -1,0 +1,40 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_truecrime'],
+  name: 'mktflow_assinante_tier1_cluster_truecrime',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--macro cluster tier 1 true crime
+--assinantes premium que consumiram pelo menos 20min qualquer um dos programas vod: O Caso Celso Daniel, Marielle, O Documentário, Gabriel Monteiro – Herói Fake, Flordelis: Questiona ou Adora, High: Confissões De Uma Traficante, Vítimas Digitais, Relatos do Front – A Outra Face Do Cartão Postal, Não Saia Hoje, Confronting a Serial Killer, Dr. Death: The Undoctored Story, SEDUCED: INSIDE THE NXIVM CULT, Linha Direta, Boate Kiss, cade o amarildo?, o caso Robinho, Rio-Paris: Voo 447, Vale o Escrito, Vale dos isolados, Mc daleste nos ultimos 180 dias.
+
+with genero_true_crime as (
+SELECT distinct g.name, c.program.title, c.program.id
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+where c.program.id in (16289,12265,23898,23265,20527,12603,20048,21502,19817,19920,19813,25113,24046,25644,28259,27327,26189,25211,26848)),
+
+consumo_em_genero_true_crime as (
+SELECT distinct a.userId as globo_id, 'consumo true crime' as base
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_true_crime b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+)
+
+SELECT 'named_user' as identifier_type, e.globo_id
+FROM consumo_em_genero_true_crime d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false
+
+

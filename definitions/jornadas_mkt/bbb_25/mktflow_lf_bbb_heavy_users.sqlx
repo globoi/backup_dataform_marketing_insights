@@ -1,0 +1,35 @@
+config {
+  type: "table",
+  name: "mktflow_lf_bbb_heavy_users",
+  schema: "jornadas_mkt",
+  tags: ['schedule_tag=jornadas_mkt_mktflow_lf_bbb_heavy_users'
+        ],
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_25",
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+        }
+    }
+}
+WITH maxsemana AS (
+  SELECT MAX(a.semana) AS ultima_semana
+  FROM ${ref('bbb_25','raiox_bbb_25_lf')} AS a 
+),
+
+base_final AS (
+  SELECT DISTINCT b.globo_id, b.semana
+  FROM ${ref('bbb_25','raiox_bbb_25_lf')} AS b
+  INNER JOIN ${ref('usuarios','free_users_all')} AS c
+    ON b.globo_id = c.globo_id
+  WHERE semana = ((
+      SELECT ultima_semana
+      FROM maxsemana) - 7)
+    AND cluster_bbb = '4. Heavy User' 
+)
+
+SELECT DISTINCT 'named_user' AS identifier_type, globo_id AS UUID
+FROM base_final

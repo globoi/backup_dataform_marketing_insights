@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_mosaico_bbb24_lf"],
+  name: 'mktflow_mosaico_bbb24_lf',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+select distinct globo_id_sessao as globo_id
+from ${ref("jornadas_mkt", "tapume_ao_vivo_nao_assinante")}
+where assinatura_sessao = 'nao_assinante'
+and eventLabel = 'nao_assinante'
+and eventAction like '%tapume.bbb-24-mosaico-bbb%'
+and globo_id_sessao is not null
+group by 1

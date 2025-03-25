@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-bd-vd-mdata-hdg-prd",
+  schema: "valiant_webmedia_metadata",
+  name: "programs",
+  description: ""
+}

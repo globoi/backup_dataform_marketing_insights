@@ -1,0 +1,275 @@
+config {
+  type: "table",
+  name: "base_todos_os_globo_ids",
+  schema: 'datacloud'
+}
+
+with base_geral as (
+  SELECT
+    distinct globoId as globo_id
+  FROM
+    ${ref('globoid_public', 'globoid_user_*')}
+  where
+    status = 'ACTIVE'
+    and _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', CURRENT_DATE -1)
+),
+base_gold as (
+  SELECT
+    ss.globo_id,
+    ss.object_id,
+    sd.product_name as nome_do_produto,
+    sd.billing_frequency as periodicidade,
+    date(sd.subscription_at) as subscription_at,
+    sd.purchase_channel as purchase_channel,
+    case
+      when pd.is_international = FALSE then 'nacional'
+      else 'internacional'
+    end as is_international,
+    sd.origin_id as id_origin,
+    sd.origin_name as name_origin
+  FROM
+    ${ref('sales_gold', 'last_subscription_state')} ss
+    JOIN ${ref('sales_gold', 'subscription_details')} sd ON ss.object_id = sd.id
+    JOIN ${ref('sales_gold', 'product_details')} pd ON sd.product_id = pd.id
+  WHERE
+    --DATE(ss.state_date) = CURRENT_DATE-1
+    --AND lower(ss.state) like '%active%'
+    LOWER(pd.name) LIKE '%globoplay%'
+),
+base2 as (
+  select
+    *
+  from
+    base_geral full
+    join base_gold using(globo_id)
+),
+base3 as (
+  select
+    *
+  from
+    base2
+    left join (
+      select
+        distinct globo_id,
+        tipo_assinante,
+        'Assinante'as tipo_usuario,
+        i.id_asset,
+        date(i.data_hora_compra) as dt_hr_compra,
+        i.canal_compra,
+        i.assinatura_gplay,
+        i.origin_id,
+        i.origin_name,
+        i.Produto_Contratado,
+        i.produto,
+        mais_canais,
+        telecine,
+        cartola as cartola_pro,
+        deezer,
+        discovery,
+        disney,
+        flatv,
+        giga,
+        lionsgate,
+        premiere,
+        star,
+        combate
+      from
+        ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} as b,
+        unnest(b.info) as i
+    ) using(globo_id)
+),
+base4 as(
+  select
+    distinct *
+  except(
+      tipo_assinante,
+      object_id,
+      nome_do_produto,
+      id_asset,
+      Produto_Contratado,
+      tipo_usuario
+    ),case
+      when object_id is not null then id_asset
+      else object_id
+    end as object_id,
+    case
+      when nome_do_produto is not null then Produto_Contratado
+      else nome_do_produto
+    end as nome_do_produto,
+    coalesce(tipo_usuario, "LF") as tipo_usuario,
+    COALESCE(tipo_assinante, "LF") AS tipo_assinante
+  from
+    base3
+),
+base5 as (
+  select
+    *
+  except(nome_do_produto, qtd_assinaturas),
+    case
+      when nome_do_produto is null then 'Sem produto associado'
+      else nome_do_produto
+    end as nome_do_produto,
+    ifnull(qtd_assinaturas, 0) as qtd_assinaturas
+  from
+    base4
+    left join (
+      SELECT
+        ss.globo_id,
+        count(distinct ss.object_id) as qtd_assinaturas
+      FROM
+        ${ref('sales_gold', 'last_subscription_state')} ss
+        JOIN ${ref('sales_gold', 'subscription_details')} sd ON ss.object_id = sd.id
+        JOIN ${ref('sales_gold', 'product_details')} pd ON sd.product_id = pd.id
+      WHERE
+        LOWER(pd.name) LIKE '%globoplay%' --AND (lower(ss.state) like '%active%' and subscription_status='Ativo')
+      group by
+        1
+    ) as ass using(globo_id)
+    left join (
+      select
+        distinct globo_id,
+        true as cartola_express
+      from
+        ${ref('analytics', 'd_account')}
+    ) using(globo_id)
+),
+base6 as (
+  select
+    distinct globo_id,
+    case
+      when object_id is null then id_asset
+    end as id_asset,
+    case
+      when dt_hr_compra is null then subscription_at
+      else dt_hr_compra
+    end as data_compra,
+    case
+      when nome_do_produto = 'Sem produto associado'
+      and tipo_usuario = 'Assinante' then Produto_Contratado
+      else nome_do_produto
+    end as nome_do_produto,
+    case
+      when periodicidade is null then produto
+      else periodicidade
+    end as periodicidade,
+    case
+      when canal_compra is null then purchase_channel
+      else canal_compra
+    end as canal_compra,
+    case
+      when assinatura_gplay is null then is_international
+      else assinatura_gplay
+    end as assinatura_gplay,
+    qtd_assinaturas,
+    case
+      when tipo_assinante = 'LF'
+      and qtd_assinaturas > 0 then 'Ex-Assinante'
+      else tipo_usuario
+    end as tipo_usuario,
+    tipo_assinante,
+    CASE
+      WHEN (
+        nome_do_produto = 'Globoplay'
+        or lower(nome_do_produto) like '%globoplay e%'
+      ) THEN TRUE
+      ELSE FALSE
+    END AS globoplay,
+    ifnull(mais_canais, false) as mais_canais,
+    ifnull(telecine, false) as telecine,
+    ifnull(cartola_pro, false) as cartola_pro,
+    ifnull(cartola_express, false) as cartola_express,
+    ifnull(deezer, false) as deezer,
+    ifnull(discovery, false) as discovery,
+    ifnull(disney, false) as disney,
+    ifnull(flatv, false) as flatv,
+    ifnull(giga, false) as giga,
+    ifnull(lionsgate, false) as lionsgate,
+    ifnull(premiere, false) as premiere,
+    ifnull(star, false) as star,
+    ifnull(combate, false) as combate,
+    case
+      when origin_id is null then id_origin
+      else origin_id
+    end as origin_id,
+    case
+      when origin_name is null then name_origin
+      else origin_name
+    end as origin_name
+  from
+    base5
+    left join (
+      select
+        globo_id,
+        i.id_asset,
+        i.Produto_Contratado
+      from
+        ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} as b,
+        unnest(b.info) as i
+    ) using(globo_id)
+),
+finaldc as (
+select
+  globo_id,
+  id_asset,
+  case
+    when tipo_usuario = 'Ex-Assinante' then null
+    else data_compra
+  end as data_compra,
+  nome_do_produto,
+  case
+    when tipo_usuario = 'Ex-Assinante' then null
+    else periodicidade
+  end as periodicidade,
+  case
+    when tipo_usuario = 'Ex-Assinante' then null
+    else canal_compra
+  end as canal_compra,
+  case
+    when assinatura_gplay_int = 'internacional' then 'internacional'
+    when globo_id='663be12a-b5ea-44fc-86d6-4a79d92aa354' then 'nacional' else assinatura_gplay
+  end as assinatura_gplay,
+  qtd_assinaturas,
+  tipo_usuario,
+  tipo_assinante,
+  CASE
+    WHEN (
+      nome_do_produto = 'Globoplay'
+      or lower(nome_do_produto) like '%globoplay e%'
+    ) THEN TRUE
+    ELSE FALSE
+  END AS globoplay,
+  mais_canais,
+  telecine,
+  cartola_pro,
+  cartola_express,
+  deezer,
+  discovery,
+  disney,
+  flatv,
+  giga,
+  lionsgate,
+  premiere,
+  star,
+  combate,
+  case
+    when (
+      nome_do_produto = 'Sem produto associado'
+      and tipo_assinante = 'Assinante'
+    ) then true
+    when tipo_usuario = 'Ex-Assinante' then true
+    when tipo_usuario = 'LF' then true
+    else false
+  end as sem_produto_associado,
+  origin_id,
+  origin_name
+from
+  base6
+  left join (
+    select
+      globo_id,
+      'internacional' as assinatura_gplay_int
+    from
+      ${ref('internacional', 'base_lf_internacional')}
+  ) as i using(globo_id))
+    select * except(assinatura_gplay), case when globo_id='663be12a-b5ea-44fc-86d6-4a79d92aa354' then 'nacional' else assinatura_gplay end as assinatura_gplay
+  from finaldc

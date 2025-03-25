@@ -1,0 +1,67 @@
+config {
+  type: "table",
+  name: "lista_recomendacao_jaccard",
+  schema: "consumo"
+}
+
+WITH
+jaccard AS (
+    SELECT
+        program_id,
+        proximo_program_id,
+        proximo_program_title,
+        proximo_url_for_consumption,
+        indice_jaccard,
+        rank_jaccard
+    FROM 
+        ${ref("consumo", "jaccard_indice")}
+),
+
+histcon AS (
+    SELECT
+        globo_id,
+        program_id AS proximo_program_id,
+    FROM ${ref("consumo", "novela_history")}
+    WHERE horas_consumidas > 0.25
+    GROUP BY globo_id, program_id
+    UNION ALL
+    SELECT
+        globo_id,
+        program_id AS proximo_program_id,
+    FROM ${ref("consumo", "series_history")}
+    WHERE horas_consumidas > 0.25
+    GROUP BY globo_id, program_id
+),
+
+data_prep AS (
+    SELECT
+        userid AS globo_id,
+        timestamp,
+        hours_watched,
+        program_id,
+        program_title,
+        url_for_consumption,
+        program_subset
+    FROM
+        ${ref("consumo", "data_prep")}
+    WHERE
+        proximo_program_id IS NULL
+
+),
+
+df AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY indice_jaccard DESC) AS rank_jaccard_globo_id
+    FROM
+        data_prep
+        LEFT JOIN jaccard USING(program_id) 
+        LEFT JOIN histcon hist
+        USING(proximo_program_id, globo_id)
+    WHERE
+        hist.proximo_program_id IS NULL
+        AND hist.globo_id IS NULL
+    QUALIFY
+        rank_jaccard_globo_id <= 5
+)
+SELECT * FROM df ORDER BY globo_id

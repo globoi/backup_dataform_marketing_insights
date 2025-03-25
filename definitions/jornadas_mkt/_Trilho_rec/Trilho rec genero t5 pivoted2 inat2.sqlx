@@ -1,0 +1,286 @@
+config {
+  type: "table",
+  name: "Trilho rec pers por genero t5 inat2",
+  schema: "trilho"
+}
+
+--tabela desativada
+--tags: ['trilho_rec', 'schedule_tag=trilho_Trilho_rec_pers_por_genero_t5_inat2']
+
+WITH raiox_base AS (
+  SELECT
+    globo_id,
+    MAX(semana) AS max_of_semana
+  FROM
+    ${ref('usuarios', 'RaioXAssinante')}
+  GROUP BY globo_id
+)
+
+, raiox_base_2 AS (
+  SELECT
+    globo_id,
+    MAX(semana) AS max_of_semana
+  FROM
+    ${ref('usuarios', 'RaioXAssinante')}
+  WHERE Cluster_Conteudo_Mais_Assistido != 'Sem_Consumo_Suficiente'
+  GROUP BY globo_id
+  
+)
+
+, raiox_tratada AS (
+  SELECT
+    rass.globo_id,
+    rass.Cluster_Conteudo_Mais_Assistido, 
+    rass.Cluster_Engajamento,
+    rass.perfil_periodo_do_dia,
+    rass.semana,
+    rbase.max_of_semana
+  FROM 
+    ${ref('usuarios', 'RaioXAssinante')} rass
+  INNER JOIN
+    raiox_base rbase
+  ON rass.globo_id = rbase.globo_id AND rass.semana = rbase.max_of_semana
+)
+
+, raiox_tratada_2 AS (
+  SELECT
+    rass.globo_id,
+    rass.Cluster_Conteudo_Mais_Assistido, 
+    rass.Cluster_Engajamento,
+    rass.perfil_periodo_do_dia,
+    rass.semana,
+    rbase.max_of_semana
+  FROM 
+    ${ref('usuarios', 'RaioXAssinante')} rass
+  INNER JOIN
+    raiox_base_2 rbase
+  ON rass.globo_id = rbase.globo_id AND rass.semana = rbase.max_of_semana
+)
+
+, base_email_45_dias AS (
+  SELECT DISTINCT
+    globo_id
+  FROM
+    ${ref('comunicacao', 'ultima_comunicacao_assinante')}
+  WHERE DATE_DIFF(CURRENT_DATE(), DATE(Data_Abertura_Ultimo_Email), DAY) <= 45
+)
+
+
+, base_email_trilho AS (
+  SELECT DISTINCT
+    step.globo_id
+  FROM
+    ${ref('trilho', 'base_bruta_inativos')}
+  INNER JOIN 
+    ${ref('comunicacao', 'step_comunicacao')} step
+  USING (globo_id)
+  INNER JOIN  
+    raiox_tratada rtrat1
+  USING (globo_id)
+  LEFT JOIN 
+    raiox_tratada_2 rtrat2
+  USING (globo_id)
+  INNER JOIN 
+    base_email_45_dias
+  USING (globo_id)
+  WHERE cluster_inatividade IN ('Inativo a mais de 90 dias', 'Inativo entre 30 e 44 dias', 'Inativo entre 45 e 90 dias') AND COALESCE(rtrat1.Cluster_Conteudo_Mais_Assistido, rtrat2.Cluster_Conteudo_Mais_Assistido) IN ('Novelas', 'Series')
+)
+
+, E3_Trilho_Rec_Conteudos_Assistidos_inat2 AS (
+  SELECT DISTINCT
+    globo_id,
+    program_id
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  INNER JOIN
+    base_email_trilho
+  USING (globo_id)
+  WHERE hours_watched >= 0.25
+)
+
+
+, E1_Trilho_Rec_Generos_Assistidos_inat2_step1 AS (
+  SELECT
+    userId AS globo_id,
+    date,
+    hours_watched,
+    program_id,
+    program_subset,
+    is_live
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  WHERE
+    DATE_DIFF(CURRENT_DATE(), date, DAY) <= 90 
+) 
+
+, E1_Trilho_Rec_Generos_Assistidos_inat2_step2 AS (
+  SELECT
+    *,
+    CASE 
+      WHEN DATE_DIFF(CURRENT_DATE(), date, DAY) <= 15
+      THEN 5
+      WHEN DATE_DIFF(CURRENT_DATE(), date, DAY) <= 30
+      THEN 2
+      ELSE 1
+    END AS peso
+  FROM
+    E1_Trilho_Rec_Generos_Assistidos_inat2_step1
+)
+
+, E1_Trilho_Rec_Generos_Assistidos_inat2_step3 AS (
+  SELECT
+    *,
+    (peso * hours_watched) AS horas_peso
+  FROM 
+    E1_Trilho_Rec_Generos_Assistidos_inat2_step2
+  INNER JOIN 
+    base_email_trilho 
+  USING (globo_id)
+  LEFT JOIN
+     ${ref('jornadas_mkt', 'genero_todas_combinacoes')}
+  USING (program_id)
+  WHERE 
+    program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+    AND NOT is_live
+    AND program_subset NOT IN ('news', 'disclosure', 'live', 'lutas', 'globo_negocios')
+    AND hours_watched >= 0.25
+)
+
+, E1_Trilho_Rec_Generos_Assistidos_inat2_step4 AS (
+  SELECT DISTINCT
+    globo_id,
+    genero,
+    SUM(horas_peso) AS horas_peso_sum,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY SUM(horas_peso) DESC) AS E1_rank_genero
+  FROM
+    E1_Trilho_Rec_Generos_Assistidos_inat2_step3
+  WHERE 
+    genero IS NOT NULL AND genero != 'Erótico' 
+  GROUP BY globo_id, genero
+  HAVING horas_peso_sum >= 0.25
+)
+
+
+, E2_Trilho_Rec_Rank_Conteudos_Por_Genero_inat2_step1 AS (
+  SELECT DISTINCT 
+    program_id
+  FROM
+     ${ref('conteudo_enriched', 'content')}
+  WHERE
+    service_id != 6807 
+    AND program_id IN (13653,13153,20506,12770,20528,13052,10816,3292,11091,13403,20534,13022,13053,20535,2542,13887,10510,2697,2656,2512,19994,12991,13575,11613,2536,11350,13652,9272,9282,3470,20523,13533,13159,13139,9323,10904,13576,9273,13024,13938,3547,4379,7306,10319,13407,13578,11213,13086,5221,14172,14198,11672,13398,5075,5218,14171,5027,13510,9899,13511,13399,17070,12029,13509,15548,13512,16197) 
+    AND status = 'published'
+)
+
+, E2_Trilho_Rec_Rank_Conteudos_Por_Genero_inat2_step_2 AS (
+  SELECT
+    program_id, 
+    genero,
+    ROW_NUMBER() OVER (PARTITION BY genero ORDER BY COUNT(DISTINCT globo_id) DESC) AS E2_rank_conteudo
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  INNER JOIN 
+    ${ref('jornadas_mkt', 'genero_todas_combinacoes')}
+  USING(program_id)
+  INNER JOIN E2_Trilho_Rec_Rank_Conteudos_Por_Genero_inat2_step1 
+  USING (program_id)
+  WHERE
+    program_id NOT IN (12082, 16280, 16281, 14907, 16284) AND
+    DATE_DIFF(CURRENT_DATE(), date, DAY) <=60 
+    AND genero IS NOT NULL
+    AND genero != 'Erótico'
+  GROUP BY program_id, genero
+)
+
+, Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_1 AS (
+  SELECT DISTINCT
+    id AS program_id,
+    media_kit_resource__poster
+  FROM
+    ${ref('conteudo_enriched', 'program')}
+  WHERE media_kit_resource__poster IS NOT NULL
+)
+
+, Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_2 AS (
+  SELECT DISTINCT 
+    program_id,
+    cnt.program_title_id AS title_id,
+    cnt.program_title,
+    title_url_for_consumption,
+    media_kit_resource__poster
+  FROM 
+    ${ref('conteudo_enriched', 'content')} cnt
+  LEFT JOIN
+    ${ref("raw", "Blocklist_de_Conteudos")} block
+  USING (program_id)
+  INNER JOIN Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_1
+  USING (program_id)
+  WHERE 
+    block.program_id IS NULL
+    AND status = 'published'
+    AND service_id != 6807
+    AND title_url_for_consumption IS NOT NULL
+)
+
+, Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_3 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY E1_rank_genero ASC, E2_rank_conteudo ASC) AS pre_rank_final,
+    ROW_NUMBER() OVER (PARTITION BY globo_id, program_id ORDER BY E1_rank_genero ASC, E2_rank_conteudo ASC) AS rank_aux,
+  FROM
+    E1_Trilho_Rec_Generos_Assistidos_inat2_step4
+  LEFT JOIN
+    E2_Trilho_Rec_Rank_Conteudos_Por_Genero_inat2_step_2
+  USING (genero)
+  LEFT JOIN 
+    E3_Trilho_Rec_Conteudos_Assistidos_inat2 e3_trilho
+  USING (globo_id, program_id) 
+  INNER JOIN 
+    Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_2
+  USING (program_id)
+  WHERE 
+    e3_trilho.globo_id IS NULL AND e3_trilho.program_id IS NULL
+    AND genero IS NOT NULL
+    AND genero != 'Erótico'
+)
+
+, Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_4 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY pre_rank_final ASC) AS rank_final
+  FROM
+    Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_3
+  WHERE 
+    rank_aux >= 2
+  QUALIFY rank_final <= 10
+)
+
+, Trilho_Rec_Pers_por_Genero_T5_inat2_step_1 AS (
+  SELECT DISTINCT
+    globo_id
+  FROM
+    Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_4
+  WHERE
+    rank_final >= 3
+)
+
+SELECT
+  globo_id,
+  program_title,
+  title_url_for_consumption,
+  media_kit_resource__poster,
+  rank_final,
+  genero,
+  program_id,
+  title_id,
+  IF(globo_id IS NOT NULL, TRUE, FALSE) AS personalizado
+FROM
+  Trilho_Recomendacao_Personalizada_por_Genero_T10_inat2_step_4
+INNER JOIN
+  Trilho_Rec_Pers_por_Genero_T5_inat2_step_1
+USING (globo_id)
+WHERE
+  rank_final <= 3
+
+
+

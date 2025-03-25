@@ -1,0 +1,95 @@
+config {
+  type: 'table',
+  name: 'recomendacao_crm',
+  schema: 'consumo',
+  description: '',
+  columns: {
+  }
+}
+
+---tabela desativada
+--- tags: ['consumo_staging_2',
+---        "schedule_tag=consumo_recomendacao_crm"
+---  ]
+
+WITH content AS (
+  SELECT
+  id AS mediaid,
+  program_title_id AS titleId
+  FROM ${ref("conteudo_enriched", "content")}
+),
+
+program AS (
+  SELECT
+  title_id AS titleId,
+  id AS program_id
+  FROM ${ref("conteudo_enriched", "program")}
+),
+
+base_series AS (
+  SELECT
+  DISTINCT
+  globo_id,
+  program_id,
+  program_title,
+  COUNT(DISTINCT mediaid) OVER (PARTITION BY globo_id, program_id) AS quantidade_episodios,
+  COUNT(DISTINCT terminou_serie) OVER (PARTITION BY globo_id, program_id) = 2 AS terminou_conteudo
+  FROM ${ref("consumo", "series_history")}
+  WHERE terminou_episodio
+),
+
+base_novela AS (
+  SELECT
+  DISTINCT
+  globo_id,
+  program_id,
+  program_title,
+  COUNT(DISTINCT mediaid) OVER (PARTITION BY globo_id, program_id) AS quantidade_episodios,
+  COUNT(DISTINCT terminou_novelas) OVER (PARTITION BY globo_id, program_id) = 2 AS terminou_conteudo
+  FROM ${ref("consumo", "novela_history")}
+  WHERE terminou_episodio
+),
+
+base_filmes AS (
+  SELECT
+  *
+  FROM ${ref("consumo", "filmes_history")}
+  INNER JOIN content USING (mediaid)
+),
+
+base_unida AS (
+  SELECT *
+  FROM program
+  INNER JOIN (
+    SELECT * FROM base_series
+    UNION ALL
+    SELECT * FROM base_novela
+  )
+  USING (program_id)
+),
+
+base1 AS (
+  SELECT *,
+  CASE
+    WHEN experiment LIKE '%GLOBO-PLAY-TITLES-user%' THEN 'Pra Você'
+    WHEN experiment LIKE '%GLOBOPLAY-TITLES-DISCOVER-user%' THEN 'Descubra'
+    WHEN experiment LIKE '%GLOBOPLAY-TITLES-HOME-CB-item%' THEN 'Porque Você Assistiu'
+    WHEN experiment LIKE '%GLOBOPLAY-TITLES-HOME-NO-BBB-user%' THEN 'Você Pode Gostar'
+    WHEN experiment LIKE '%GLOBOPLAY-TITLES-item%' THEN 'Quem Viu Também Viu'
+  END AS experiment_tratado,
+  DATE(timestamp) AS timestamp_data
+  FROM ${ref("consumo_clean", "recomendacao")}
+  WHERE table_suffix_date >= '2019-01-01'
+),
+
+base AS (
+  SELECT *,
+  ROW_NUMBER() OVER (PARTITION BY globo_id, experiment_tratado ORDER BY timestamp_data DESC) AS Mais_Recente,
+  ROW_NUMBER() OVER (PARTITION BY globo_id, timestamp_data ORDER BY score DESC) AS score_dia
+  FROM base1
+)
+
+SELECT * FROM base
+LEFT JOIN base_unida USING (titleId, globo_id)
+LEFT JOIN base_filmes USING (titleId, globo_id)
+WHERE base.Mais_Recente <= 10

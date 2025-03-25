@@ -1,0 +1,41 @@
+config {
+  type: 'table',
+  tags: [],
+  name: 'mktflow_projeto_gnt_cluster_propensao_2',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--CREATE OR REPLACE TABLE `gglobo-mkt-ins-hdg-prd.campanhas_mkt.mktflow_projeto_gnt_cluster_propensao` as
+
+WITH
+  -- etapa com os filtros de negócio principal
+  consumo_variedades as (
+
+WITH tier1_variaties as (
+select distinct globo_id, 'tier1 variedades' as base
+from ${ref("macro_clusters_mkt", "mktflow_assinante_tier1_cluster_variedades")}
+),
+
+ex_ass_variaties as (
+select distinct o.globo_id, 'lf variedades' as base
+from ${ref("macro_clusters_mkt", "mktflow_lf_cluster_variedades")} o
+inner join ${ref("sales_enriched", "asset_v2")} i
+on o.globo_id = i.globo_id)
+
+select * from tier1_variaties
+union distinct
+select * from ex_ass_variaties
+  )
+
+  SELECT b.globo_id, b.grupo
+  FROM consumo_variedades as a
+  INNER JOIN ${ref("experimentos", "projeto_gnt_cluster_propensao_relacao_grupos")} as b
+  on a.globo_id = b.globo_id

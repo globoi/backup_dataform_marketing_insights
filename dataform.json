@@ -1,0 +1,10 @@
+{
+    "warehouse": "bigquery",
+    "defaultSchema": "temp",
+    "defaultDatabase": "gglobo-mkt-ins-hdg-dev",
+    "assertionSchema": "dataform_assertions",
+    "vars": {
+        "foundationDatabase": "gglobo-foundation-psd-hdg-prd"
+    },
+    "defaultLocation": "US"
+}

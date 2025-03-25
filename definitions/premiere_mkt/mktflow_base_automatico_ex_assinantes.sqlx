@@ -1,0 +1,31 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=premiere_mkt_mktflow_base_automatica_ex_assinantes', 'schedule_cron=0 13 * * *'],
+    name: 'mktflow_base_automatica_ex_assinantes',
+    schema: 'premiere_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "premiere_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT globoid AS globo_id,
+  Dia,
+  Produto,
+  Canal,
+  Preco,
+  Forma_Pagamento,
+  Clube
+FROM
+  -- estrutura-esportes.Time_Inteligencia.CRM_ExAssinantes_Premiere
+  ${ref("Time_Inteligencia", "CRM_ExAssinantes_Premiere")}
+WHERE
+  LENGTH(globoid) > 0
+  AND DATE(Dia) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)

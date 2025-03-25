@@ -1,0 +1,19 @@
+config {
+  type: 'table',
+  name: 'genero_todas_combinacoes',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_AcabouSeries','schedule_tag=jornadas_mkt_genero_todas_combinacoes'],
+  description: ''
+}
+
+
+SELECT 
+  DISTINCT
+  genero,
+  program_id,
+  program_title,
+FROM ${ref("conteudo_enriched", "content")},
+UNNEST(genre_names) AS genero
+WHERE ARRAY_LENGTH(genre_names) >=1
+
+

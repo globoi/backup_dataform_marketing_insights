@@ -1,0 +1,44 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=gshow_mkt_mktflow_base_automatica_acesso_gshow_120d', 'schedule_cron=0 7 * * 3'],
+    name: 'mktflow_base_automatica_acesso_gshow_120d',
+    schema: 'gshow_mkt',
+    description: '',
+    columns: {},
+    
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "gshow_mkt"
+        }
+    }
+}
+
+SELECT DISTINCT
+userId as globo_id
+FROM ${ref("gshow", "common_sessions_*")} , unnest(hits) as h
+--`gglobo-horizon-data-hdg-prd.gshow.common_sessions_*`
+WHERE (_TABLE_SUFFIX BETWEEN
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 120 DAY))
+    AND
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+)
+AND provider = 'cadun'
+AND userid is not null
+and h.url LIKE '%gshow.globo.com%'
+
+UNION DISTINCT
+
+SELECT DISTINCT
+userId as globo_id
+FROM ${ref("gshow", "common_sessions_*")} , unnest(hits) as h
+--`gglobo-horizon-data-hdg-prd.gshow.common_sessions_*`
+WHERE (_TABLE_SUFFIX BETWEEN
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 120 DAY))
+    AND
+    FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+)
+AND provider = 'cadun'
+AND userid is not null
+AND h.url LIKE '%gshow.globo.com/tudo-mais/'

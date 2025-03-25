@@ -1,0 +1,105 @@
+config {
+  type: "table",
+  name: "base_consumo_semanal_mais_canais_reduzida",
+  schema: "usuarios",
+  tags: ["usuarios_staging_4",
+        "schedule_tag=usuarios_base_consumo_semanal_mais_canais_reduzida"
+  
+  ]
+}
+
+WITH
+
+dados_usuarios_canais AS (
+    SELECT
+        DISTINCT *
+    FROM
+        ${ref("usuarios","dados_usuarios_assinantes")}
+    WHERE
+        mais_canais
+),
+
+consumo_quebrado_usuarios_mais_canais AS (
+    SELECT
+        userid AS globo_id,
+        DATE(`date`) AS Data_Consumo,
+        DATE_TRUNC(`date`, WEEK(MONDAY)) AS Data_Semana,
+        program_id,
+        program_title,
+        channel_title,
+        hours_watched AS Horas,
+        is_live
+    FROM
+        dados_usuarios_canais du
+        LEFT JOIN ${ref("consumo_enriched","impression")} imp
+        ON du.globo_id = imp.userid
+    WHERE
+        `date`> '2020-08-31'
+),
+
+consumo_semanal_usuarios_mais_canais AS (
+    SELECT
+        Data_Semana,
+        globo_id,
+        program_id,
+        program_title,
+        cq.channel_title,
+        Categoria_Tratada,
+        is_live,
+        SUM(Horas) AS Horas,
+        COUNT(Data_Consumo) AS Qtd_Plays,
+        COUNT(DISTINCT(Data_Consumo)) AS Qtd_Dias
+    FROM
+        consumo_quebrado_usuarios_mais_canais cq
+        LEFT JOIN ${ref("conteudo", "acervo")} ag
+        ON cq.program_id = ag.id
+    GROUP BY
+        Data_Semana,
+        globo_id,
+        program_id,
+        program_title,
+        channel_title,
+        Categoria_Tratada,
+        is_live
+),
+
+base_consumo_semanal_mais_canal_total AS (
+    SELECT
+        * EXCEPT(Horas),
+        Horas AS Horas_Semana,
+        CASE
+            WHEN program_id IN (9095,11378, 12995) THEN 'Live TVG e Futura'
+            WHEN program_id = 12217 THEN 'Combate'
+            WHEN program_id = 12117 THEN 'Premiere'
+            WHEN Categoria_Tratada = 'Coprodução/Original' THEN 'Vod Globoplay'
+            WHEN Categoria_Tratada = 'Combate OTT' THEN 'Combate'
+            WHEN channel_title IN (
+                'BIS','Bis OTT','Canal Brasil','Canal Brasil OTT','Canal Off','GloboNews',
+                'GloboNews OTT','Gloob','Gloob OTT','Gloobinho','Gloobinho OTT','GNT','GNT OTT',
+                'Mais Globosat','Mais Globosat OTT','Megapix 2','Megapix OTT','Multishow','Multishow OTT',
+                'OFF OTT','Philos OTT','SporTV','SporTV 2','SporTV 3','SporTV OTT',
+                'Studio Universal','Studio Universal OTT','SYFY','SyFy OTT','Universal','Universal OTT',
+                'VIVA','Viva OTT') AND is_live THEN 'Live + Canais'
+            WHEN channel_title IN (
+                'BIS','Bis OTT','Canal Brasil','Canal Brasil OTT','Canal Off','GloboNews',
+                'GloboNews OTT','Gloob','Gloob OTT','Gloobinho','Gloobinho OTT','GNT','GNT OTT',
+                'Mais Globosat','Mais Globosat OTT','Megapix 2','Megapix OTT','Multishow','Multishow OTT',
+                'OFF OTT','Philos OTT','SporTV','SporTV 2','SporTV 3','SporTV OTT',
+                'Studio Universal','Studio Universal OTT','SYFY','SyFy OTT','Universal','Universal OTT',
+                'VIVA','Viva OTT') AND NOT is_live THEN 'Vod + Canais'
+            ELSE 'Vod Globoplay'
+        END AS Tipo_Conteudo
+    FROM
+        consumo_semanal_usuarios_mais_canais
+),
+
+base_consumo_semanal_mais_canais_reduzida AS (
+    SELECT
+        *
+    FROM
+        base_consumo_semanal_mais_canal_total
+    WHERE
+        DATE_SUB(CURRENT_DATE(), INTERVAL 35 DAY) <= Data_Semana
+)
+
+SELECT * FROM base_consumo_semanal_mais_canais_reduzida

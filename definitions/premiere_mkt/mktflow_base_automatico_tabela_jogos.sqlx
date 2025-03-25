@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=premiere_mkt_mktflow_base_automatica_tabela_jogos', 'schedule_cron=30 6 * * *'],
+    name: 'mktflow_base_automatica_tabela_jogos',
+    schema: 'premiere_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "premiere_mkt"
+        }
+    }
+}
+
+SELECT
+  *
+FROM
+--   estrutura-esportes.Time_Inteligencia.CRM_Tabela_Jogos
+${ref("Time_Inteligencia", "CRM_Tabela_Jogos")}

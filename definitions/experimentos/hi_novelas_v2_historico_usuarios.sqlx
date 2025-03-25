@@ -1,0 +1,49 @@
+config {
+  type: 'table',
+  name: 'hi_novelas_v2_historico_usuarios',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+
+-- CREATE OR REPLACE TABLE `gglobo-mkt-ins-hdg-prd.experimentos.hi_novelas_v2_historico_usuarios` AS 
+
+-- Histórico de usuário por grupo por semana a partir da data de inicio do experimento, filtrando noveleiros desengajados na plataforma
+
+
+WITH
+  raiox_tratado AS (
+  SELECT
+    globo_id,
+    semana,
+    MAX(total_horas) AS total_horas_tratado
+  FROM
+    ${ref("usuarios", "RaioXAssinante")}
+  WHERE
+    semana BETWEEN '2023-05-29' AND DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7 -- pegar as semanas do inicio do experimento até a ultima semana fechada
+    AND Cluster_Conteudo_Mais_Assistido = 'Novelas'
+  GROUP BY
+    globo_id,
+    semana
+  HAVING
+    total_horas_tratado <= (1.8 * 7) -- garantir a regra de desengajamento da plataforma de <=1,8h por dia (*7 para semana)
+  )
+
+SELECT
+  aa.globo_id,
+  bb.grupo_n,
+  aa.semana as semana_ref,
+  DATE_ADD(aa.semana, INTERVAL 7 DAY) as semana_participacao
+FROM
+  raiox_tratado AS aa
+INNER JOIN 
+  ${ref("experimentos", "hi_novelas_v2_relacao_grupos")} as bb
+ON
+  aa.globo_id = bb.globo_id
+
+
+
+
+

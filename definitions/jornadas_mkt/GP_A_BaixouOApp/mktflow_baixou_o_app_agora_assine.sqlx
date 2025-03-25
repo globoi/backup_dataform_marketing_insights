@@ -1,0 +1,23 @@
+config {
+  type: "table",
+  name: "mktflow_baixou_o_app_agora_assine",
+  schema: "jornadas_mkt",
+  tags: ["GP_A_BaixouOApp",'schedule_tag=jornadas_mkt_mktflow_baixou_o_app_agora_assine']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH impression_final AS (
+SELECT i.userid as globo_id,
+       f.country_code,
+FROM ${ref("usuarios", "free_users_all")} AS f
+JOIN ${ref("usuarios", "first_play_app")} AS i 
+ON f.globo_id = i.userid 
+AND TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), i.timestamp, DAY) <= 1
+)
+SELECT *,
+      CURRENT_DATE() AS dt_proc
+FROM impression_final

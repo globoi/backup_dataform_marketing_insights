@@ -1,0 +1,47 @@
+config {
+    type: "incremental",
+    name: "mktflow_carrinho_abandonado",
+    schema: "jornadas_mkt",
+    tags: ["jornadas_mkt", 'schedule_tag=jornadas_mkt_mktflow_carrinho_abandonado',
+        'schedule_cron=0 */2 * * *'
+    ],
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            tags: "jornadas_mkt",
+            owner: "martech"
+        }
+    }
+}
+
+WITH payload_data AS (
+SELECT
+    context,
+    event_date,
+    JSON_VALUE(PARSE_JSON(payload), "$.payload.globoId") AS globoId,
+    JSON_EXTRACT(payload, "$.payload.basicUserInfo.email") AS email,
+    JSON_EXTRACT(payload, "$.payload.portfolios[0].portfolioSlug") AS portfolioSlug,
+    JSON_EXTRACT(payload, "$.payload.portfolios[0].name") AS portfolioName,
+    -- Explode o array de history para capturar a data com status ABANDONED
+    ARRAY(
+      SELECT AS STRUCT 
+        JSON_EXTRACT(history_entry, "$.date") AS date,
+        JSON_EXTRACT(history_entry, "$.status") AS status
+      FROM
+        UNNEST(JSON_EXTRACT_ARRAY(payload, "$.payload.history")) AS history_entry
+    ) AS history_entries
+FROM
+   `gglobo-mkt-ins-hdg-prd.jornadas_mkt.passo2_carrinho`
+)
+SELECT
+  globoId,
+  email,
+  portfolioSlug,
+  portfolioName,
+  context,
+  event_date
+FROM
+  payload_data
+WHERE
+    portfolioSlug is not null
+    

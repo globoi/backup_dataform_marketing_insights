@@ -1,0 +1,65 @@
+config {
+    type: "table",
+    schema: 'jornadas_mkt',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_jornada_cross_bbb_24_gplay_ass"
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "jornadas_mkt",
+            owner: "martech"
+        }
+    },
+    description: 'Tabela com os dados de e-mail dos usuários que foram impactados pela jornada cross do bbb 24.',
+    columns: {
+        email_send_id: 'Código do e-mail enviado',
+        subscriber_id: 'O número de identificação do assinante afetado. Esse número representa o ID exclusivo para cada registro de assinante.',
+        globo_id: 'Código que identifica o usuário.',
+        job_id: 'Número de identificação do job para o e-mail enviado.',
+        activity_or_email_name: 'Nome da atividade ou e-mail',
+        email_or_activity_name: 'Nome do email ou atividade',
+        email_id: 'Número de identificação do e-mail para o job.',
+        email_name: 'O nome do e-mail enviado pelo job.',
+        email_subject: 'O assunto do e-mail enviado.',
+        journey_id: 'O identificador exclusivo da jornada. Existem um ou mais VersionIDs associados a um JourneyID.',
+        journey_name: 'Nome da jornada',
+        activity_id: 'O identificador exclusivo da atividade.',
+        activity_name: 'O nome da atividade.',
+        send_date: 'Data da atividade',
+        open_date: 'Data de abertura do email',
+        click_date: 'Data e hora do clique',
+    }
+}
+
+WITH
+  jornada_ass AS (
+  SELECT
+    DISTINCT email_send_id,
+    SubscriberID AS subscriber_id,
+    GLOBO_ID AS globo_id,
+    CAST(JobID AS STRING) AS job_id,
+    ActivityOrEmailName AS activity_or_email_name,
+    EmailOrActivityName AS email_or_activity_name,
+    EmailID AS email_id,
+    EmailName AS email_name,
+    EmailSubject AS email_subject,
+    JourneyID AS journey_id,
+    JourneyName AS journey_name,
+    ActivityID AS activity_id,
+    ActivityName AS activity_name,
+    send_date,
+    open_date,
+    click_date
+  FROM
+    ${ref('mkt_enriched', 'email_send')}
+  WHERE
+    date >= "2024-02-04"
+    AND (LOWER(ActivityOrEmailName) LIKE '%cross%'
+      AND JourneyName='GP_JORN_CROSS-BBB-ASS-2024')
+  ORDER BY
+    send_date ASC)
+SELECT
+  *
+FROM
+  jornada_ass

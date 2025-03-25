@@ -1,0 +1,54 @@
+config {
+    type: "table",
+    schema: "combate_mkt",
+    name: "sms_logs",
+    tags: ["combate_mkt",
+        "schedule_tag=combate_mkt_sms_logs",
+        "schedule_cron=0 10 * * *",
+        "schedule_retry=3"
+    ],
+    bigquery: {
+        labels: {
+            tier: "clean",
+            source: "mktcloud",
+            schedule: "diario",
+            tags: "combate_mkt",
+            dag: "combate_mkt_sms_logs"
+        }
+    },
+    description: 'Tabela que contém informações de registro de logs dos sms enviados.',
+    columns: {
+        log_date: "Data do log.",
+        subscriber_key: "A chave do usuário afetado.",
+        mobile_subscription_id: "O ID exclusivo do registro do usuário.",
+        subscription_definition_id: "O ID exclusivo da palavra-chave.",
+        mobile_hash: "Número de celular do usuário hasheado.",
+        opt_out_status_id: "Se o usuário optou por não receber mensagens SMS.",
+        opt_out_method_id: "Método que o usuário usou para cancelar o recebimento de mensagens SMS.",
+        opt_out_date: "Data em que o usuário optou por não receber mensagens SMS.",
+        opt_in_status_id: "Se o usuário optou por receber uma mensagem SMS.",
+        opt_in_method_id: "Método que o usuário usou para aceitar mensagens SMS.",
+        opt_in_date: "Data em que o usuário optou por receber mensagens SMS.",
+        source: "A fonte do envio",
+        created_date: "Data em que a mensagem foi criada",
+        modified_date: "Data em que a mensagem foi modificada"
+    }
+}
+
+SELECT
+  DISTINCT SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",_log_date_) AS log_date,
+  subscriber_key,
+  mobile_subscription_id,
+  subscription_definition_id,
+  mobile_hash,
+  opt_out_status_id,
+  opt_out_method_id,
+  SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S", opt_out_date) AS opt_out_date,
+  opt_in_status_id,
+  opt_in_method_id,
+  PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S', opt_in_date) AS opt_in_date,
+  SOURCE as source,
+  PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S', created_date) AS created_date,
+  PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S', modified_date) AS modified_date
+FROM
+  ${ref('raw', 'COMBATE_SMSSubscriptionLog_raw')}

@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  schema: "bbb_22",
+  name: "Meta_cancelamento_vol_bbb22",
+  description: ""
+}
+
+

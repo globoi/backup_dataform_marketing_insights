@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-audiencia-hdg-prd",
+  schema: "prep_ga4_globoplay",
+  name: "tb_navegacao",
+  description: ""
+}

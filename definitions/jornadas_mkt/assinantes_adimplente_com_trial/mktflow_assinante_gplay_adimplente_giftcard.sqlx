@@ -1,0 +1,24 @@
+config {
+  type: 'table',
+  tags: ['assinante_gplay_adimplente_giftcard', 'schedule_tag=jornadas_mkt_mktflow_assinante_gplay_adimplente_giftcard'
+  ,,
+        "schedule_cron=0 12 * * *"],
+  name: 'mktflow_assinante_gplay_adimplente_giftcard',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT 
+ b.globo_id
+ ,a.gift_card_end_at
+ ,a.id
+FROM
+${ref("sales_gold", "subscription_details")} a
+Join ${ref("jornadas_mkt", "mktflow_assinantes_adimplente_com_trial")} b ON a.id = b.id_asset
+WHERE a.payment_method LIKE 'Gift Card'

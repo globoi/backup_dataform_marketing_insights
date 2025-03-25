@@ -1,0 +1,19 @@
+config {
+  type: 'table',
+  tags: ['bbb_23'],
+  name: 'mktflow_bbb23_assinantes_desinteressados',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT distinct a.globo_id 
+FROM ${ref("usuarios", "base_ativa_pagante_com_trial")} as a
+LEFT JOIN ${ref("bbb_23", "Raiox_BBB_23_Assinantes")} as b
+ON a.globo_id = b.globo_id
+WHERE b.globo_id IS NULL

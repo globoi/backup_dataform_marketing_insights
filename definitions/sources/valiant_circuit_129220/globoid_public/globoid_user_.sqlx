@@ -1,0 +1,6 @@
+config { 
+    type: "declaration", 
+    database: "valiant-circuit-129220", 
+    schema: "globoid_public", 
+    name: "globoid_user_*", 
+    description: ""}

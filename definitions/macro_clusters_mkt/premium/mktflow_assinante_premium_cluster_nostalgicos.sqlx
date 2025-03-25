@@ -1,0 +1,79 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_nostalgicos',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_nostalgicos',
+  schema: 'macro_clusters_mkt',
+  description: 'Usuários assinantes premium que consumiram pelo menos 20min de conteudos (integra ou trecho) considerados nostalgicos (manualmente) nos ultimos 180 dias.',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+-- Usuários assinantes premium que consumiram conteudos (integra ou trecho) considerados nostalgicos (manualmente) nos ultimos 180 dias.
+WITH consumo_nostalgicos as (
+  SELECT distinct  a.userId, sum(hours_watched) as hrs_consumidas
+  FROM ${ref("consumo_enriched", "all_impression")} a
+  INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} b
+    ON a.userId = b.globo_id
+  WHERE a.date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND a.program_id in (16888,11225,10003,13016,17230,12989,13765,2534,5409,6969,7608,8143,9620,8886,13457,10409,14198,17285,19976,17289,17295,11672,12571,12678,24857,24713,17871,16005, 2536,11350,5221,10510,2512,25689,23253,2839826557,27883,26374,28008,22478,25489,27135)
+    AND b.tipo_cadastro = "Assinante"
+  AND mais_canais = true
+GROUP BY ALL
+  HAVING hrs_consumidas >= 0.32
+)
+
+SELECT distinct 'named_user' as identifier_type, userId as globo_id
+FROM consumo_nostalgicos
+
+--Malhação - Id	16888
+--Malhação - Toda Forma de Amar	11225
+--Malhação - Viva a Diferença	10003
+--Malhação 1995	13016
+--Malhação 1997	17230
+--Malhação 2008	12989
+--Malhação 2009	13765
+--Malhação 2010	2534
+--Malhação 2011	5409
+--Malhação 2012	6969
+--Malhação 2013	7608
+--Malhação 2014	8143
+--Malhação Pro Dia Nascer Feliz	9620
+--Malhação Seu Lugar no Mundo	8886
+--Malhação Sonhos	13457
+--Malhação – Vidas Brasileiras	10409
+--Dragon Ball 1419
+--Barbie Fairytopia 17285
+--Dragon Ball Z Kai 19976
+--Barbie como Rapunzel 17289
+--Barbie e o Quebra-nozes 17295
+--Todo Mundo Odeia o Chris 11672
+--Sandy e Junior: A História 12571
+--Sandy e Junior: Nossa História 12678
+--Navio da Xuxa 24857
+--Xou da Xuxa - Edição Especial 24713
+--Shrek 17871
+--Shrek 2 16005
+--Os Normais 2536
+--Sandy & Junior 11350
+--Tapas e Beijos 5221
+--Toma Lá Dá Cá 10510
+--A Grande Família 2512
+--25689 - A Mão do Eurico	
+--23253 - As Aventuras de José & Durval	
+--28398 - Belo: Perto Demais da Luz
+--26557 - Betinho: No Fio da Navalha	
+--27883 - Pra Sempre Paquitas	
+--26374 - Rebelde
+--28008 - Turma da Mônica – Origens	
+--22478 - Um Beijo do Gordo
+--25489 - Xuxa, O Documentário
+--27135 - Senna por Ayrton

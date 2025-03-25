@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "pesquisas",
+  name: "pesquisa_assinantes_30_dias_dados_brutos",
+  description: ""
+}

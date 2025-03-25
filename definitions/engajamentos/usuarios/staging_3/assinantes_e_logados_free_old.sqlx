@@ -1,0 +1,27 @@
+config {
+  type: 'table',
+  tags: [],
+  schema: 'usuarios',
+  name: 'assinantes_e_logados_free_old',
+  description: '',
+  columns: {}
+}
+
+with usuarios as (
+  select
+    distinct globo_id,
+    'Assinante' as tipo_usuario
+  from
+    ${ref('usuarios', 'base_ativa_pagante_com_trial')}
+  union
+    distinct
+  select
+    distinct globo_id,
+    'Logado Free' as tipo_usuario
+  from
+    ${ref('usuarios', 'Free users')}
+)
+select
+  *
+from
+  usuarios

@@ -1,0 +1,17 @@
+config {
+  type: "table",
+  schema: 'atualizacao_tabelas',
+  name:'assinantes_por_produto_contratado',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_assinantes_por_produto_contratado',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+SELECT
+  Produto_Contratado,
+  id_asset
+from
+  ${ref('usuarios', 'perfil_assinantes_ativo_reduzido')}

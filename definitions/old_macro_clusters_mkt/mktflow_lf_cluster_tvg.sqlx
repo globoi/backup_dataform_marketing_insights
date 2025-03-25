@@ -1,0 +1,39 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_tvg",
+    schema: 'macro_clusters_mkt',
+    tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_tvg',
+        "schedule_cron=0 11 * * *"
+    ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "11h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+WITH base_consumo_tvg AS (
+SELECT DISTINCT 'named_user' as identifier_type
+,a.userId as globo_id
+,SUM(a.hours_watched) AS hrs
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} b
+ON a.userId = b.globo_id
+WHERE a.date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 90 DAY)
+AND a.program_title = 'Globoplay Ao Vivo'
+AND b.tipo_cadastro = 'Logado Free'
+GROUP BY 1,2
+HAVING hrs >= 1
+)
+SELECT base_consumo_tvg.identifier_type, base_consumo_tvg.globo_id
+FROM base_consumo_tvg
+
+

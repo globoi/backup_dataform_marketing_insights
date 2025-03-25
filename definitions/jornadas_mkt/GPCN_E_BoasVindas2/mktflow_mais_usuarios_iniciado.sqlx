@@ -1,0 +1,72 @@
+config {
+  type: 'table',
+  name: 'mktflow_mais_usuarios_iniciando',
+  schema: 'jornadas_mkt',
+  tags: ['GPCN_E_BoasVindas2','schedule_tag=jornadas_mkt_mktflow_mais_usuarios_iniciando'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+ WITH
+ primeiro_step_1 AS (
+     SELECT 
+        program_id,
+        program_title,
+        program_subset,
+        SUM(Usuario_dia_0) AS SUM_of_unique_users,
+    FROM
+        ${ref("consumo", "primeiro_consumo_usuarios")}
+    WHERE
+        DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) <= Primeiro_consumo
+    GROUP BY
+        program_id,
+        program_title,
+        program_subset
+ ),
+
+ primeiro_step_2 AS (
+     SELECT
+        *,
+        ROW_NUMBER() OVER(PARTITION BY program_subset ORDER BY SUM_of_unique_users DESC) AS rank_subset,
+    FROM
+        primeiro_step_1
+    WHERE
+        program_subset IN ("special", "varieties", "humor", "series", "novelas", "realities", "kids")
+ ),
+
+ primeiro_step_3 AS (
+     SELECT
+        *,
+        ROW_NUMBER() OVER(ORDER BY SUM_of_unique_users DESC) AS rank_geral
+    FROM
+        primeiro_step_2
+    WHERE
+        rank_subset <= 10
+ ),
+
+ primeiro_step_4 AS (
+     SELECT
+        1 AS globo_id,
+        CURRENT_DATE() AS dt_proc,
+        rank_geral,
+        rank_subset,
+        program_id,
+        program_title,
+        program_subset,
+        SUM_of_unique_users,
+        media_kit_resource__poster,
+        url_for_consumption,
+        media_kit_resource__logotipo_xl
+    FROM
+        primeiro_step_3 ps3
+        LEFT JOIN ${ref("conteudo_enriched", "program")} cep
+        ON ps3.program_id = cep.id
+ )
+
+
+SELECT * from primeiro_step_4

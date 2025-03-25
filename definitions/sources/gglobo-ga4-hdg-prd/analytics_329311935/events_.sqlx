@@ -1,0 +1,6 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-ga4-hdg-prd", 
+    schema: "analytics_329311935", 
+    name: "events_*", 
+    description: ""}

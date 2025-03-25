@@ -1,0 +1,26 @@
+config {
+  type: "table",
+  name: "Trilho_rec_genero_t5_alt_pivoted",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_Trilho_rec_genero_t5_alt_pivoted']
+}
+
+SELECT
+  *,
+  globo_id IS NULL AS personalizado
+FROM (
+  SELECT
+    globo_id,
+    rank_final,
+    title_id
+  FROM ${ref("jornadas_mkt", "Lista_trilho_rec_alt_top_series")}
+)
+PIVOT (
+  ANY_VALUE(title_id) FOR rank_final IN (
+    1 AS rank_1,
+    2 AS rank_2,
+    3 AS rank_3,
+    4 AS rank_4,
+    5 AS rank_5
+  )
+)

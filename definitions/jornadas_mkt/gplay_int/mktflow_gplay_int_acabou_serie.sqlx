@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_acabou_serie',
+  schema: 'jornadas_mkt',
+  description: '',
+  tags: ["gplay_int", 'schedule_tag=jornadas_mkt_mktflow_gplay_int_acabou_serie'],
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT DISTINCT
+    globo_id, 
+    program_id
+FROM 
+  ${ref("consumo", "series_history")}
+WHERE
+globo_id IN (
+  SELECT globo_id 
+  FROM
+  ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) AS i
+  WHERE i.assinatura_gplay = 'internacional'
+  )
+AND terminou_serie
+

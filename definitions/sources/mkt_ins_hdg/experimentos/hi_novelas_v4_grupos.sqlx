@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "experimentos",
+  name: "hi_novelas_v4_grupos"
+}
+
+-- gglobo-mkt-ins-hdg-prd.experimentos.hi_novelas_v4_grupos

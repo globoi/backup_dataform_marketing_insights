@@ -1,0 +1,31 @@
+config {
+  type: 'table',
+  name: 'mktflow_acervo_globoplay__programas__sf',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_S_BoasVindasTier1','schedule_tag=jornadas_mkt_mktflow_acervo_globoplay__programas__sf'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+  SELECT 
+    "" AS globo_id,
+    id,
+    title,
+    channel_title,
+    Exclusividade,
+    Ineditismo,
+    Titulo_Original_Tratado,
+    Categoria_Tratada,
+    Nacionalinternacional_Tratado,
+    Studio_Tratado,
+    Genero_Tratado,
+    Subgenero_1_Tratado,
+    Subgenero_2_Tratado,
+    Protagonismo_Tratado,
+    ProceduralSerializado_Tratado
+  FROM 
+    ${ref("conteudo", "acervo")}

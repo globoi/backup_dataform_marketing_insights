@@ -1,0 +1,151 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_ass_papanovelas",
+        "schedule_cron=* * 15 * *"
+    ],
+    name: 'mktflow_ass_papanovelas',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {}
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+with base as (
+  select distinct
+    DATE_TRUNC (b.date, MONTH) AS mes,
+    a.globo_id,
+    ROUND(SUM(b.hours_watched),2) AS hrs_consumidas
+  from `gglobo-mkt-ins-hdg-prd.usuarios.base_ativa_pagante_com_trial_new` as a
+  join `gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` as b
+    on a.globo_id = b.userId
+  where b.date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+    AND b.program_subset = 'novelas'
+  group by 1,2
+),
+  
+base_gplay AS ( #base que divide o consumo em grupos de consumo, indo DO 1 ao 4, DO maior consumo para o menor
+  SELECT *,
+    NTILE(6) OVER (PARTITION BY mes ORDER BY hrs_consumidas DESC) AS cluster_novela_gplay
+  FROM base
+),
+ 
+
+base_parte1_gs AS (
+  SELECT
+    DATE_TRUNC (a.data, MONTH) AS mes,
+    a.globoId,
+    COUNT(DISTINCT hits.editoriaN2) AS visitas_por_usuario
+  FROM `gglobo-prodservdig-hdg-prd.foundation_gshow.foundation_gshow_sessions` AS a,
+    UNNEST(a.hits) AS hits
+  INNER JOIN `gglobo-mkt-ins-hdg-prd.usuarios.base_ativa_pagante_com_trial_new` AS b
+    ON a.globoId = b.globo_id
+  WHERE  a.data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+    AND LOWER(hits.editoriaN1) = 'novelas'
+  GROUP BY 1, 2
+  ORDER BY 1 ASC
+),
+ 
+base_gshow AS ( #base que divide o consumo em grupos de consumo,indo DO 1 ao 4,DO maior consumo para o menor
+  SELECT
+    *,
+    NTILE(6) OVER (PARTITION BY mes ORDER BY visitas_por_usuario DESC) AS cluster_novela_gshow
+  FROM base_parte1_gs
+),
+
+ 
+base_cluster_final AS (
+  SELECT
+    gp.globo_id,
+    gp.mes,
+    gs.cluster_novela_gshow,
+    gp.cluster_novela_gplay,
+    CASE
+      WHEN cluster_novela_gshow= 1 AND cluster_novela_gplay= 1 THEN 'Heavy User'
+      WHEN cluster_novela_gshow= 1
+    AND cluster_novela_gplay= 2 THEN 'Mid-Heavy User'
+      WHEN cluster_novela_gshow= 1 AND cluster_novela_gplay= 3 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow= 1
+    AND cluster_novela_gplay= 4 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 1 AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow= 1
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 2 AND cluster_novela_gplay= 1 THEN 'Mid-Heavy User'
+      WHEN cluster_novela_gshow= 2
+    AND cluster_novela_gplay= 2 THEN 'Mid-Heavy User'
+      WHEN cluster_novela_gshow= 2 AND cluster_novela_gplay= 3 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow= 2
+    AND cluster_novela_gplay= 4 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 2 AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow= 2
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 3 AND cluster_novela_gplay= 1 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow= 3
+    AND cluster_novela_gplay= 2 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow= 3 AND cluster_novela_gplay= 3 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow= 3
+    AND cluster_novela_gplay= 4 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 3 AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow= 3
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 4 AND cluster_novela_gplay= 1 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 4
+    AND cluster_novela_gplay= 2 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 4 AND cluster_novela_gplay= 3 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 4
+    AND cluster_novela_gplay= 4 THEN 'Mid User'
+      WHEN cluster_novela_gshow= 4 AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow= 4
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 5 AND cluster_novela_gplay= 1 THEN 'Light User'
+      WHEN cluster_novela_gshow= 5
+    AND cluster_novela_gplay= 2 THEN 'Light User'
+      WHEN cluster_novela_gshow= 5 AND cluster_novela_gplay= 3 THEN 'Light User'
+      WHEN cluster_novela_gshow= 5
+    AND cluster_novela_gplay= 4 THEN 'Light User'
+      WHEN cluster_novela_gshow= 5 AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow= 5
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6 AND cluster_novela_gplay= 1 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6
+    AND cluster_novela_gplay= 2 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6 AND cluster_novela_gplay= 3 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6
+    AND cluster_novela_gplay= 4 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6 AND cluster_novela_gplay= 5 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow= 6
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+      WHEN cluster_novela_gshow IS NULL AND cluster_novela_gplay= 1 THEN 'Heavy User'
+      WHEN cluster_novela_gshow IS NULL
+    AND cluster_novela_gplay= 2 THEN 'Mid-Heavy User'
+      WHEN cluster_novela_gshow IS NULL AND cluster_novela_gplay= 3 THEN 'Mid-Mid User'
+      WHEN cluster_novela_gshow IS NULL
+    AND cluster_novela_gplay= 4 THEN 'Mid User'
+      WHEN cluster_novela_gshow IS NULL AND cluster_novela_gplay= 5 THEN 'Light User'
+      WHEN cluster_novela_gshow IS NULL
+    AND cluster_novela_gplay= 6 THEN 'Super-Light User'
+  END
+  AS cluster_novela_tratado
+  FROM base_gplay AS gp
+  LEFT JOIN base_gshow AS gs
+  ON(gs.globoId = gp.globo_id AND gp.mes = gs.mes)
+  WHERE gp.globo_id IS NOT NULL
+  ORDER BY cluster_novela_tratado
+),
+
+ 
+max_mes AS (
+  SELECT
+    EXTRACT(MONTH FROM DATE (MAX(bc.mes))) AS ultimo_mes
+  FROM base_cluster_final AS bc
+)
+ 
+SELECT bcf.globo_id,
+  bcf.mes,
+  bcf.cluster_novela_tratado,
+FROM base_cluster_final AS bcf
+WHERE EXTRACT(MONTH FROM DATE (bcf.mes)) = ((SELECT ultimo_mes FROM max_mes)-1)

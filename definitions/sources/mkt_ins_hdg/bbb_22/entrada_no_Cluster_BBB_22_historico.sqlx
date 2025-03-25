@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  schema: "bbb_22",
+  name: "Entrada_no_Cluster_BBB_22_historico",
+  description: ""
+}
+
+

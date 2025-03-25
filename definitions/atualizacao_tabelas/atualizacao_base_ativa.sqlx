@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  name: 'atualizacao_base_ativa',
+  schema: 'atualizacao_tabelas',
+  description: '',
+  columns: {
+  }
+}
+
+with tabela as (SELECT
+  COUNT(DISTINCT globo_id) AS qtd_usuarios,
+  DATE(i.data_hora_compra,'America/Sao_Paulo') AS data_hora_compra,
+  max(i.data_hora_compra) as max_date
+FROM
+  ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} as b,unnest(b.info) as i
+WHERE
+  DATE(i.data_hora_compra,'America/Sao_Paulo') >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  group by 2
+  order by 2 asc)
+  select * except(max_date),DATETIME(max_date, "America/Sao_Paulo") as max_date from tabela
+  order by data_hora_compra asc

@@ -1,0 +1,56 @@
+config {
+  type: 'table',
+  name: 'mktflow_lf_cluster_filmes',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AvisaQueTaBombando','schedule_tag=jornadas_mkt_mktflow_lf_cluster_filmes'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+WITH
+impression AS (
+  SELECT
+    userid AS globo_id
+  FROM
+    ${ref("consumo_enriched","impression")} imp 
+    INNER JOIN ${ref("usuarios", "Free users")} fu
+    ON imp.userid = fu.globo_id
+  WHERE
+    program_id = 10122
+    AND `date` <= CURRENT_DATE()
+),
+
+tapume AS (
+  SELECT
+    globo_id_sessao AS globo_id
+  FROM
+    ${ref("jornadas_mkt", "tapume_ao_vivo_nao_assinante")} tap
+    INNER JOIN ${ref("usuarios", "Free users")} fu
+    ON tap.globo_id_sessao = fu.globo_id
+  WHERE LOWER(eventAction) IN ('tapume.megapix', 'tapume.universal')
+),
+
+telecine AS (
+  SELECT
+    globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) as i
+    INNER JOIN ${ref("usuarios", "Free users")}
+    USING(globo_id)
+  WHERE
+    i.origem = "Venda direta"
+    AND LOWER(i.Produto_Contratado) LIKE '%globoplay%'
+    AND LOWER(i.Produto_Contratado) LIKE '%telecine%'
+),
+
+union_all AS (
+  SELECT * FROM impression
+  UNION ALL SELECT * FROM tapume
+  UNION ALL SELECT * FROM telecine
+)
+SELECT DISTINCT(globo_id) FROM union_all

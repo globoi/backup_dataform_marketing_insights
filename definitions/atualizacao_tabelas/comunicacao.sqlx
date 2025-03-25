@@ -1,0 +1,24 @@
+config {
+  type: "table",
+  schema: 'atualizacao_tabelas',
+  name: 'comunicacao',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_comunicacao',
+ "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+SELECT
+  Flag_Abriu_App_30D,
+  Flag_Abriu_Email_30D,
+  Flag_Recebeu_Push_30D,
+  count(distinct globo_id) as usuarios
+FROM
+  ${ref('usuarios', 'perfil_assinantes_ativo_reduzido')}
+  inner join ${ref('comunicacao', 'step_comunicacao')} using(globo_id)
+group by
+  1,
+  2,
+  3

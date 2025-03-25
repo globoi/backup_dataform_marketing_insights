@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_21",
+  name: "raiox_bbb_21_propensao_churn_historico",
+  description: ""
+}

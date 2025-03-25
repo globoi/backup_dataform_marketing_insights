@@ -1,0 +1,33 @@
+config {
+  type: "table",  
+  schema: "usuarios",
+  name: "free_users_all_old",
+  tags: [],
+  description: '',
+  columns: {}
+}
+
+WITH base_internacional AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref("sales_enriched", "asset_v2")}
+  WHERE Product2Id IN ('01t3l00000O3yOxAAJ', '01t3l00000O3yOsAAJ', '01t3l00000Oq6JTAAZ', '01t3l00000Oq6JOAAZ') AND status = 'Ativo'
+)
+
+-- seleciona todos os usuários com gplay provisionado
+SELECT u.*
+FROM ${ref("sales_enriched", "user")} u
+
+-- que não estão presentes na base de assinantes ativos de nacional
+LEFT JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")} b ON b.globo_id = u.globo_id
+
+-- e tmb não estão presentes na base de assinantes ativos de internacional
+LEFT JOIN base_internacional i ON i.globo_id = u.globo_id
+WHERE i.globo_id IS NULL
+AND  b.globo_id IS NULL
+
+-- não possuem status ativo na tabela user e nem são do sistema legado (inconsistência de status e de ofertas de venda)
+AND NOT (u.status = 'Ativo' AND u.SISTEMA = 'Legado')
+
+-- e não são dependentes de assinantes
+AND NOT EXISTS (SELECT 1 FROM ${ref("sales_enriched", "relacionamento")} relacionamento WHERE relacionamento.Asset_status = 'Ativo' AND relacionamento.EVA_Status_Relacionamento__c = 'Ativo' AND relacionamento.globo_id_dependente = u.globo_id)
+

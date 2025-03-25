@@ -1,0 +1,110 @@
+config {
+  type: "table",
+  name: "novela_history",
+  schema: "consumo",
+  tags: ["consumo_staging_1_history",
+        "schedule_tag=consumo_novela_history"
+  ]
+}
+
+WITH content AS (
+  SELECT
+    * REPLACE(COALESCE(season, 1) AS season)
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    status != "unpublished"
+    AND program_subset = "novelas"
+    AND duration IS NOT NULL
+),
+content_ranked AS (
+  SELECT
+    *,
+    RANK() OVER (
+      PARTITION BY program_id
+      ORDER BY
+        exhibited_at
+    ) AS episode_rank,
+    RANK() OVER (
+      PARTITION BY program_id,
+      season
+      ORDER BY
+        id
+    ) AS season_episode_rank,
+  FROM
+    content
+),
+content_max AS (
+  SELECT
+    *,
+    MAX(episode_rank) OVER (PARTITION BY program_id) AS program_max_episode_rank,
+    MAX(season_episode_rank) OVER (PARTITION BY program_id) AS season_max_episode_rank
+  FROM
+    content_ranked
+),
+content_final AS (
+  SELECT
+    id AS mediaid,
+    episode,
+    season,
+    season_episode_rank,
+    season_max_episode_rank,
+    episode_rank,
+    program_max_episode_rank,
+  FROM
+    content_max
+),
+join_tables AS (
+  SELECT
+    * EXCEPT (history_sum),
+    terminou_episodio
+    AND episode_rank = program_max_episode_rank AS terminou_novelas,
+    terminou_episodio
+    AND season_episode_rank = season_max_episode_rank AS terminou_temporada,
+    ANY_VALUE(ultimo_consumo) OVER (
+      PARTITION BY globo_id,
+      program_id
+      ORDER BY
+        ultimo_consumo DESC
+    ) AS ultimo_consumo_do_programa,
+    LAG(episode_rank, 1) OVER (
+      PARTITION BY program_id,
+      globo_id
+      ORDER BY
+        episode_rank DESC
+    ) AS Next,
+    LAG(episode_rank, 1) OVER (
+      PARTITION BY program_id,
+      globo_id
+      ORDER BY
+        episode_rank ASC
+    ) AS Previous
+  FROM
+    ${ref("consumo", "novela_history_imp_aux")}
+    INNER JOIN content_final USING (mediaid)
+)
+SELECT
+  *
+EXCEPT
+  (
+    Next,
+    Previous,
+    season_max_episode_rank,
+    program_max_episode_rank,
+    episode,
+    tempo_assistido,
+    duration,
+    completude_tempo
+  ),
+  COALESCE(episode_rank - Previous = 1, FALSE) AS assistiu_anterior,
+  COALESCE(Next - episode_rank = 1, FALSE) AS assistiu_posterior,
+  ROW_NUMBER() OVER (
+    PARTITION BY globo_id,
+    program_id
+    ORDER BY
+      episode_rank DESC
+  ) = 1 AS maior_episodio_assistido,
+  ultimo_consumo_do_programa = ultimo_consumo AS ultimo_episodio_assistido,
+  ROUND(completude_tempo, 2) AS completude_tempo
+FROM
+  join_tables

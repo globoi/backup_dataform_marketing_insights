@@ -1,0 +1,359 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=globoorg_mkt_mktflow_base_auto_globoorg_macro_cluster_df2', 'schedule_cron=10 8 * * 6'],
+    name: 'mktflow_base_auto_globoorg_macro_cluster_df2',
+    schema: 'globoorg_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "globoorg_mkt"
+        }
+    }
+}
+
+WITH
+  Cluster_Variedades AS (
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.revista_quem.pgt_*`
+    ${ref("revista_quem", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%revistaquem.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.receitas.pgt_*`
+    ${ref("receitas", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%receitas.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/tudo-mais/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/moda-e-beleza/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/podcast/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%horoscopo.gshow.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/variedades/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/programas/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.o_globo.pgt_*`
+    ${ref("o_globo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%oglobo.globo.com/blogs-e-colunas/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.o_globo.pgt_*`
+    ${ref("o_globo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%oglobo.globo.com/cultura/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.techtudo.pgt_*`
+    ${ref("techtudo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%techtudo.com.br/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.vogue.pgt_*`
+    ${ref("vogue", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%vogue.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.revista_marie_claire.pgt_*`
+    ${ref("revista_marie_claire", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%revistamarieclaire.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globosatplay.pgt_*`
+    ${ref("globosatplay", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%canaisglobo.globo.com/c/modo-viagem/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globosatplay.pgt_*`
+    ${ref("globosatplay", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%canaisglobo.globo.com/c/futura/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gnt.pgt_*`
+    ${ref("gnt", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gnt.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.multishow.pgt_*`
+    ${ref("multishow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%multishow.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/programas/rock-in-rio/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/tudo-mais/tv-e-famosos/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/tudo-mais/viralizou/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.gshow.pgt_*`
+    ${ref("gshow", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%gshow.globo.com/realities/the-masked-singer-brasil/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2 )
+SELECT
+  'VARIEDADES' AS CLUSTER,
+  userid AS globo_id
+FROM
+  Cluster_Variedades g

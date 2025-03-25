@@ -1,0 +1,54 @@
+config {
+  type: 'table',
+  name: 'mktflow_segment_novelas_ep1_d_1',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_Novelas','schedule_tag=jornadas_mkt_mktflow_segment_novelas_ep1_d_1'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+WITH all_impression_step_1 AS (
+  SELECT 
+    globo_id,
+    program_id,
+    userId,
+    timestamp
+  FROM
+    ${ref("consumo_enriched", "all_impression")} i
+  WHERE timestamp >= TIMESTAMP("2020-05-21 12:00:00-03") AND program_subset = 'novelas' AND DATE(timestamp) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) 
+)
+
+,join_program_step_2 AS (
+  SELECT 
+    *
+  FROM
+    all_impression_step_1 i
+  LEFT JOIN ${ref("conteudo_enriched", "program")} p
+  ON i.program_id = p.id
+  WHERE p.title_id NOT IN ("HFbkdv5bs2", "H7s5dLsVmV", "g56h6HmYYZ", "LFvgcHWxBc", "xpPmXwgN2k", "sKLwmqfJ2w", "WsnrKKVfMB", "6M9SmwNsGm", "kF2gNpsJFB", "KxKVvK6Vvq", "C86VK9vggk")
+)
+
+,join_free_users_all_step_3 AS (
+  SELECT
+    *
+  FROM  
+    join_program_step_2 i
+  INNER JOIN ${ref("usuarios", "free_users_all")} f
+  ON i.userId = f.globo_id
+  QUALIFY ROW_NUMBER() OVER(PARTITION BY i.userId ORDER BY i.timestamp) = 1
+)
+
+
+SELECT
+  CURRENT_DATE() AS dt_proc,
+  userId AS globo_id,
+  program_id,
+  IF(GP_internacional_ind = 'globo-play-us', 'US', 'BR') AS GP_internacional_ind
+FROM 
+  join_free_users_all_step_3
+

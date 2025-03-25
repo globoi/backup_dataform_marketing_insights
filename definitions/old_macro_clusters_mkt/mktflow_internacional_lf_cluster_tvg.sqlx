@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_internacional_lf_cluster_tvg'],
+  name: 'mktflow_internacional_lf_cluster_tvg',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT distinct 'named_user' as identifier_type, globoid as globo_id
+FROM ${ref("simulcast", "consumo_ibope")} a
+INNER JOIN ${ref("internacional", "base_lf_internacional")} b
+on a.globoid = b.globo_id
+WHERE program_id = '9095'
+and data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 90 DAY)

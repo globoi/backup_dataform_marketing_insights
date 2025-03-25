@@ -1,0 +1,47 @@
+config {
+  type: 'table',
+  tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_chega_de_trecho_bbb_24"],
+  name: 'mktflow_bbb24_lf_chega_de_trecho',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+with maxsemana as (
+  select
+    max(a.semana) as ultima_semana
+  from
+    ${ref("bbb_24", "raiox_bbb_24_lf")} as a ),
+base_final as (
+  SELECT
+    distinct b.globo_id,
+    --(date(b.semana) - 7 ), --Linha não utilizada
+    semana
+  FROM
+    ${ref("bbb_24", "raiox_bbb_24_lf")} as b
+  WHERE
+    horas_excerpt > 0
+    OR horas_extra > 0
+    AND qtd_midias_excerpt >= 7
+    --and semana = (select ultima_semana from maxsemana) --Linha alterada para puxar da ultima semana fechada
+    AND semana = (
+      (
+        SELECT
+          ultima_semana
+        FROM
+          maxsemana
+      ) -7
+    )
+)
+SELECT
+  distinct globo_id
+FROM
+  base_final
+

@@ -1,0 +1,16 @@
+config {
+  type: "incremental",  
+  schema: "jornadas_mkt",
+  name: "base_inatividade_midia_incremental",
+  tags: ["base_midia_inatividade", 'schedule_tag=jornadas_mkt_base_inatividade_midia_incremental'],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+SELECT
+  dt_proc,
+  globo_id,
+  id_asset
+FROM ${ref('jornadas_mkt','mktflow_base_midia_inatividade')}
+

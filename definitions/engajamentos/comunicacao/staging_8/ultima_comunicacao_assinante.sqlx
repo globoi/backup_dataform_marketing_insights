@@ -1,0 +1,85 @@
+config {
+  type: "table",
+  name: "ultima_comunicacao_assinante",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_8",'schedule_tag=comunicacao_ultima_comunicacao_assinante'],
+}
+
+WITH cadastros_assinantes AS (
+  SELECT
+    globo_id,
+    telefone,
+    endereco,
+    dt_aniversario 
+  FROM ${ref("mkt_clean", "dados_cadastros_assinantes_V2")}
+),
+
+usuarios_assinantes AS (
+  SELECT DISTINCT * FROM ${ref("usuarios", "dados_usuarios_assinantes")}
+),
+
+whatsapp AS (
+  SELECT 
+    globo_id,
+    Status_Opt_In
+  FROM ${ref("comunicacao", "base_opt_in_whatsapp")}
+),
+
+ultima_abertura_app AS (
+  SELECT
+     globo_id,
+     data_abertura AS data_ultima_abertura_app,
+     push_descricao AS abertura_app_descricao_push,
+     push_titulo AS abertura_app_titulo_push,
+     data_abertura > DATE_ADD(CURRENT_DATE(), INTERVAL -32 DAY) AS flag_abriu_app_30D
+  FROM ${ref("comunicacao", "base_ultima_abertura_app")}
+),
+
+ultimo_push AS (
+  SELECT 
+    globo_id,
+    data_recebimento_ultimo_push,
+    push_titulo_recebido,
+    push_descricao_recebido,
+    data_abertura_ultimo_push,
+    push_titulo_aberto,
+    push_descricao_aberto,
+    qtd_pushs_30D,
+    perfil_uso_push,
+    qtd_pushs_abertos_30D,
+    COALESCE((qtd_pushs_30D > 0), False) AS flag_recebeu_push_30D,
+    COALESCE((qtd_pushs_abertos_30D > 0), False) AS flag_abriu_push_30D
+  FROM ${ref("comunicacao", "base_ultimo_push")}
+),
+
+ultimo_email AS (
+  SELECT
+    globo_id,
+    perfil_email,
+    Data_Envio AS data_envio_ultimo_email,
+    Data_Abertura AS data_abertura_ultimo_email,
+    Data_Click AS data_click_ultimo_email,
+    Enviados_30D AS emails_enviados_30D,
+    Abertos_30D AS emails_abertos_30D,
+    COALESCE((Enviados_30D > 0), False) AS flag_recebeu_email_30D,
+    COALESCE((Abertos_30D > 0), False) AS flag_abriu_email_30D
+  FROM ${ref("comunicacao", "ultimo_email")}
+)
+
+SELECT DISTINCT 
+  globo_id, id_asset, tipo_assinante, mais_canais,
+  dt_assinatura_comeco, canal_compra, data_hora_compra, produto, tempo_de_base_agrupado,
+  numero_assinaturas, numero_dependentes, gender, age, address_state, first_play, first_play_subset,
+  data_first_play, ultimo_consumo, ultimo_consumo_subset, data_ultimo_consumo, produto_contratado, origem,
+  telefone, endereco, dt_aniversario, perfil_email, data_envio_ultimo_email, data_abertura_ultimo_email,
+  data_click_ultimo_email, emails_enviados_30D, emails_abertos_30D, data_recebimento_ultimo_push,
+  push_titulo_recebido, push_descricao_recebido, data_abertura_ultimo_push, push_titulo_aberto, push_descricao_aberto,
+  qtd_pushs_30D, perfil_uso_push, data_ultima_abertura_app, abertura_app_descricao_push, abertura_app_titulo_push,
+  flag_recebeu_email_30D, flag_abriu_email_30D, flag_recebeu_push_30D, flag_abriu_app_30D, flag_abriu_push_30D,
+  COALESCE(Status_Opt_In, False) AS Status_Opt_In 
+FROM usuarios_assinantes
+LEFT JOIN ultimo_email USING (globo_id)
+LEFT JOIN ultimo_push USING (globo_id)
+LEFT JOIN ultima_abertura_app USING (globo_id)
+LEFT JOIN cadastros_assinantes USING (globo_id)
+LEFT JOIN whatsapp USING (globo_id)

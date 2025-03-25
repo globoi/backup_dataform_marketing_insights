@@ -1,0 +1,73 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_saldo_mais_50_centavos', 'schedule_cron=15 11 * * *'],
+    name: 'mktflow_base_automatica_ex_saldo_mais_50_centavos',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  fte_full_bonus AS (
+  SELECT
+    globo_id
+  FROM (
+    SELECT
+      globo_id,
+      ledger_entry_bonus_amount,
+      ledger_entry_deposit_amount,
+      ledger_entry_won_amount
+    FROM
+        -- `gglobo-caex-analytics-hdg-prd.analytics.f_entry`
+        ${ref("analytics", "f_entry")}
+    WHERE
+      status_id != 1
+    QUALIFY
+      ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY bet_datetime ASC) = 1 )
+  WHERE
+    ledger_entry_bonus_amount > 0
+    AND ledger_entry_deposit_amount = 0
+    AND ledger_entry_won_amount = 0 ),
+  usuarios_com_apenas_uma_entrada AS (
+  SELECT
+    globo_id,
+    COUNT(DISTINCT entry_id) AS qtd_entradas
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_entry`
+    ${ref("analytics", "f_entry")}
+  WHERE
+    status_id != 1
+  GROUP BY
+    globo_id
+  HAVING
+    qtd_entradas = 1 ),
+  saldo_maior_que_50_centavos AS (
+  SELECT
+    globo_id,
+    total_wallet_current_value
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.d_wallet`
+    ${ref("analytics", "d_wallet")}
+  WHERE
+    total_wallet_current_value >= 0.5 )
+SELECT
+  globo_id,
+  total_wallet_current_value AS saldo_atual
+FROM
+  fte_full_bonus
+INNER JOIN
+  usuarios_com_apenas_uma_entrada
+USING
+  (globo_id)
+INNER JOIN
+  saldo_maior_que_50_centavos
+USING
+  (globo_id)

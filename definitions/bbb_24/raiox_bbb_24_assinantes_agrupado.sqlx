@@ -1,0 +1,723 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech"    }
+  },
+  description: 'Tabela agrupada com os assinantes que assistiram pelo menos 15 minutos de algum conteúdo relacionado ao BBB 24.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    cluster_bbb_acumulado: 'Cluster acumulado em que consideramos somente o consumo em lives.',
+    cluster_share_bbb_total: 'Porcentagem de consumo do usuário acumulado sob o BBB.',
+    share_total_bbb: 'Horas consumidas em BBB acumuladas sob todo o consumo dos usuários inclusive o BBB',
+    share_semanas_bbb: 'Porcentagem de quanto o assinante ficou no cluster BBB.',
+    min_semana: 'Semana em que o assinante entrou no Cluster BBB.',
+    max_semana: 'Última semana em que o assinante esteve no cluster BBB.',
+    semanas_total: 'Quantidade total de semanas de consumo do assinante.',
+    semanas_cluster_bbb: 'Quantidade total de semanas em que o assinante permaneceu no cluster BBB.',
+    semanas_fora_cluster: 'Quantidade total de semanas em que o assinante esteve fora do cluster BBB.',
+    risco_churn_2024: 'Risco que o usuário tem de cancelar.',
+    horas_bbb: 'Total de horas consumidas pelo assinante nos programas relacionados à BBB.',
+    horas_ao_vivo_bbb: 'Total de horas agrupadas em que o assinante consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+    horas_total: 'Total de horas agrupadas que o assinante consumiu dentro da plataforma.',
+    no_live: 'Quantidade de semanas em que o assinante permaneceu no Cluster No Live.',
+    light_user: 'Quantidade de semanas em que o assinante permaneceu no Cluster Light User.',
+    mid_light_user: 'Quantidade de semanas em que o assinante permaneceu no Cluster Mid Light User.',
+    mid_heavy_user: 'Quantidade de semanas em que o assinante permaneceu no Cluster Mid Heavy User.',
+    heavy_user: 'Quantidade de semanas em que o assinante permaneceu no Cluster Heavy User.',
+    cluster_conteudo: 'Subset mais assistido pelo assinante considerando o consumo em BBB.',
+    cluster_conteudo_reduzido: 'Subset mais assistido pelo assinante desconsiderando o consumo em BBB. Cálculo mais reduzido.',
+    consumiu_bbb_20:	'Flag se o assinante consumiu o BBB 2020.',
+    assinou_cancelou_bbb_20: 'Flag se o usuário assinou entre 01/01/2020 e 30/04/2020, solicitou o cancelamento entre 01/04/2020 e 31/05/2020 e teve a assinatura cancelada no ano de 2020.',
+    consumiu_bbb_21: 'Flag se o assinante consumiu o BBB 2021.',
+    assinou_cancelou_bbb_21: 'Flag se o usuário assinou entre 01/01/2021 e 30/04/2021, solicitou o cancelamento entre 01/04/2021 e 31/05/2021 e teve a assinatura cancelada no ano de 2021.',
+    consumiu_bbb_22: 'Flag se o assinante consumiu o BBB 2022.',
+    assinou_cancelou_bbb_22: 'Flag se o usuário assinou entre 01/01/2022 e 30/04/2022, solicitou o cancelamento entre 01/04/2022 e 31/05/2022 e teve a assinatura cancelada no ano de 2022.',
+    consumiu_bbb_23: 'Flag se o assinante consumiu o BBB 2023.',
+    assinou_cancelou_bbb_23: 'Flag se o usuário assinou entre 01/01/2023 e 30/04/2023, solicitou o cancelamento entre 01/04/2023 e 31/05/2023 e teve a assinatura cancelada no ano de 2023.',
+    assinou_2024: 'Flag se o usuário assinou após 08/01/2024.',
+    sol_cancel_vol_24: 'Flag se o usuário solicitou o cancelamento após 08/01/2024.',
+    tipo_assinante: 'Identifica se o assinante é titular ou dependente.',
+    canal_compra: 'Canal pelo qual a compra do ativo foi realizada. Ex.: WEB',
+    produto: 'Informa o tipo de produto que o assinante possui. Ex: Mensal, anual ou bianual.',
+    telefone: 'Informa se o assinante possui número de telefone cadastrado.',
+    produto_contratado: 'Informa o nome do produto. Ex.: Globoplay e Telecine'
+
+  }
+
+}
+WITH base1 AS (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        globo_id,
+        consumiu_bbb_20,
+        assinou_cancelou_bbb_20,
+        consumiu_bbb_21,
+        assinou_cancelou_bbb_21,
+        consumiu_bbb_22,
+        assinou_cancelou_bbb_22,
+        consumiu_bbb_23,
+        assinou_cancelou_bbb_23,
+        assinou_2024,
+        sol_cancel_vol_24,
+        CASE
+          WHEN cluster_bbb = '4. Heavy User' THEN '4_Heavy_User'
+          WHEN cluster_bbb = '0. No Live' THEN '0_No_Live'
+          WHEN cluster_bbb = '1. Light User' THEN '1_Light_User'
+          WHEN cluster_bbb = '2. Mid-Light User' THEN '2_Mid_Light_User'
+          WHEN cluster_bbb = '3. Mid-Heavy User' THEN '3_Mid_Heavy_User'
+        END AS cluster_bbb,
+        total_horas_bbb,
+        total_horas_simulcast_bbb,
+        horas_ao_vivo_globo,
+        horas_filmes,
+        horas_mais_canais,
+        horas_novela,
+        horas_series,
+        horas_outros_conteudos,
+        semana
+      FROM
+        ${ref("bbb_24", "raiox_bbb_24_assinantes")}
+    ) PIVOT(
+      SUM(total_horas_bbb) total_horas_bbb,
+      sum(total_horas_simulcast_bbb) total_horas_simulcast_bbb,
+      SUM(horas_ao_vivo_globo) horas_ao_vivo_globo,
+      SUM(horas_filmes) horas_filmes,
+      SUM(horas_mais_canais) horas_mais_canais,
+      SUM(horas_novela) horas_novela,
+      SUM(horas_series) horas_series,
+      SUM(horas_outros_conteudos) horas_outros_conteudos,
+      COUNT(DISTINCT semana) semana FOR cluster_bbb IN (
+        '0_No_Live',
+        '1_Light_User',
+        '2_Mid_Light_User',
+        '3_Mid_Heavy_User',
+        '4_Heavy_User'
+      )
+    )
+),
+consulta AS (
+  SELECT
+    *
+  EXCEPT(
+      total_horas_bbb_0_No_Live,
+      total_horas_simulcast_bbb_0_No_Live,
+      horas_ao_vivo_globo_0_No_Live,
+      horas_filmes_0_No_Live,
+      horas_mais_canais_0_No_Live,
+      horas_novela_0_No_Live,
+      horas_series_0_No_Live,
+      horas_outros_conteudos_0_No_Live,
+      total_horas_bbb_1_Light_User,
+      total_horas_simulcast_bbb_1_Light_User,
+      horas_ao_vivo_globo_1_Light_User,
+      horas_filmes_1_Light_User,
+      horas_mais_canais_1_Light_User,
+      horas_novela_1_Light_User,
+      horas_series_1_Light_User,
+      horas_outros_conteudos_1_Light_User,
+      total_horas_bbb_2_Mid_Light_User,
+      total_horas_simulcast_bbb_2_Mid_Light_User,
+      horas_ao_vivo_globo_2_Mid_Light_User,
+      horas_filmes_2_Mid_Light_User,
+      horas_mais_canais_2_Mid_Light_User,
+      horas_novela_2_Mid_Light_User,
+      horas_series_2_Mid_Light_User,
+      horas_outros_conteudos_2_Mid_Light_User,
+      total_horas_bbb_3_Mid_Heavy_User,
+      total_horas_simulcast_bbb_3_Mid_Heavy_User,
+      horas_ao_vivo_globo_3_Mid_Heavy_User,
+      horas_filmes_3_Mid_Heavy_User,
+      horas_mais_canais_3_Mid_Heavy_User,
+      horas_novela_3_Mid_Heavy_User,
+      horas_series_3_Mid_Heavy_User,
+      horas_outros_conteudos_3_Mid_Heavy_User,
+      total_horas_bbb_4_Heavy_User,
+      total_horas_simulcast_bbb_4_Heavy_User,
+      horas_ao_vivo_globo_4_Heavy_User,
+      horas_filmes_4_Heavy_User,
+      horas_mais_canais_4_Heavy_User,
+      horas_novela_4_Heavy_User,
+      horas_series_4_Heavy_User,
+      horas_outros_conteudos_4_Heavy_User
+    ),
+    ifnull(total_horas_bbb_0_No_Live, 0) AS total_horas_bbb_0_No_Live,
+    ifnull(total_horas_simulcast_bbb_0_No_Live, 0) as total_horas_simulcast_bbb_0_No_Live,
+    ifnull(horas_ao_vivo_globo_0_No_Live, 0) AS horas_ao_vivo_globo_0_No_Live,
+    ifnull(horas_filmes_0_No_Live, 0) AS horas_filmes_0_No_Live,
+    ifnull(horas_mais_canais_0_No_Live, 0) AS horas_mais_canais_0_No_Live,
+    ifnull(horas_novela_0_No_Live, 0) AS horas_novela_0_No_Live,
+    ifnull(horas_series_0_No_Live, 0) AS horas_series_0_No_Live,
+    ifnull(horas_outros_conteudos_0_No_Live, 0) AS horas_outros_conteudos_0_No_Live,
+    ifnull(total_horas_bbb_1_Light_User, 0) AS total_horas_bbb_1_Light_User,
+    ifnull(total_horas_simulcast_bbb_1_Light_User, 0) as total_horas_simulcast_bbb_1_Light_User,
+    ifnull(horas_ao_vivo_globo_1_Light_User, 0) AS horas_ao_vivo_globo_1_Light_User,
+    ifnull(horas_filmes_1_Light_User, 0) AS horas_filmes_1_Light_User,
+    ifnull(horas_mais_canais_1_Light_User, 0) AS horas_mais_canais_1_Light_User,
+    ifnull(horas_novela_1_Light_User, 0) AS horas_novela_1_Light_User,
+    ifnull(horas_series_1_Light_User, 0) AS horas_series_1_Light_User,
+    ifnull(horas_outros_conteudos_1_Light_User, 0) AS horas_outros_conteudos_1_Light_User,
+    ifnull(total_horas_bbb_2_Mid_Light_User, 0) AS total_horas_bbb_2_Mid_Light_User,
+    ifnull(total_horas_simulcast_bbb_2_Mid_Light_User, 0) as total_horas_simulcast_bbb_2_Mid_Light_User,
+    ifnull(horas_ao_vivo_globo_2_Mid_Light_User, 0) AS horas_ao_vivo_globo_2_Mid_Light_User,
+    ifnull(horas_filmes_2_Mid_Light_User, 0) AS horas_filmes_2_Mid_Light_User,
+    ifnull(horas_mais_canais_2_Mid_Light_User, 0) AS horas_mais_canais_2_Mid_Light_User,
+    ifnull(horas_novela_2_Mid_Light_User, 0) AS horas_novela_2_Mid_Light_User,
+    ifnull(horas_series_2_Mid_Light_User, 0) AS horas_series_2_Mid_Light_User,
+    ifnull(horas_outros_conteudos_2_Mid_Light_User, 0) AS horas_outros_conteudos_2_Mid_Light_User,
+    ifnull(total_horas_bbb_3_Mid_Heavy_User, 0) AS total_horas_bbb_3_Mid_Heavy_User,
+    ifnull(total_horas_simulcast_bbb_3_Mid_Heavy_User, 0) as total_horas_simulcast_bbb_3_Mid_Heavy_User,
+    ifnull(horas_ao_vivo_globo_3_Mid_Heavy_User, 0) AS horas_ao_vivo_globo_3_Mid_Heavy_User,
+    ifnull(horas_filmes_3_Mid_Heavy_User, 0) AS horas_filmes_3_Mid_Heavy_User,
+    ifnull(horas_mais_canais_3_Mid_Heavy_User, 0) AS horas_mais_canais_3_Mid_Heavy_User,
+    ifnull(horas_novela_3_Mid_Heavy_User, 0) AS horas_novela_3_Mid_Heavy_User,
+    ifnull(horas_series_3_Mid_Heavy_User, 0) AS horas_series_3_Mid_Heavy_User,
+    ifnull(horas_outros_conteudos_3_Mid_Heavy_User, 0) AS horas_outros_conteudos_3_Mid_Heavy_User,
+    ifnull(total_horas_bbb_4_Heavy_User, 0) AS total_horas_bbb_4_Heavy_User,
+    ifnull(total_horas_simulcast_bbb_4_Heavy_User, 0) as total_horas_simulcast_bbb_4_Heavy_User,
+    ifnull(horas_ao_vivo_globo_4_Heavy_User, 0) AS horas_ao_vivo_globo_4_Heavy_User,
+    ifnull(horas_filmes_4_Heavy_User, 0) AS horas_filmes_4_Heavy_User,
+    ifnull(horas_mais_canais_4_Heavy_User, 0) AS horas_mais_canais_4_Heavy_User,
+    ifnull(horas_novela_4_Heavy_User, 0) AS horas_novela_4_Heavy_User,
+    ifnull(horas_series_4_Heavy_User, 0) AS horas_series_4_Heavy_User,
+    ifnull(horas_outros_conteudos_4_Heavy_User, 0) AS horas_outros_conteudos_4_Heavy_User
+  FROM
+    base1
+),
+
+consulta2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN total_horas_bbb_0_No_Live IS NULL THEN 0
+      ELSE total_horas_bbb_0_No_Live
+    END + CASE
+      WHEN total_horas_bbb_1_Light_User IS NULL THEN 0
+      ELSE total_horas_bbb_1_Light_User
+    END + CASE
+      WHEN total_horas_bbb_2_Mid_Light_User IS NULL THEN 0
+      ELSE total_horas_bbb_2_Mid_Light_User
+    END + CASE
+      WHEN total_horas_bbb_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE total_horas_bbb_3_Mid_Heavy_User
+    END + CASE
+      WHEN total_horas_bbb_4_Heavy_User IS NULL THEN 0
+      ELSE total_horas_bbb_4_Heavy_User
+    END AS horas_bbb,
+    CASE
+      WHEN total_horas_simulcast_bbb_0_No_Live IS NULL THEN 0
+      ELSE total_horas_simulcast_bbb_0_No_Live
+    END + CASE
+      WHEN total_horas_simulcast_bbb_1_Light_User IS NULL THEN 0
+      ELSE total_horas_simulcast_bbb_1_Light_User
+    END + CASE
+      WHEN total_horas_simulcast_bbb_2_Mid_Light_User IS NULL THEN 0
+      ELSE total_horas_simulcast_bbb_2_Mid_Light_User
+    END + CASE
+      WHEN total_horas_simulcast_bbb_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE total_horas_simulcast_bbb_3_Mid_Heavy_User
+    END + CASE
+      WHEN total_horas_simulcast_bbb_4_Heavy_User IS NULL THEN 0
+      ELSE total_horas_simulcast_bbb_4_Heavy_User
+    END AS horas_ao_vivo_bbb,
+  FROM
+    consulta
+),
+consulta3 AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_ao_vivo_globo_0_No_Live IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_0_No_Live
+    END + CASE
+      WHEN horas_filmes_0_No_Live IS NULL THEN 0
+      ELSE horas_filmes_0_No_Live
+    END + CASE
+      WHEN horas_mais_canais_0_No_Live IS NULL THEN 0
+      ELSE horas_mais_canais_0_No_Live
+    END + CASE
+      WHEN horas_novela_0_No_Live IS NULL THEN 0
+      ELSE horas_novela_0_No_Live
+    END + CASE
+      WHEN horas_series_0_No_Live IS NULL THEN 0
+      ELSE horas_series_0_No_Live
+    END + CASE
+      WHEN horas_outros_conteudos_0_No_Live IS NULL THEN 0
+      ELSE horas_outros_conteudos_0_No_Live
+    END + CASE
+      WHEN horas_ao_vivo_globo_1_Light_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_1_Light_User
+    END + CASE
+      WHEN horas_filmes_1_Light_User IS NULL THEN 0
+      ELSE horas_filmes_1_Light_User
+    END + CASE
+      WHEN horas_mais_canais_1_Light_User IS NULL THEN 0
+      ELSE horas_mais_canais_1_Light_User
+    END + CASE
+      WHEN horas_novela_1_Light_User IS NULL THEN 0
+      ELSE horas_novela_1_Light_User
+    END + CASE
+      WHEN horas_series_1_Light_User IS NULL THEN 0
+      ELSE horas_series_1_Light_User
+    END + CASE
+      WHEN horas_outros_conteudos_1_Light_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_1_Light_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_2_Mid_Light_User
+    END + CASE
+      WHEN horas_filmes_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_filmes_2_Mid_Light_User
+    END + CASE
+      WHEN horas_mais_canais_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_mais_canais_2_Mid_Light_User
+    END + CASE
+      WHEN horas_novela_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_novela_2_Mid_Light_User
+    END + CASE
+      WHEN horas_series_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_series_2_Mid_Light_User
+    END + CASE
+      WHEN horas_outros_conteudos_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_2_Mid_Light_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_filmes_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_filmes_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_mais_canais_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_mais_canais_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_novela_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_novela_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_series_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_series_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_outros_conteudos_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_4_Heavy_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_4_Heavy_User
+    END + CASE
+      WHEN horas_filmes_4_Heavy_User IS NULL THEN 0
+      ELSE horas_filmes_4_Heavy_User
+    END + CASE
+      WHEN horas_mais_canais_4_Heavy_User IS NULL THEN 0
+      ELSE horas_mais_canais_4_Heavy_User
+    END + CASE
+      WHEN horas_novela_4_Heavy_User IS NULL THEN 0
+      ELSE horas_novela_4_Heavy_User
+    END + CASE
+      WHEN horas_series_4_Heavy_User IS NULL THEN 0
+      ELSE horas_series_4_Heavy_User
+    END + CASE
+      WHEN horas_outros_conteudos_4_Heavy_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_4_Heavy_User
+    END + horas_bbb AS horas_total
+  FROM
+    consulta2
+),
+consulta4 AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_mais_canais_0_No_Live IS NULL THEN 0
+      ELSE horas_mais_canais_0_No_Live
+    END + CASE
+      WHEN horas_mais_canais_1_Light_User IS NULL THEN 0
+      ELSE horas_mais_canais_1_Light_User
+    END + CASE
+      WHEN horas_mais_canais_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_mais_canais_2_Mid_Light_User
+    END + CASE
+      WHEN horas_mais_canais_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_mais_canais_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_mais_canais_4_Heavy_User IS NULL THEN 0
+      ELSE horas_mais_canais_4_Heavy_User
+    END AS horas_mais_canais,
+    CASE
+      WHEN horas_novela_0_No_Live IS NULL THEN 0
+      ELSE horas_novela_0_No_Live
+    END + CASE
+      WHEN horas_novela_1_Light_User IS NULL THEN 0
+      ELSE horas_novela_1_Light_User
+    END + CASE
+      WHEN horas_novela_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_novela_2_Mid_Light_User
+    END + CASE
+      WHEN horas_novela_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_novela_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_novela_4_Heavy_User IS NULL THEN 0
+      ELSE horas_novela_4_Heavy_User
+    END AS horas_novela,
+    CASE
+      WHEN horas_outros_conteudos_0_No_Live IS NULL THEN 0
+      ELSE horas_outros_conteudos_0_No_Live
+    END + CASE
+      WHEN horas_outros_conteudos_1_Light_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_1_Light_User
+    END + CASE
+      WHEN horas_outros_conteudos_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_2_Mid_Light_User
+    END + CASE
+      WHEN horas_outros_conteudos_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_outros_conteudos_4_Heavy_User IS NULL THEN 0
+      ELSE horas_outros_conteudos_4_Heavy_User
+    END AS horas_outros_conteudos,
+    CASE
+      WHEN horas_series_0_No_Live IS NULL THEN 0
+      ELSE horas_series_0_No_Live
+    END + CASE
+      WHEN horas_series_1_Light_User IS NULL THEN 0
+      ELSE horas_series_1_Light_User
+    END + CASE
+      WHEN horas_series_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_series_2_Mid_Light_User
+    END + CASE
+      WHEN horas_series_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_series_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_series_4_Heavy_User IS NULL THEN 0
+      ELSE horas_series_4_Heavy_User
+    END AS horas_serie,
+    CASE
+      WHEN horas_ao_vivo_globo_0_No_Live IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_0_No_Live
+    END + CASE
+      WHEN horas_ao_vivo_globo_1_Light_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_1_Light_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_2_Mid_Light_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_ao_vivo_globo_4_Heavy_User IS NULL THEN 0
+      ELSE horas_ao_vivo_globo_4_Heavy_User
+    END AS horas_ao_vivo_globo,
+    CASE
+      WHEN horas_filmes_0_No_Live IS NULL THEN 0
+      ELSE horas_filmes_0_No_Live
+    END + CASE
+      WHEN horas_filmes_1_Light_User IS NULL THEN 0
+      ELSE horas_filmes_1_Light_User
+    END + CASE
+      WHEN horas_filmes_2_Mid_Light_User IS NULL THEN 0
+      ELSE horas_filmes_2_Mid_Light_User
+    END + CASE
+      WHEN horas_filmes_3_Mid_Heavy_User IS NULL THEN 0
+      ELSE horas_filmes_3_Mid_Heavy_User
+    END + CASE
+      WHEN horas_filmes_4_Heavy_User IS NULL THEN 0
+      ELSE horas_filmes_4_Heavy_User
+    END AS horas_filme
+  FROM
+    consulta3
+),
+consulta5 AS (
+  SELECT
+    *,
+    CASE
+      WHEN (horas_novela > horas_ao_vivo_globo)
+      AND (horas_novela > horas_mais_canais)
+      AND (horas_novela > horas_outros_conteudos)
+      AND (horas_novela > horas_serie)
+      AND (horas_novela > horas_filme) THEN 'Novela'
+      WHEN (horas_serie > horas_ao_vivo_globo)
+      AND (horas_serie > horas_mais_canais)
+      AND (horas_serie > horas_outros_conteudos)
+      AND (horas_serie > horas_novela)
+      AND (horas_serie > horas_filme) THEN 'Serie'
+      WHEN (horas_mais_canais > horas_ao_vivo_globo)
+      AND (horas_mais_canais > horas_serie)
+      AND (horas_mais_canais > horas_outros_conteudos)
+      AND (horas_mais_canais > horas_novela)
+      AND (horas_mais_canais > horas_filme) THEN 'Mais Canais'
+      WHEN (horas_ao_vivo_globo > horas_mais_canais)
+      AND (horas_ao_vivo_globo > horas_serie)
+      AND (horas_ao_vivo_globo > horas_outros_conteudos)
+      AND (horas_ao_vivo_globo > horas_novela)
+      AND (horas_ao_vivo_globo > horas_filme) THEN 'Ao Vivo TVG'
+      WHEN (horas_outros_conteudos > horas_mais_canais)
+      AND (horas_outros_conteudos > horas_serie)
+      AND (horas_outros_conteudos > horas_ao_vivo_globo)
+      AND (horas_outros_conteudos > horas_novela)
+      AND (horas_outros_conteudos > horas_filme) THEN 'Outros Conteudos'
+      WHEN (horas_filme > horas_mais_canais)
+      AND (horas_filme > horas_serie)
+      AND (horas_filme > horas_ao_vivo_globo)
+      AND (horas_filme > horas_novela)
+      AND (horas_filme > horas_outros_conteudos) THEN 'Filme'
+      ELSE 'Somente BBB'
+    END AS cluster_conteudo,
+    Case
+      when (horas_mais_canais < 1)
+      and (horas_serie < 1)
+      and (horas_novela < 1)
+      and (horas_filme < 1)
+      and (horas_ao_vivo_globo > horas_outros_conteudos) THEN 'Ao Vivo TVG'
+      when (horas_mais_canais < 1)
+      and (horas_serie < 1)
+      and (horas_novela < 1)
+      and (horas_filme < 1)
+      and (horas_outros_conteudos > horas_ao_vivo_globo) THEN 'Outros Conteudos'
+      when (horas_novela > horas_mais_canais)
+      and (horas_novela > horas_serie)
+      and (horas_novela > horas_filme) THEN 'Novela'
+      when (horas_serie > horas_mais_canais)
+      and (horas_serie > horas_novela)
+      and (horas_serie > horas_filme) THEN 'Serie'
+      when (horas_filme > horas_mais_canais)
+      and (horas_filme > horas_novela)
+      and (horas_filme > horas_serie) THEN 'Filme'
+      when (horas_mais_canais > horas_serie)
+      and (horas_mais_canais > horas_novela)
+      and (horas_mais_canais > horas_filme) THEN 'Mais Canais'
+      else 'Somente BBB'
+    end as cluster_conteudo_reduzido
+  FROM
+    consulta4
+),
+consulta6 AS (
+  SELECT
+    globo_id,
+    horas_bbb,
+    horas_ao_vivo_bbb,
+    horas_total,
+    semana_0_No_Live AS no_live,
+    semana_1_Light_User AS light_user,
+    semana_2_Mid_Light_User AS mid_light_user,
+    semana_3_Mid_Heavy_User AS mid_heavy_user,
+    semana_4_Heavy_User AS heavy_user,
+    cluster_conteudo,
+    cluster_conteudo_reduzido,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    assinou_cancelou_bbb_23,
+    consulta5.assinou_2024,
+    sol_cancel_vol_24,
+    min_semana,
+    max_semana,
+    (DATE_DIFF(max_semana, min_semana, WEEK)) + 1 AS semanas_total
+  FROM
+    consulta5
+    LEFT JOIN ${ref("bbb_24", "entrada_cluster_assinante")} USING (globo_id)
+    LEFT JOIN ${ref("bbb_24", "max_semana_assinante")} USING (assinou_2024)
+),
+consulta7 AS (
+  SELECT
+    * except(assinou_2024)
+,
+    consulta6.assinou_2024,
+    (
+      semanas_total - no_live - light_user - mid_light_user - mid_heavy_user - heavy_user
+    ) AS fora_cluster
+  FROM
+    consulta6
+),
+consulta8 AS (
+  SELECT
+    * except(assinou_2024)
+,
+    consulta7.assinou_2024,
+    CASE
+      WHEN heavy_user >= mid_heavy_user
+      AND heavy_user >= mid_light_user
+      AND heavy_user >= light_user
+      AND heavy_user >= no_live
+      AND heavy_user >= fora_cluster THEN '4. Heavy User'
+      WHEN mid_heavy_user >= heavy_user
+      AND mid_heavy_user >= mid_light_user
+      AND mid_heavy_user >= light_user
+      AND mid_heavy_user >= no_live
+      AND mid_heavy_user >= fora_cluster THEN '3. Mid-Heavy User'
+      WHEN mid_light_user >= heavy_user
+      AND mid_light_user >= mid_heavy_user
+      AND mid_light_user >= light_user
+      AND mid_light_user >= no_live
+      AND mid_light_user >= fora_cluster THEN '2. Mid-Light User'
+      WHEN light_user >= heavy_user
+      AND light_user >= mid_heavy_user
+      AND light_user >= mid_light_user
+      AND light_user >= no_live
+      AND light_user >= fora_cluster THEN '1. Light User'
+      WHEN no_live >= heavy_user
+      AND no_live >= mid_heavy_user
+      AND no_live >= mid_light_user
+      AND no_live >= light_user
+      AND no_live >= fora_cluster THEN '0. No Live'
+      ELSE 'Fora_Cluster'
+    END AS cluster_bbb_acumulado,
+    ROUND((horas_bbb) / horas_total, 2) AS share_total_bbb,
+    CASE
+      WHEN ROUND((horas_bbb) / horas_total, 2) >= 0.8 THEN '2. Alta Concentração'
+      WHEN ROUND((horas_bbb) / horas_total, 2) >= 0.5 THEN '1. Média Concentração'
+      ELSE '0. Diversificado'
+    END AS cluster_share_bbb_total
+  FROM
+    consulta7
+),
+consulta9 AS (
+  SELECT
+    *,
+    CASE
+      WHEN consulta8.assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '0. No Live'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 1
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '4. Heavy User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 2
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 3
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 4
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '1. Light User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 5
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '0. No Live'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 6
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '4. Heavy User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 7
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 8
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 9
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '1. Light User'
+      AND cluster_share_bbb_total = '2. Alta Concentração' THEN 10
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '0. No Live'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 11
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '4. Heavy User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 12
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 13
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 14
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '1. Light User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 15
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '0. No Live'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 16
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '4. Heavy User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 17
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 18
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 19
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '1. Light User'
+      AND cluster_share_bbb_total = '1. Média Concentração' THEN 20
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '0. Diversificado' THEN 21
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '0. Diversificado' THEN 22
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '3. Mid-Heavy User'
+      AND cluster_share_bbb_total = '0. Diversificado' THEN 23
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = '2. Mid-Light User'
+      AND cluster_share_bbb_total = '0. Diversificado' THEN 24
+      WHEN assinou_2024 IS TRUE
+      AND cluster_bbb_acumulado = 'Fora_Cluster' THEN 26
+      WHEN assinou_2024 IS FALSE
+      AND cluster_bbb_acumulado = 'Fora_Cluster' THEN 27
+      ELSE 25
+    END AS risco_churn_2024,
+    (
+      no_live + light_user + mid_light_user + mid_heavy_user + heavy_user
+    ) AS semanas_cluster_bbb,
+    (
+      (
+        no_live + light_user + mid_light_user + mid_heavy_user + heavy_user
+      ) / semanas_total
+    ) AS share_semanas_bbb
+  FROM
+    consulta8
+),
+bbb24 as (
+SELECT
+  globo_id,
+  cluster_bbb_acumulado,
+  cluster_share_bbb_total,
+  share_total_bbb,
+  share_semanas_bbb,
+  min_semana,
+  max_semana,
+  semanas_total,
+  semanas_cluster_bbb,
+  fora_cluster AS semanas_fora_cluster,
+  risco_churn_2024,
+  horas_bbb,
+  horas_ao_vivo_bbb,
+  horas_total,
+  no_live,
+  light_user,
+  mid_light_user,
+  mid_heavy_user,
+  heavy_user,
+  cluster_conteudo,
+  cluster_conteudo_reduzido,
+  consumiu_bbb_20,
+  assinou_cancelou_bbb_20,
+  consumiu_bbb_21,
+  assinou_cancelou_bbb_21,
+  consumiu_bbb_22,
+  assinou_cancelou_bbb_22,
+  consumiu_bbb_23,
+  assinou_cancelou_bbb_23,
+  assinou_2024,
+  sol_cancel_vol_24,
+  tipo_assinante,
+  canal_compra,
+  telefone,
+  produto,
+  produto_contratado,
+  row_number() over(partition by globo_id) as rn
+from
+  consulta9
+  left join (
+    select
+      *
+    except(Produto_Contratado),
+      Produto_Contratado as produto_contratado
+    from
+      ${ref("comunicacao", "ultima_comunicacao_assinante")}
+  ) using (globo_id)
+  qualify rn=1)
+  select * except(rn) from bbb24

@@ -1,0 +1,102 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_acao",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_acao']
+,bigquery: {
+    labels: {
+      mktcloud: "true",
+      urban: "list"
+    }
+  }
+}
+
+-------------------------------------VERSÃO 2---------------------------------------------------
+
+--macro cluster LF Ação
+
+--LF que consumiram programas do genero ação (vod ou ao vivo)
+
+with genero_acao as (
+SELECT distinct g.name, c.program.title, c.program.id, c.program.subset, c.program.metadata_scheme, c.program.format
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+where name LIKE '%Ação%'
+),
+
+consumo_em_acao as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_acao b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_de_acao as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND subgenero_programa in ('ACAO E AVENTURA')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo acao' as base
+FROM consumo_em_acao
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo acao' as base
+FROM consumo_em_programas_ao_vivo_de_acao),
+
+--LF que tentaram dar play nos canais Megapix ou Universal e levaram tapume nos últimos 30 dias.
+
+lf_tapumeacao_ultimos30d as (
+with tapume as (
+SELECT
+  *
+FROM
+   ${ref("consumo_clean", "tageamento_eventos")}
+WHERE 
+  eventCategory = 'agora'
+  AND eventAction in ('tapume.megapix', 'tapume.universal')
+  AND eventLabel = 'nao_assinante' 
+  AND table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+
+SELECT distinct a.globo_id_hit as globo_id, 'tapume' as base
+FROM tapume a
+INNER JOIN ${ref("usuarios", "Free users")} b 
+on a.globo_id_hit = b.globo_id
+where globo_id_hit is not null),
+
+--uniao de todos os atuais usuarios LF que:
+--consumiram programas vod do genero acao ou programas ao vivo do subgenero acao nos ultimos 180 dias, ou
+--tentaram dar play nos canais Megapix ou Universal e levaram tapume nos últimos 30 dias
+
+basefinal as (
+SELECT distinct globo_id, base
+FROM uniao_consumo_vod_e_ao_vivo
+union distinct
+SELECT distinct globo_id, base
+FROM lf_tapumeacao_ultimos30d
+),
+
+basefinal_2 as (
+select *
+from basefinal
+order by 1,2
+),
+
+basefinal_3 as (
+select distinct globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+from basefinal_2
+group by 1)
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal_3 d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Logado Free"
+
+
+--select distinct count(distinct globo_id) as gid, bases 
+--from oi
+--group by rollup(2)
+--order by 2 asc

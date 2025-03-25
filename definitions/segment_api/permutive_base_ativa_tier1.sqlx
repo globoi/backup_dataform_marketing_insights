@@ -1,0 +1,13 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_base_ativa_tier1'],
+  name: 'permutive_base_ativa_tier1',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  DISTINCT globo_id as user_id
+  FROM ${ref("macro_clusters_mkt","mktflow_assinante_tier1_cluster_baseativa")}

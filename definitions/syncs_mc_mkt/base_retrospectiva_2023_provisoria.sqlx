@@ -1,0 +1,14 @@
+config {
+  type: "table",
+  schema: "syncs_mc_mkt"
+
+}
+
+SELECT
+  *,
+  row_number() OVER (
+    ORDER BY
+      globo_id
+  ) as ordem
+FROM
+  ${ref('retrospectiva_2023', 'base_retrospectiva_2023_provisoria')}

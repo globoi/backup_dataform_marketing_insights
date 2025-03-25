@@ -1,0 +1,77 @@
+config {
+  type: 'table',
+    name: 'jaccard_indice',
+  schema: 'consumo',
+  description: '',
+  columns: {
+  }
+}
+WITH
+data_intersection AS(
+  SELECT
+    program_id,
+    program_title,
+    url_for_consumption,
+    proximo_program_id,
+    proximo_program_title,
+    proximo_url_for_consumption,
+    COUNT(DISTINCT userid) AS qtd_intersecao
+  FROM 
+    ${ref("consumo", "data_prep")}
+  GROUP BY
+    program_id,
+    program_title,
+    url_for_consumption,
+    proximo_program_id,
+    proximo_program_title,
+    proximo_url_for_consumption
+),
+
+data_union AS(
+  SELECT
+    program_id,
+    COUNT(DISTINCT userid) AS qtd_users_program
+  FROM
+    ${ref("consumo", "data_prep")}
+  GROUP BY
+    program_id
+),
+
+data_union_join AS(
+  SELECT
+    program_id AS proximo_program_id,
+    qtd_users_program AS proximo_qtd_users_program
+  FROM
+    data_union
+),
+
+jaccard_1 AS (
+  SELECT
+    *,
+    SAFE_DIVIDE(qtd_intersecao, (qtd_users_program + proximo_qtd_users_program - qtd_intersecao)) AS indice_jaccard
+  FROM
+    data_intersection
+    INNER JOIN data_union USING(program_id)
+    INNER JOIN data_union_join  USING(proximo_program_id)
+),
+
+jaccard AS (
+  SELECT
+    program_id,
+    program_title,
+    url_for_consumption,
+    proximo_program_id,
+    proximo_program_title,
+    proximo_url_for_consumption,
+    indice_jaccard,
+    qtd_intersecao,
+    qtd_users_program,
+    proximo_qtd_users_program,
+    ROW_NUMBER() OVER(PARTITION BY program_id ORDER BY indice_jaccard DESC) AS rank_jaccard
+  FROM
+    jaccard_1
+  QUALIFY
+    rank_jaccard <= 50
+)
+
+SELECT * FROM jaccard

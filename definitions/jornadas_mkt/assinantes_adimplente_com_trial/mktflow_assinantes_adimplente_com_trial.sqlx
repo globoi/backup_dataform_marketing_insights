@@ -1,0 +1,44 @@
+config {
+  type: 'table',
+  tags: ['assinantes_adimplente_com_trial', 'schedule_tag=jornadas_mkt_mktflow_assinantes_adimplente_com_trial'],
+  name: 'mktflow_assinantes_adimplente_com_trial',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+  SELECT
+    DISTINCT
+    globo_id,
+    info.id_asset,
+    tipo_assinante,
+    mais_canais,
+    produto_contratado,
+    CAST(null AS BOOL) AS em_ativacao, --campo excluido na migracao para gold em Ago 2023
+    info.dt_assinatura_comeco,
+    canal_compra,
+    DATETIME(data_hora_compra) AS data_hora_compra,
+    produto,
+    origem,
+    assinatura_gplay,
+    tempo_de_base_agrupado,
+    CAST(null AS BOOL) AS unsubscribed_email,
+    CAST(null AS BOOL) AS unsubscribed_push,    
+    CURRENT_DATE() AS dt_proc,
+    info.gplay_basico,
+    info.gplay_padrao,
+    info.gplay_padrao_ads,
+    info.combo
+  FROM
+  ${ref("usuarios", "base_ativa_pagante_com_trial_new")}
+  ,UNNEST(info) AS info
+  QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY globo_id, tipo_assinante
+  ORDER BY dt_assinatura_comeco ASC) = 1
+

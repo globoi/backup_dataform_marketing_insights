@@ -1,0 +1,81 @@
+config {
+  type: 'table',
+  schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_raiox_bbb_25_lf_ultima_comunicacao'
+    ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_25",
+      owner: "martech"
+
+    }
+  },
+  description: 'Tabela com os usuários distintos que contém na tabela raiox_bbb_25_lf_agrupado e os dados de comunicação desses usuários.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    tipo_usuario: 'Classificação do usuário em Logado Free/Ex-Assinante.', 
+    telefone: 'Flag se o usuário possui telefone cadastrado.',
+    endereco: 'Flag se o usuário possui endereço cadastrado.',
+    dt_aniversario: 'Flag se o usuário possui data de aniversário cadastrada.',
+    gender: 'Flag se o usuário possui gênero cadastrado.',
+    age: 'Flag se o usuário possui idade cadastrado.',
+    first_play: 'Informa qual o primeiro programa que o usuário assistiu.',
+    first_play_subset: 'Informa qual o primeiro subset que o usuário assistiu.',
+    data_first_play: 'Informa qual a primeira data que o usuário assistiu seu primeiro programa.',
+    ultimo_consumo: 'Informa qual o último programa que o usuário assistiu.',
+    ultimo_consumo_subset: 'Informa qual o último subset que o usuário assistiu.',
+    data_ultimo_consumo: 'Informa qual a última data que o usuário assistiu seu último programa.',
+    whatsapp_optin_datetime: 'Informa a data em que o usuário realizou o optin no whatsapp.',
+    whatsapp_optin_status: 'Informa se o usuário possui optin no whatsapp.',
+    push_ultimo_data_enviado: 'Informa a data do último push enviado pro usuário.',
+    push_ultimo_titulo_enviado: 'Informa o título do último push enviado pro usuário.',
+    push_ultimo_descricao_enviado: 'Informa a descrição do último push enviado pro usuário.',
+    push_ultimo_data_aberto: 'Informa a data do último push aberto pelo usuário.',
+    push_ultimo_titulo_aberto: 'Informa o título do último push aberto pelo usuário.',
+    push_ultimo_descricao_aberto: 'Informa a descrição do último push aberto pelo usuário.',
+    push_perfil_uso: 'Informa o perfil de push do usuário. Ex: Se abriu push há mais de 1 mês.',
+    push_qtd_enviado_30D: 'Quantidade de push enviados para o usuário nos últimos 30 dias.',
+    push_qtd_aberto_30D: 'Quantidade de push abertos pelo usuário nos últimos 30 dias.',
+    push_flag_enviado_30D: 'Flag informando se o usuário recebeu push nos últimos 30 dias.',
+    push_flag_aberto_30D: 'Flag informando se o usuário abriu push nos últimos 30 dias.',
+    push_optout_qtd: 'Quantidade de opt out em push que o usuário possui.',
+    push_optout_ultimo_data: 'Última data em que o usuário realizou opt out.',
+    push_optout_status: 'Informa se o usuário possui push ativo ou não.',
+    email_qtd_enviado_30D: 'Quantidade de e-mails enviados para o usuário nos últimos 30 dias.',
+    email_ultimo_data_enviado: 'Informa a data do último e-mail enviado pro usuário.',
+    email_ultimo_data_click: 'Informa a data do último click em e-mail pelo usuário.',
+    email_ultimo_data_aberto: 'Informa a data do último e-mail aberto pelo usuário.',
+    email_qtd_aberto_30D: 'Quantidade de e-mails abertos pelo usuário nos últimos 30 dias.',
+    email_perc_aberto_30D: 'Percentual de abertura de e-mail pelo usuário nos últimos 30 dias.',
+    email_perfil_30D: 'Informa o perfil de e-mail do usuário. Ex: Heavy User (abriu pelo menos 50% dos e-mails).',
+    email_flag_enviado_30D: 'Flag informando se o usuário recebeu e-mail nos últimos 30 dias.',
+    email_flag_aberto_30D: 'Flag informando se o usuário abriu e-mail nos últimos 30 dias.',
+    appopen_qtd_30D: 'Quantidade de vezes que o usuário abriu o app nos últimos 30 dias.',
+    appopen_qtd_devices: 'Quantidade de devices que o usuário usou para abrir o app.',
+    appopen_qtd_dias: 'Quantidade de dias que o usuário abriu o app.',
+    appopen_ultimo_data: 'Última data que o usuário abriu o app.',
+    appopen_flag_30D: 'Flag informando se o usuário abriu o app nos últimos 30 dias.',
+    acesso_qtd_dias: 'Quantidade de dias que o usuário acesso a plataforma.',
+    acesso_ultima_data: 'Última data que o usuário acessou a plataforma.',
+    acesso_qtd_plataformas: 'Quantidade de plataformas que o usuário acessou.',
+    acesso_flag_30D: 'Flag se o usuário acessou a plataforma nos últimos 30 dias.',
+  }
+}
+
+with cluster_bbb as (
+select distinct globo_id,tipo_usuario from ${ref("bbb_25","raiox_bbb_25_lf_agrupado")})
+select * except(tipo_cadastro,tipo_assinante,
+data_hora_compra,
+produto,
+id_asset,
+mais_canais,
+dt_assinatura_comeco,
+canal_compra,
+tempo_de_base_agrupado,
+assinatura_gplay,
+Produto_Contratado,
+origem,
+numero_assinaturas,
+numero_dependentes,address_state,consumo_qtd_dias,consumo_qtd_midia,consumo_qtd_programs,consumo_mean_hwatched,consumo_tipo_conteudo,consumo_flag_30D) from cluster_bbb inner join ${ref("comunicacao","ultima_comunicacao_geral")} using(globo_id)
+where tipo_cadastro='Logado Free'

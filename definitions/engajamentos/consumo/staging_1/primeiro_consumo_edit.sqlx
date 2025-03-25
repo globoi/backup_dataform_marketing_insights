@@ -1,0 +1,7 @@
+config {
+  type: 'table',
+  schema: 'consumo',
+  description: '',
+  columns: {
+  }
+}

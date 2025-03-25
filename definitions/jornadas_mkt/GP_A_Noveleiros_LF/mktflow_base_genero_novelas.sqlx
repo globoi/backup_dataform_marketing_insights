@@ -1,0 +1,34 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_genero_novelas',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_noveleiros_lf','schedule_tag=jornadas_mkt_mktflow_base_genero_novelas'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+with todos_os_generos as (
+SELECT distinct g.name, c.program.title,c.program.id, c.program.metadata_scheme
+FROM ${ref("conteudo", "all_content_program")} as c,
+--`gglobo-pp-globoplay-hdg-prd.conteudo.all_content_program` c,
+UNNEST(c.genres) g),
+
+genero_novela as (
+SELECT *
+FROM todos_os_generos
+WHERE metadata_scheme in ('soap_opera')
+)
+
+SELECT a.program_title, SUM(a.playcount) AS total_playcount
+FROM ${ref("consumo_enriched", "all_impression")} as a
+--`gglobo-foundation-psd-hdg-prd.consumo_enriched.all_impression` a
+INNER JOIN genero_novela b
+on a.program_id = b.id
+WHERE DATE(a.date) BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) AND CURRENT_DATE()
+GROUP BY a.program_title
+ORDER BY total_playcount DESC
+LIMIT 10

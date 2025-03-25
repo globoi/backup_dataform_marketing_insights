@@ -1,0 +1,299 @@
+config {
+  type: "incremental",
+  schema: "xuxaverso",
+  uniqueKey: ["globo_id"],
+  description: 'Tabela com os usuários que consumiram algum conteúdo relacionado à Xuxa desde o início de 2022 no gplay e interagiram, ou não, em outras plataformas, como gshow e g1.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    tipo_cadastro: 'Identifica se o usuário é Assinante ou Logado Free.',
+    gplay_qtd_midias: 'Quantidade de mídias distintas relacionadas à Xuxa que o usuário consumiu.',
+    gplay_qtd_programas: 'Quantidade de programas distintos relacionados à Xuxa que o usuário consumiu.',
+    gplay_soma_horas: 'Total de horas consumidas pelo usuário nos conteudos relacionados à Xuxa.',
+    gplay_qtd_dias: 'Quantidade de dias distintos que o usuario consumiu conteudos relacionados à Xuxa.',
+    gplay_min_data: 'Data do primeiro consumo do usuário em algum conteudo relacionado à Xuxa.',
+    gplay_max_data: 'Data do ultimo consumo do usuário em algum conteudo relacionado à Xuxa.',
+    assistiu_trailer_doc: 'Identifica se o usuário assistiu ou não o trailer do documentário da Xuxa.',
+    gplay: {
+      description: "Array com as informações de mídias, programas e títulos das mídias assistidas.",
+      columns: {
+        midias_assistidas: "Array com as mídias assistidas.",
+        titulo_midias_assistidas: "Array com os títulos das mídias assistidas.",
+        programas_assistidos: "Array com os programas assistidos."
+      }
+    },
+    gshow_views: 'Quantidade de views que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do Gshow.',
+    gshow_pageviews: 'Quantidade de pageviews que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do Gshow.',
+    g1_views: 'Quantidade de views que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do G1.',
+    g1_pageviews: 'Quantidade de pageviews que o usuario tem em conteudos relacionados à Xuxa dentro da plataforma do G1.',
+    tipo_assinante: 'Identifica se o usuário é Titular, Dependente ou Logado Free.',
+    id_asset: 'Código que identifica a assinatura.',
+    data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+    dt_assinatura_comeco: 'Identifica a data de início de vigência da assinatura, ou para o LF, a data de início do consumo free.',
+    produto: 'Identifica a periodicidade da cobrança do produto adquirido. Ex: Anual, bianual ou mensal.',
+    canal_compra: 'Identifica o canal de aquisição da assinatura (WEB, Inaap Google etc).',
+    produto_contratado: 'Identifica o produto contratado pelo usuário (Ex.: Globoplay + canais ao vivo, Globoplay) ou Globoplay Free para o usuário LF.',
+    internacional: 'Identifica se o usuário é internacional ou não.',
+    telefone: 'Identifica se o usuário possui o telefone cadastrado.',
+    endereco: 'Identifica se o usuário possui o endereço cadastrado',
+    dt_aniversario: 'Identifica se o usuário possui a data de nascimento cadastrada',
+    gender: 'Identifica o gênero do usuário.',
+    age: 'Identifica a idade do assinante.',
+    address_state: 'Identifica o estado de residência.',
+    first_play: 'Identifica o título do conteúdo do primeiro consumo do usuário.',
+    ultimo_consumo: 'Identifica o conteúdo do último consumo do usuário.',
+    data_ultimo_consumo: 'Identifica a data do último consumo do usuário.',
+    whatsapp_optin_status: 'Identifica se o usuário possui optin no WhatsApp.',
+    push_perfil_uso: 'Perfil do usuário em relação ao engajamento com push (Ex.: 0. Nunca Abriu um Push).',
+    push_flag_enviado_30D: 'Check se houve push enviado nos últimos 30 dias.',
+    push_flag_aberto_30D: 'Check se houve push aberto nos últimos 30 dias.',
+    push_optout_status: 'Identifica o status atual para recebimento de push (Push Ativo ou Opt-out).',
+    email_perfil_30D: 'Perfil do usuário em relação ao engajamento com e-mail (Ex.: 3. Heavy User).',
+    email_flag_aberto_30D: 'Check se houve e-mail aberto nos últimos 30 dias.',
+    appopen_flag_30D: 'Check se houve abertura de aplicativo nos últimos 30 dias, monitorado por Urban.',
+    acesso_flag_30D: 'Check se houve acesso ao Globoplay nos últimos 30 dias, monitorado por GA.'
+
+  }
+}
+pre_operations {
+  declare date_inc default(
+    ${when(incremental(),
+    `SELECT MAX(gplay_max_data) FROM ${self()}`,
+    `SELECT DATE('2021-12-31')`)}
+  )
+}
+
+WITH 
+  gplay AS (
+  SELECT
+    DISTINCT userId AS globo_id,
+    COUNT(DISTINCT i.mediaid) AS gplay_qtd_midias,
+    COUNT(DISTINCT i.program_id) AS gplay_qtd_programas,
+    SUM(i.hours_watched) AS gplay_soma_horas,
+    COUNT(DISTINCT i.date) AS gplay_qtd_dias,
+    min(i.date) as gplay_min_data,
+    max(i.date) as gplay_max_data
+  FROM
+    ${ref('consumo_enriched', 'all_impression')} as i
+  INNER JOIN
+    ${ref('xuxaverso', 'conteudos_gplay')}
+  USING
+    (mediaid)
+  WHERE
+    date > date_inc
+  GROUP BY
+    1),
+
+gplay_1 as (
+  select
+    globo_id,
+    sum(gplay_qtd_midias) as gplay_qtd_midias,
+    sum(gplay_qtd_programas) as gplay_qtd_programas,
+    sum(gplay_soma_horas) as gplay_soma_horas,
+    sum(gplay_qtd_dias) as gplay_qtd_dias,
+    min(gplay_min_data) as gplay_min_data,
+    max(gplay_max_data) as gplay_max_data
+  from
+    (
+      select
+        *
+      from
+        gplay
+        ${
+          when(incremental(),
+            `
+            UNION ALL
+            SELECT sf.globo_id,sf.gplay_qtd_midias,sf.gplay_qtd_programas,sf.gplay_soma_horas,sf.gplay_qtd_dias,sf.gplay_min_data,sf.gplay_max_data
+            FROM ${self()} AS sf
+            INNER JOIN gplay USING(globo_id)
+            `)
+        }
+    ) group by 1
+        ),
+
+  pagina_gshow AS (
+  SELECT
+    globoId AS globo_id,
+    COUNT(1) AS gshow_views,
+    COUNTIF(h.tipoConsumo = 'pageview') AS gshow_pageviews
+  FROM
+    ${ref('foundation_gshow', 'foundation_gshow_sessions')} AS s,
+    UNNEST(hits) AS h
+  WHERE
+    DATA > date_inc
+    AND LOWER(screenName) LIKE '%xuxa%'
+    AND LOWER(screenName) NOT LIKE '%nadador%'
+  GROUP BY
+    1 ),
+
+pagina_gshow_1 as (
+  select
+    globo_id,
+    sum(gshow_views) as gshow_views,
+    sum(gshow_pageviews) as gshow_pageviews
+  from
+    (
+      select
+        *
+      from
+        pagina_gshow
+        ${
+          when(incremental(),
+            `
+            UNION ALL
+            SELECT sf.globo_id, sf.gshow_views, sf.gshow_pageviews
+            FROM ${self()} AS sf
+            INNER JOIN gplay USING(globo_id)
+            `)
+        }
+    ) group by 1
+        ),
+
+  pagina_g1 AS (
+  SELECT
+    globoId AS globo_id,
+    COUNT(1) AS g1_views,
+    COUNTIF(h.tipoConsumo = 'pageview') AS g1_pageviews
+  FROM
+    ${ref('foundation_g1', 'foundation_g1_sessions')} AS s,
+    UNNEST(hits) AS h
+  WHERE
+    DATA > date_inc
+    AND LOWER(screenName) LIKE '%xuxa%'
+    AND LOWER(screenName) NOT LIKE '%nadador%'
+  GROUP BY
+    1 ),
+
+pagina_g1_1 as (
+  select
+    globo_id,
+    sum(g1_views) as g1_views,
+    sum(g1_pageviews) as g1_pageviews
+  from
+    (
+      select
+        *
+      from
+        pagina_g1
+        ${
+          when(incremental(),
+            `
+            UNION ALL
+            SELECT sf.globo_id, sf.g1_views, sf.g1_pageviews
+            FROM ${self()} AS sf
+            INNER JOIN gplay USING(globo_id)
+            `)
+        }
+    ) group by 1
+        )
+
+SELECT
+  DISTINCT globo_id,
+  case when (assinatura_gold='Logado Free' and produto_contratado is null) then 'Logado Free Internacional' 
+  when tipo_cadastro = 'Assinante' then 'Assinante Nacional'
+  when tipo_cadastro = 'Logado Free' then 'Logado Free Nacional'
+  when tipo_cadastro = 'Internacional' then 'Assinante Internacional'
+  else tipo_cadastro end as tipo_cadastro,
+  gplay_qtd_midias,
+  gplay_qtd_programas,
+  gplay_soma_horas,
+  gplay_qtd_dias,
+  gplay_min_data,
+  gplay_max_data,
+  IFNULL(gshow_views,0) AS gshow_views,
+  IFNULL(gshow_pageViews,0)AS gshow_pageviews,
+  IFNULL(g1_views,0) AS g1_views,
+  IFNULL(g1_pageViews,0) AS g1_pageviews,
+  tipo_assinante,c.id_asset,
+data_hora_compra,
+c.dt_assinatura_comeco,
+produto,
+c.canal_compra,
+Produto_Contratado as produto_contratado,
+internacional,
+c.telefone,
+c.endereco,
+dt_aniversario,
+c.gender,
+c.age,
+c.address_state,
+first_play,
+ultimo_consumo,
+data_ultimo_consumo,
+c.whatsapp_optin_status,
+c.push_perfil_uso,
+c.push_flag_enviado_30D,
+c.push_flag_aberto_30D,
+c.push_optout_status,
+c.email_perfil_30D,
+c.email_flag_aberto_30D,
+c.appopen_flag_30D,
+c.acesso_flag_30D
+FROM
+  gplay_1
+LEFT JOIN
+  pagina_gshow_1
+USING
+  (globo_id)
+LEFT JOIN
+  pagina_g1_1
+USING
+  (globo_id)
+  left join (select distinct globo_id,
+  id_asset,
+  tipo_assinante,
+tipo_cadastro,
+data_hora_compra,
+cast(dt_assinatura_comeco as date) as dt_assinatura_comeco ,
+produto,
+canal_compra,
+Produto_Contratado,
+false as internacional,
+telefone,
+endereco,
+dt_aniversario,
+gender,
+age,
+address_state,
+first_play,
+ultimo_consumo,
+data_ultimo_consumo,
+whatsapp_optin_status,
+push_perfil_uso,
+push_flag_enviado_30D,
+push_flag_aberto_30D,
+push_optout_status,
+email_perfil_30D,
+email_flag_aberto_30D,
+appopen_flag_30D,
+acesso_flag_30D from ${ref('comunicacao', 'ultima_comunicacao_geral')}
+  union distinct
+  select distinct globo_id,
+  id_asset,
+  cast(null as string) as tipo_assinante,
+'Internacional'as tipo_cadastro,
+cast(null as timestamp) as data_hora_compra,
+dt_assinatura_comeco,
+'mensal'as produto,
+canal_compra,
+'Globoplay Internacional' as Produto_Contratado,
+true as internacional,
+telefone,
+endereco,
+cast(null as BOOLEAN) as dt_aniversario,
+gender,
+age,
+cast(null as string) as address_state,
+cast(null as string) as first_play,
+cast(null as string) as ultimo_consumo,
+cast(null as date) as data_ultimo_consumo,
+whatsapp_optin_status,
+push_perfil_uso,
+push_flag_enviado_30D,
+push_flag_aberto_30D,
+push_optout_status,
+email_perfil_30D,
+email_flag_aberto_30D,
+appopen_flag_30D,
+acesso_flag_30D from ${ref('internacional', 'ultima_comunicacao_internacional')}
+  ) as c using(globo_id)
+  left join ${ref('internacional','base_lf_internacional')} using(globo_id)

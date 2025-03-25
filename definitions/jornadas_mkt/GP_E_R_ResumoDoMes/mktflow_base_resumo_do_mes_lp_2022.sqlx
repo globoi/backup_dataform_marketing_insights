@@ -1,0 +1,142 @@
+config {
+  type: "table",
+  name: "mktflow_base_resumo_do_mes_lp_2022",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_R_ResumoDoMes"]
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+uniao_2022_1 AS (
+    SELECT * FROM 
+    (SELECT
+        globo_id,
+        dt_assinatura_comeco AS assinante_desde,
+        mes,
+        badge
+    FROM
+        ${ref("jornadas_mkt", "perfis_union")}
+        INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")}
+        USING(globo_id))
+    PIVOT
+        (COUNT(DISTINCT(mes)) FOR badge IN (
+            "Ao_Vivaco", "Apegado", "Cinefilo", "Ecletico", "Humorista",
+            "Ligeirinho", "Maratonista", "Noveleiro", "Reporter", "Tecnologico", "Viciado", "Vipao"
+        ))
+),
+
+uniao_2022_2 AS (
+    SELECT
+        globo_id, Ao_Vivaco, Apegado, Cinefilo,
+       Ecletico, Humorista, Ligeirinho, Maratonista, Noveleiro, 
+       Reporter, Tecnologico, Viciado, Vipao,
+       MIN(assinante_desde) AS assinante_desde
+    FROM
+        uniao_2022_1
+    GROUP BY
+        globo_id, Ao_Vivaco, Apegado, Cinefilo,
+        Ecletico, Humorista, Ligeirinho, Maratonista, 
+       Noveleiro, Reporter, Tecnologico, Viciado, Vipao
+),
+
+uniao_2022_3 AS (
+    SELECT
+        * EXCEPT(Vipao),
+        Ao_Vivaco IN (1,2) AS ao_vivaco_bronze,
+        Ao_Vivaco IN (3,4,5,6,7,8) AS ao_vivaco_prata,
+        Ao_Vivaco >= 9 AS ao_vivaco_ouro,
+        Apegado IN (1,2) AS apegado_bronze,
+        Apegado IN (3,4,5,6,7,8) AS apegado_prata,
+        Apegado >= 9 AS apegado_ouro,
+        Cinefilo IN (1,2) AS cinefilo_bronze,
+        Cinefilo IN (3,4,5,6,7,8) AS cinefilo_prata,
+        Cinefilo >= 9 AS cinefilo_ouro,
+        Ecletico IN (1,2) AS ecletico_bronze,
+        Ecletico IN (3,4,5,6,7,8) AS ecletico_prata,
+        Ecletico >= 9 AS ecletico_ouro,
+        Humorista IN (1,2) AS humorista_bronze,
+        Humorista IN (3,4,5,6,7,8) AS humorista_prata,
+        Humorista >= 9 AS humorista_ouro,
+        Ligeirinho IN (1,2) AS ligeirinho_bronze,
+        Ligeirinho IN (3,4,5,6,7,8) AS ligeirinho_prata,
+        Ligeirinho >= 9 AS ligeirinho_ouro,
+        Maratonista IN (1,2) AS maratonista_bronze,
+        Maratonista IN (3,4,5,6,7,8) AS maratonista_prata,
+        Maratonista >= 9 AS maratonista_ouro,
+        Noveleiro IN (1,2) AS noveleiro_bronze,
+        Noveleiro IN (3,4,5,6,7,8) AS noveleiro_prata,
+        Noveleiro >= 9 AS noveleiro_ouro,
+        Reporter IN (1,2) AS reporter_bronze,
+        Reporter IN (3,4,5,6,7,8) AS reporter_prata,
+        Reporter >= 9 AS reporter_ouro,
+        Tecnologico IN (1,2) AS tecnologico_bronze,
+        Tecnologico IN (3,4,5,6,7,8) AS tecnologico_prata,
+        Tecnologico >= 9 AS tecnologico_ouro,
+        Viciado IN (1,2) AS viciado_bronze,
+        Viciado IN (3,4,5,6,7,8) AS viciado_prata,
+        Viciado >= 9 AS viciado_ouro,
+        Vipao IS NOT NULL AS Vipao                                 
+    FROM
+        uniao_2022_2
+),
+
+uniao_2022 AS (
+    SELECT
+        uniao3.*,
+        COALESCE(ProgramaMaisAssistido_program_id, 0) AS ProgramaMaisAssistido_program_id,
+        CAST(COALESCE(ROUND(ProgramaMaisAssistido_Horas_Assistidas),0) AS INT64) AS ProgramaMaisAssistido_Horas_Assistidas,
+        COALESCE(ProgramaMaisAssistido_Programa, "0") AS ProgramaMaisAssistido_Programa,
+        COALESCE(SerieMaisAssistida_program_id,0) AS SerieMaisAssistida_program_id,
+        COALESCE(SerieMaisAssistida_Programa, "0") AS SerieMaisAssistida_Programa,        
+        CAST(COALESCE(ROUND(Series_Horas_Assistidas_Series), 0) AS INT64) AS Series_Horas_Assistidas_Series,
+        COALESCE(Series_Series_Assistidas, 0) AS Series_Series_Assistidas,
+        COALESCE(Novelas_Novelas_Assistidas, 0) AS Novelas_Novelas_Assistidas,
+        CAST(COALESCE(ROUND(Novelas_Horas_Assistidas_Novelas), 0) AS INT64) AS Novelas_Horas_Assistidas_Novelas,
+        CAST(COALESCE(ROUND(Horas_Assistidas_Filmes), 0) AS INT64) AS Horas_Assistidas_Filmes,
+        COALESCE(Filmes_Assistidos, 0) AS Filmes_Assistidos
+
+    FROM
+        uniao_2022_3 uniao3
+        INNER JOIN ${ref("jornadas_mkt","resumo_do_mes_2022_dados_macros")} rm
+        USING(globo_id)
+),
+
+base_final_1 AS (
+    SELECT
+        globo_id,
+        CAST(ROUND(SUM(hours_watched)) AS INT64) AS hrs_consumidas,
+        COUNT(DISTINCT(program_id)) AS programas_assistidos,
+        COUNT(DISTINCT(mediaid)) AS episodios_assistidos
+    FROM
+        ${ref("consumo_enriched", "all_impression")}
+    WHERE
+        EXTRACT(YEAR FROM `timestamp`) >= 2022
+    GROUP BY
+        globo_id
+),
+
+base_final AS (
+    SELECT DISTINCT
+        *
+    FROM
+        uniao_2022
+        INNER JOIN base_final_1
+        USING(globo_id)
+),
+
+resumo AS (
+    SELECT DISTINCT
+        bf.* EXCEPT(Vipao),
+        mais_canais AS Vipao
+    FROM
+        base_final bf
+        INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")} ba
+        USING(globo_id)
+)
+
+
+SELECT * FROM resumo

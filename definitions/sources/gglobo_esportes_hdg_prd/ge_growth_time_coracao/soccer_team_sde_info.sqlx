@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-esportes-hdg-prd",
+  schema: "ge_growth_time_coracao",
+  name: "soccer_team_sde_info",
+  description: ""
+}

@@ -1,0 +1,27 @@
+config {
+  type: 'table',
+  name: 'atualizacao_base_produto_contratado_assinante',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_atualizacao_base_produto_contratado_assinante',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {
+  }
+}
+
+WITH
+  tabela AS (
+  SELECT
+    DATETIME(data_hora_compra, "America/Sao_Paulo") AS data_hora_compra,
+    DATETIME(data_first_play, "America/Sao_Paulo") AS data_first_play,
+    data_ultimo_consumo
+  FROM
+    ${ref('usuarios', 'base_produto_contratado_assinante')})
+SELECT
+  MAX(data_hora_compra) AS max_data_hora_compra,
+  MAX(data_ultimo_consumo) AS max_data_ultimo_consumo,
+  MAX(data_first_play) AS max_data_first_play
+FROM
+  tabela

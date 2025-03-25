@@ -1,0 +1,49 @@
+config {
+  type: "table",
+  name: "Lst_Rec_Pers_Genero_T5_Pivoted",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_Lst_Rec_Pers_Genero_T5_Pivoted']
+}
+
+WITH trilho_to_pivote AS
+(
+  SELECT 
+    globo_id,
+    rank_final,
+    title_id
+  FROM
+  ${ref("jornadas_mkt", "Trilho_Rec_Pers_por_Genero_T5")}
+),
+new_trilho AS
+(
+  SELECT 
+    *
+  FROM trilho_to_pivote
+  PIVOT
+  (
+    MAX(title_id)
+    FOR rank_final IN (1,2,3,4,5)
+  )
+)
+
+SELECT
+  globo_id,
+  _1 AS rank_1,
+  _2 AS rank_2,
+  _3 AS rank_3,
+  _4 AS rank_4,
+  _5 AS rank_5,
+  CASE 
+    WHEN globo_id IS NOT NULL THEN TRUE 
+    ELSE FALSE 
+  END AS personalizado
+FROM new_trilho
+
+
+
+ 
+
+
+
+
+  

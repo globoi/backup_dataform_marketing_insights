@@ -1,0 +1,32 @@
+config {
+  type: 'table',
+  name: 'atualizacao_click',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_atualizacao_click',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH
+  click AS (
+  SELECT
+    DATETIME(EventDate, "America/Sao_Paulo") AS EventDate,
+    SubscriberID
+  FROM
+    ${ref('mkt_clean','click')})
+SELECT
+  COUNT(DISTINCT SubscriberID) AS qts_SubscriberID,
+  DATE(EventDate) AS EventDate
+FROM
+  click
+WHERE
+  EventDate >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+GROUP BY
+  2
+ORDER BY
+  2 desc
+
+    

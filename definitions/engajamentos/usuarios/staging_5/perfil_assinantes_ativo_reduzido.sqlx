@@ -1,0 +1,182 @@
+config {
+    type: "table",
+    name: "perfil_assinantes_ativo_reduzido",
+    schema: "usuarios",
+    tags: ["usuarios_staging_5",
+        "schedule_tag=usuarios_perfil_assinantes_ativo_reduzido"
+    ]
+}
+
+WITH
+  perfil_assinantes_ativo_1 AS (
+  SELECT
+    * EXCEPT(dt_assinatura_comeco),
+    CASE
+      WHEN dt_assinatura_comeco > CAST(CURRENT_DATE() AS date) THEN DATE(data_hora_compra)
+      ELSE dt_assinatura_comeco
+  END
+    AS dt_assinatura_comeco,
+    ( DATE_DIFF( CURRENT_DATE(), COALESCE( CAST(data_ultimo_consumo AS DATE), DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) ), DAY ) >= 30 )
+    AND ( DATE_DIFF( CURRENT_DATE(), dt_assinatura_comeco, DAY ) > 30 ) AS inativo
+  FROM
+    ${ref("usuarios", "step_info")}
+  LEFT JOIN
+    ${ref("consumo", "step_consumo_reduzido")}
+  USING
+    (globo_id) ),
+  perfil_assinantes_ativo_acervo AS (
+  SELECT
+    *
+  FROM
+    perfil_assinantes_ativo_1
+  WHERE
+    LOWER(assinatura_gplay) = "nacional" ),
+  base AS (
+  SELECT
+    DISTINCT * EXCEPT (CLUSTER),
+    COALESCE(CLUSTER, "Não Clusterizado") AS CLUSTER
+  FROM
+    perfil_assinantes_ativo_acervo
+  LEFT JOIN
+    ${ref("palantir_export", "export_Cluster")}
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globo_id,
+      Cluster_Engajamento,
+      novo_cluster_engajamento,
+      Cluster_Conteudo_Mais_Assistido_Mes,
+      perfil_periodo_do_dia_mes,
+      perfil_dia_da_semana_mes,
+      frequencia_mensal,
+      total_horas_Mes,
+      diversidade_mensal,
+      diversidade_conteudo_mensal
+    FROM
+      ${ref("usuarios", "RaioXAssinanteMensal")}
+    WHERE
+      EXTRACT( MONTH
+      FROM
+        mes ) = EXTRACT( MONTH
+      FROM
+        DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH) )
+      AND EXTRACT( YEAR
+      FROM
+        mes ) = EXTRACT( YEAR
+      FROM
+        DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH) ) )
+  USING
+    (globo_id)),
+  cte_web AS(
+  SELECT
+    DISTINCT globo_id,
+    canal_growth,
+    TRUE AS venda_growth
+  FROM
+    ${ref("reports", "vendas_sf")} AS vd
+  INNER JOIN (
+    SELECT
+      DISTINCT origem_id,
+      origem,
+      produto,
+      canal AS canal_growth
+    FROM
+      ${ref("comunicacao", "origemids_growth")}
+    WHERE
+      LOWER(produto) LIKE '%%globoplay') AS web
+  USING
+    (origem_id)
+    -- WHERE
+    -- dt_venda >= '2024-07-22'
+    ),
+  cte_app AS(
+  SELECT
+    customer_user_id AS globo_id,
+    COALESCE(af_prt, media_source) AS canal_growth,
+    TRUE AS venda_growth
+  FROM
+    ${ref("AppsFlyer", "VendasAppsflyer_v2_1")}
+  WHERE
+    -- DATE(event_time_utc) >= '2024-07-22'
+    -- AND
+    LOWER(service_name) LIKE '%globoplay%'),
+  uniao_growth AS(
+  SELECT
+    *
+  FROM
+    cte_web
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    cte_app)
+SELECT
+  CURRENT_DATE('America/Sao_Paulo') AS dt_proc,
+  globo_id,
+  id_asset,
+  tipo_assinante,
+  mais_canais,
+  Produto_Contratado,
+  em_ativacao,
+  dt_assinatura_comeco,
+  canal_compra,
+  canal_growth,
+  data_hora_compra,
+  produto,
+  origem,
+  assinatura_gplay,
+  tempo_de_base_agrupado,
+  numero_dependentes,
+  address_state,
+  address_city,
+  age,
+  gender,
+  numero_assinaturas,
+  first_play,
+  first_play_subset,
+  data_first_play,
+  ultimo_consumo,
+  ultimo_consumo_subset,
+  data_ultimo_consumo,
+  inativo,
+  Cluster_Engajamento,
+  novo_cluster_engajamento,
+  Cluster_Conteudo_Mais_Assistido_Mes,
+  perfil_periodo_do_dia_mes,
+  perfil_dia_da_semana_mes,
+  frequencia_mensal,
+  total_horas_Mes,
+  diversidade_mensal,
+  diversidade_conteudo_mensal,
+  total_hrs_ultima_semana,
+  CLUSTER
+FROM
+  base
+LEFT JOIN
+  uniao_growth
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    total_horas AS total_hrs_ultima_semana
+  FROM
+    ${ref('usuarios', 'RaioXAssinante')}
+  WHERE
+    EXTRACT(YEAR
+    FROM
+      semana) = EXTRACT(YEAR
+    FROM
+      DATE_SUB(CURRENT_DATE(), INTERVAL 1 WEEK))
+    AND EXTRACT(WEEK
+    FROM
+      semana) = EXTRACT(WEEK
+    FROM
+      DATE_SUB(CURRENT_DATE(), INTERVAL 1 WEEK))
+  QUALIFY
+    ROW_NUMBER() OVER(PARTITION BY globo_id, semana) =1 )
+USING
+  (globo_id)
+
+  qualify row_number() over(partition by globo_id, id_asset) =1

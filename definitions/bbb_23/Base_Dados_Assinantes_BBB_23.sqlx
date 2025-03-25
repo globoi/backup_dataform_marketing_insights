@@ -1,0 +1,187 @@
+config {
+    type: 'table',
+    name: 'Base_Dados_Assinantes_BBB_23',
+    schema: 'bbb_23',
+    tags: ['bbb_23','bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com os usuários da nossa base ativa incremental a partir do dia 16/01/2023 e histórico de consumo/cancelamento em BBB.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    id_asset: 'Código que identifica a assinatura.',
+    dt_assinatura_comeco: 'Data início da assinatura do usuário.',
+    base_ativa: 'Última data em que o assinante apareceu na nossa base ativa pagante com trial.',
+    consumiu_bbb_20: 'Flag se o assinante consumiu o BBB 2020.',
+    cancelou_vol_20: 'Flag se o assinante cancelou durante o BBB 2020.',
+    consumiu_bbb_21: 'Flag se o assinante consumiu o BBB 2021.',
+    cancelou_vol_21: 'Flag se o assinante cancelou durante o BBB 2021.',
+    consumiu_bbb_22: 'Flag se o assinante consumiu o BBB 2022.',
+    cancelou_vol_22: 'Flag se o assinante cancelou durante o BBB 2022.',
+    sol_cancel_vol_23: 'Flag se o assinante solicitou o cancelamento voluntario durante o BBB 2023.',
+  }
+
+}
+
+with base_bbb_20 as (
+  SELECT
+    distinct globo_id,
+    True as consumiu_bbb_20,
+    cancelou_vol_20
+  FROM
+  ${ref("bbb_20", "status_Erick_historico")}
+    left join (
+      select
+        distinct globo_id,
+        True as cancelou_vol_20
+      from
+ ${ref("usuarios", "base_cancelamento")}
+      where
+        EXTRACT(
+          YEAR
+          FROM
+            dt_hr_cancelamento_final_ciclo
+        ) = 2020
+        and lower(AssetName) like '%globoplay%'
+    ) using(globo_id)
+),
+base_bbb_21 as (
+  select
+    distinct globo_id,
+    True as consumiu_bbb_21,
+    cancelou_vol_21
+  from
+ ${ref("bbb_21", "RaioXBBB21_historico")}
+    left join (
+      select
+        distinct globo_id,
+        True as cancelou_vol_21
+      from
+${ref("usuarios", "base_cancelamento")}
+      where
+        EXTRACT(
+          YEAR
+          FROM
+            dt_hr_cancelamento_final_ciclo
+        ) = 2021
+        and lower(AssetName) like '%globoplay%'
+    ) using(globo_id)
+),
+base_bbb_22 as (
+  select
+    distinct globo_id,
+    True as consumiu_bbb_22,
+    cancelou_vol_22
+  from
+${ref("bbb_22", "Raiox_BBB_22_historico")}
+    left join (
+      select
+        distinct globo_id,
+        True as cancelou_vol_22
+      from
+${ref("usuarios", "base_cancelamento")}
+      where
+        EXTRACT(
+          YEAR
+          FROM
+            dt_hr_cancelamento_final_ciclo
+        ) = 2022
+        and lower(AssetName) like '%globoplay%'
+    ) using(globo_id)
+),
+base_bbb_23 as (
+  select
+    distinct globo_id,
+    True as sol_cancel_vol_23
+  from
+${ref("usuarios", "base_cancelamento")}
+  where
+    EXTRACT(
+      YEAR
+      FROM
+        data_hora_cancelamento
+    ) = 2023
+    and lower(AssetName) like '%globoplay%'
+),
+assinantes as (
+  select
+    distinct globo_id,
+    id_asset,
+    min(dt_assinatura_comeco) over(partition by globo_id) as dt_assinatura_comeco,
+    max(dt_proc) over(partition by id_asset, globo_id) as base_ativa
+  from
+    ${ref("usuarios", "base_ativa_incremental_old")}
+  where
+    dt_proc >= '2023-01-16'
+    and tipo_assinante != 'trial'
+    and assinatura_gplay = 'nacional'
+),
+
+
+assinantes2 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    base_ativa,
+    dt_assinatura_comeco,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id,
+      id_asset,
+      base_ativa,
+      dt_assinatura_comeco
+      ORDER BY
+        globo_id,
+        id_asset,
+        base_ativa,
+        dt_assinatura_comeco
+    ) AS rm,
+  FROM
+    assinantes QUALIFY rm = 1)
+
+
+select
+  distinct globo_id,
+  id_asset,
+  dt_assinatura_comeco,
+  base_ativa,
+  case
+    when consumiu_bbb_20 is null then false
+    else consumiu_bbb_20
+  end as consumiu_bbb_20,
+  case
+    when cancelou_vol_20 is null then false
+    else cancelou_vol_20
+  end as cancelou_vol_20,
+  case
+    when consumiu_bbb_21 is null then false
+    else consumiu_bbb_21
+  end as consumiu_bbb_21,
+  case
+    when cancelou_vol_21 is null then false
+    else cancelou_vol_21
+  end as cancelou_vol_21,
+  case
+    when consumiu_bbb_22 is null then false
+    else consumiu_bbb_22
+  end as consumiu_bbb_22,
+  case
+    when cancelou_vol_22 is null then false
+    else cancelou_vol_22
+  end as cancelou_vol_22,
+  case
+    when sol_cancel_vol_23 is null then false
+    else sol_cancel_vol_23
+  end as sol_cancel_vol_23
+from
+  assinantes2
+  left join base_bbb_20 using (globo_id)
+  left join base_bbb_21 using (globo_id)
+  left join base_bbb_22 using (globo_id)
+  left join base_bbb_23 using (globo_id)

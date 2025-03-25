@@ -1,0 +1,59 @@
+config {
+    type: 'table',
+    name: 'retrospectiva_2024_vf',
+    schema: 'retrospectiva',
+    description: 'retrospectiva consolidado em 2024 versão final',
+    columns: {}
+}
+
+SELECT 
+globoid,
+to_hex(sha256(CONCAT('Retrospectiva24', globoid))) AS globoid_hash,
+ge_consumo,
+--ge_editoria,
+--ge_editorias,
+ge_editoria_f,
+--ge_dia_semana,
+--ge_periodo,
+g1_consumo,
+--g1_editoria,
+--g1_editorias,
+g1_editoria_f,
+--g1_dia_semana,
+--g1_periodo,
+gshow_consumo,
+--gshow_editoria,
+--gshow_editorias,
+gshow_editoria_f,
+--gshow_dia_semana,
+--gshow_periodo,
+receitas_consumo,
+--receitas_editoria,
+--receitas_editorias,
+receitas_editoria_f,
+--receitas_dia_semana,
+--receitas_periodo,
+home_consumo,
+home_dia_semana,
+home_periodo,
+cartola_rodada_escalada,
+cartola_dia_semana,
+cartola_periodo,
+consumo_escalacoes_total,
+--consumo_total,
+dia_semana_mais_consumido,
+periodo_mais_consumido,
+primeiroProduto,
+segundoProduto,
+terceiroProduto,
+Top1,
+Top2,
+Top3,
+--Top4,
+--Top5,
+classificacao
+
+FROM--`gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_consolidado_2024`
+${ref("retrospectiva", "retrospectiva_consolidado_2024")}
+WHERE consumo_total > 100 OR consumo_total = 0 -- 0 são globoids que jogaram apenas cartola
+--ORDER BY consumo_total ASC

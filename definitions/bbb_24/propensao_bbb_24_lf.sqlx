@@ -1,0 +1,238 @@
+config {
+  type: "table",
+  schema: 'bbb_24',
+
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech",
+      horario: "12h20min"
+    }
+  },
+  description: 'Dataset que objetiva apontar o Logado Free com maior disposição a assinatura do BBB com base na interação de métricas heurísticas e descritivas sobre dados de consumo, assinatura e interação com plataformas Globo (G1 e GShow)',
+  columns: {
+    indice_propensao: 'Indicador de propensão a assinatura do LF',
+    globo_id: 'Identificador do usuário (Cada linha é distinta por usuário), disponível em gglobo-mkt-ins-hdg-prd.usuarios.Free users',
+    FREEUSERS_user_group: 'Dados do grupo de assinatura do usuário, disponível em gglobo-mkt-ins-hdg-prd.usuarios.Free users',
+    FREEUSERS_status: 'Status da assinatura do LF, caso já tenha sido assinante, disponível em gglobo-mkt-ins-hdg-prd.usuarios.Free users',
+    FREEUSERS_dt_free_inicio: 'Data do começo do usuário como LF, disponível em gglobo-mkt-ins-hdg-prd.usuarios.Free users',
+    FREEUSERS_dt_criacao_gid: 'Data de criação do usuário, disponível em gglobo-mkt-ins-hdg-prd.usuarios.Free users',
+    BBB20_check_assinante_periodo: 'Verifica se o LF consta na base de RaioX assinante 2020',
+    BBB21_check_assinante_periodo: 'Verifica se o LF consta na base de RaioX assinante 2021',
+    BBB22_check_assinante_periodo: 'Verifica se o LF consta na base de RaioX assinante 2022',
+        BBB23_check_assinante_periodo: 'Verifica se o LF consta na base de RaioX assinante 2023',
+    RXBBB21_cluster_acumulado: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_21.raiox_bbb_21_propensao_churn`',
+    RXBBB21_cluster_share_total: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_21.raiox_bbb_21_propensao_churn`',
+    RXBBB21_percentual_consumo_bbb: 'Percentual de consumo BBB, em relação ao Total do período. Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_21.raiox_bbb_21_propensao_churn`',
+    RXBBB22_cluster_conteudo: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico`',
+    RXBBB22_cluster_acumulado: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico`',
+    RXBBB22_cluster_share_total: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico`',
+    RXBBB22_risco_churn: 'Índice de propensão a Churn. Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico`',
+        RXBBB22_percentual_consumo_bbb: 'Percentual de consumo BBB, em relação ao Total do período. Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_22.Raiox_BBB_22_Agrupado_historico`',
+    RXBBB23_cluster_conteudo: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado`',
+    RXBBB23_cluster_acumulado: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado`',
+    RXBBB23_cluster_share_total: 'Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado`',
+    RXBBB23_risco_churn: 'Índice de propensão a Churn. Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado`',
+        RXBBB23_percentual_consumo_bbb: 'Percentual de consumo BBB, em relação ao Total do período. Dado da tabela `gglobo-mkt-ins-hdg-prd.bbb_23.Raiox_BBB_23_Assinantes_Agrupado`',
+    IMPRESSION23_tipo_conteudo: 'Lista de tipo de conteúdos (LIVE, VOD e Short) consumidos pelo usuário no periodo. CASE com base nos dados de is_live e is_full_content, disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_qtd_media_id: 'Quantidade de plays, disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_dqtd_media_id: 'Quantidade distinta de midia_id, disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_dqtd_program_id: 'Quantidade distinta de program_id, disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_sum_hours_watched: 'Soma de hours_watched geral, disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_sum_hours_watched_bbb: 'Soma de hours_watched filtrado por conteúdos program_id BBB (verificar relação no confluence), disponível na tabela de consumo_enriched.anonymous_and_logged_in_impression',
+    IMPRESSION23_percentual_consumo_bbb: 'Percentual de consumo BBB, em relação ao Total do período. Dado da tabela `gglobo-foundation-psd-hdg-prd.consumo_enriched.anonymous_and_logged_in_impression`',
+    indice_assinante: 'Índice que considera pesos para usuários que eram assinantes em períodos de BBB22, BBB21 e BBB20. Consultar código para identificar a regra',
+    indice_churn: 'Índice que considera o contrário do indice_propensão_churn do BBB23',
+    GSHOWBBB_dqtd_materias: 'Quantidade distinta do tipo de conteúdo (Home, Votacao, Casa de Vidro) consumido pelo usuário',
+    GSHOWBBB_dqtd_conteudos: 'Quantidade distinta dos contéudos/pagepaths consumidos por usuário',
+    GSHOWBBB_qtd_votacao: 'Quantidade de votações (eventLabel = Opcao voto) realizadas por usuário',
+    GSHOWBBB_sum_tempoNaPagina: 'Soma do tempo em contéudos/pagepaths em segundos',
+  }
+}
+
+WITH bbb2022 AS (
+  SELECT
+    globo_id,
+    Cluster_BBB_Acumulado RXBBB22_cluster_acumulado,
+    Cluster_Share_BBB_Total RXBBB22_cluster_share_total,
+    Horas_BBB / Horas_Total RXBBB22_percentual_consumo_bbb,
+    Cluster_Conteudo RXBBB22_cluster_conteudo,
+    Risco_Churn_2022 RXBBB22_risco_churn
+  FROM
+    ${ref("bbb_22", "Raiox_BBB_22_Agrupado_historico")}
+),
+bbb2021 AS (
+  SELECT
+    globo_id,
+    Cluster_BBB_Acumulado RXBBB21_cluster_acumulado,
+    Cluster_Share_BBB_Total RXBBB21_cluster_share_total,
+    Horas_BBB / Horas_Total RXBBB21_percentual_consumo_bbb
+  FROM
+    ${ref("bbb_21", "raiox_bbb_21_propensao_churn_historico")}
+),
+bbb2020 AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("bbb_20", "status_Erick_historico")}
+),
+bbb2023 as (
+  select
+    distinct globo_id,
+    Cluster_BBB_Acumulado RXBBB23_cluster_acumulado,
+    Cluster_Share_BBB_Total RXBBB23_cluster_share_total,
+    Horas_BBB / Horas_Total RXBBB23_percentual_consumo_bbb,
+    Cluster_Conteudo RXBBB23_cluster_conteudo,
+    Risco_Churn_2023 RXBBB23_risco_churn
+  FROM
+    ${ref("bbb_23", "Raiox_BBB_23_Assinantes_Agrupado")}
+),
+consumo2023 AS (
+  SELECT
+    userId,
+    hours_watched,
+    mediaid,
+    program_id,
+    is_live,
+    is_full_content,CASE
+      WHEN is_live IS TRUE THEN 'Live'
+      WHEN is_full_content IS TRUE THEN 'VOD'
+      WHEN is_full_content IS FALSE THEN 'Short'
+    END tipo_conteudo,
+    program_subset,CASE
+      WHEN program_id IN (
+        4609,
+        8568,
+        12082,
+        13492,
+        16280,
+        16281,
+        16284,
+        24008,
+        24022
+      ) THEN 'BBB'
+      ELSE 'Outros'
+    END grupo_conteudo
+  FROM
+    ${ref("consumo_enriched", "anonymous_and_logged_in_impression")}
+  WHERE
+    DATE BETWEEN "2023-01-16"
+    AND "2023-04-26"
+),
+aggConsumo2023 AS (
+  SELECT
+    userId globo_id,
+    STRING_AGG(DISTINCT tipo_conteudo) IMPRESSION23_tipo_conteudo,
+    COUNT(mediaid) IMPRESSION23_qtd_media_id,
+    COUNT(DISTINCT mediaid) IMPRESSION23_dqtd_media_id,
+    COUNT(DISTINCT program_id) IMPRESSION23_dqtd_program_id,
+    SUM(hours_watched) IMPRESSION23_sum_hours_watched,
+    SUM(
+      CASE
+        WHEN grupo_conteudo = 'BBB' THEN hours_watched
+      END
+    ) IMPRESSION23_sum_hours_watched_bbb,
+    SUM(
+      CASE
+        WHEN grupo_conteudo = 'BBB' THEN hours_watched
+      END
+    ) / SUM(hours_watched) IMPRESSION23_percentual_consumo_bbb
+  FROM
+    consumo2023
+  GROUP BY
+    userId
+),
+gshow AS (
+  SELECT
+    globo_id,
+    COUNT(DISTINCT materia) GSHOWBBB_dqtd_materias,
+    SUM(dqtd_conteudos) GSHOWBBB_dqtd_conteudos,
+    SUM(qtd_votacao) GSHOWBBB_qtd_votacao,
+    SUM(sum_tempoNaPagina) GSHOWBBB_sum_tempoNaPagina
+  FROM
+    ${ref("bbb_24", "gshow_consumo_bbb_24")}
+  WHERE
+    temporada_bbb = 'BBB24'
+  GROUP BY
+    globo_id
+),
+result AS (
+  SELECT
+    fu.globo_id,
+    fu.user_group FREEUSERS_user_group,
+    fu.status FREEUSERS_status,
+    fu.dt_free_inicio FREEUSERS_dt_free_inicio,
+    fu.dt_criacao_gid FREEUSERS_dt_criacao_gid,
+    b0.globo_id IS NOT NULL BBB20_check_assinante_periodo,
+    b1.globo_id IS NOT NULL BBB21_check_assinante_periodo,
+    b2.globo_id IS NOT NULL BBB22_check_assinante_periodo,
+    b3.globo_id IS NOT NULL BBB23_check_assinante_periodo,
+    b1.RXBBB21_cluster_acumulado,
+    b1.RXBBB21_cluster_share_total,
+    b1.RXBBB21_percentual_consumo_bbb,
+    b2.RXBBB22_cluster_acumulado,
+    b2.RXBBB22_cluster_share_total,
+    b2.RXBBB22_percentual_consumo_bbb,
+    b2.RXBBB22_cluster_conteudo,
+    b2.RXBBB22_risco_churn,
+    b3.RXBBB23_cluster_acumulado,
+    b3.RXBBB23_cluster_share_total,
+    b3.RXBBB23_percentual_consumo_bbb,
+    b3.RXBBB23_cluster_conteudo,
+    b3.RXBBB23_risco_churn,
+    c22.IMPRESSION23_tipo_conteudo,
+    c22.IMPRESSION23_qtd_media_id,
+    c22.IMPRESSION23_dqtd_media_id,
+    c22.IMPRESSION23_dqtd_program_id,
+    c22.IMPRESSION23_sum_hours_watched,
+    c22.IMPRESSION23_sum_hours_watched_bbb,
+    c22.IMPRESSION23_percentual_consumo_bbb,CASE
+      WHEN CONCAT(
+        b0.globo_id IS NOT NULL,
+        b1.globo_id IS NOT NULL,
+        b2.globo_id IS NOT NULL,
+        b3.globo_id IS NOT NULL
+      ) = 'truetruetrue' THEN 1
+      WHEN CONCAT(
+        b0.globo_id IS NOT NULL,
+        b1.globo_id IS NOT NULL,
+        b2.globo_id IS NOT NULL,
+        b3.globo_id IS NOT NULL
+      ) IN (
+        'truefalsetrue',
+        'falsetruetrue',
+        'truetruefalse'
+      ) THEN 0.75
+      WHEN b3.globo_id IS NOT NULL THEN 0.5
+      WHEN b2.globo_id IS NOT NULL
+      OR b1.globo_id IS NOT NULL THEN 0.25
+      ELSE 0
+    END indice_assinante,
+    CAST(b3.RXBBB23_risco_churn AS INT) / 27 indice_churn,
+    gs.GSHOWBBB_dqtd_materias,
+    gs.GSHOWBBB_dqtd_conteudos,
+    gs.GSHOWBBB_qtd_votacao,
+    gs.GSHOWBBB_sum_tempoNaPagina
+  FROM
+    ${ref("usuarios", "Free users")} fu
+    LEFT JOIN bbb2023 b3 USING(globo_id)
+    LEFT JOIN bbb2022 b2 USING(globo_id)
+    LEFT JOIN bbb2021 b1 USING(globo_id)
+    LEFT JOIN bbb2020 b0 USING(globo_id)
+    LEFT JOIN AggConsumo2023 c22 USING(globo_id)
+    LEFT JOIN gshow gs USING(globo_id)
+  WHERE
+    (b2.globo_id IS NOT NULL)
+    or (b3.globo_id IS NOT NULL)
+    OR (b1.globo_id IS NOT NULL)
+    OR (b0.globo_id IS NOT NULL)
+    OR c22.IMPRESSION23_percentual_consumo_bbb > 0
+)
+SELECT
+  (
+    IFNULL(indice_assinante, 0) + IFNULL(IMPRESSION23_percentual_consumo_bbb, 0)
+  ) / 2 indice_propensao,
+  *
+FROM
+  result

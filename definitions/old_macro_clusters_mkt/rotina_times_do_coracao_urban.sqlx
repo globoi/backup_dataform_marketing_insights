@@ -1,0 +1,27 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=macro_clusters_mkt_rotina_times_do_coracao_urban'],
+  name: 'rotina_times_do_coracao_urban',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+}
+
+WITH
+  base_ult_com AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref("comunicacao", "ultima_comunicacao_geral")} 
+  )
+
+SELECT
+  globoid AS named_user,
+  time_aferido as time_futebol,
+  NTILE(3) OVER (ORDER BY RAND()) AS indice_grupo,
+FROM
+  ${ref("Cartola", "TimeCoracao_Cart18_20_GE")} AS a
+INNER JOIN 
+  base_ult_com AS b 
+    ON a.globoID = b.globo_id

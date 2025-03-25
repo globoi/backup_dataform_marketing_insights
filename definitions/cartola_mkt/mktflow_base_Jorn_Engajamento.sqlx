@@ -1,0 +1,55 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_Jorn_Engajamento',
+  "schedule_cron = 0 10 * * *"],
+  name: 'mktflow_base_Jorn_Engajamento',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      schedule_cron: "* 10 * * *"
+    }
+  }
+}
+WITH jogaram_ultimos_30_dias AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref("analytics", "f_entry")}
+  WHERE status_id != 1
+  AND bet_value > 0
+  AND DATE_DIFF(CURRENT_DATE('-03'), bet_date, DAY) <= 30
+)
+ 
+, jogaram_ultimos_7_dias AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref('analytics', 'f_entry')}
+  WHERE status_id != 1
+  AND bet_value > 0
+  AND DATE_DIFF(CURRENT_DATE('-03'), bet_date, DAY) <= 7
+)
+ 
+, bonus_jornada AS (
+  SELECT bonus_id
+  FROM ${ref('analytics', 'f_bonus')} 
+  WHERE code = "PLAYBACKEXPRESS2024"
+  AND status_id != 2
+)
+ 
+, usaram_o_bonus AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref('reports','entry_value_source')}  vs, UNNEST(vs.record) record
+  INNER JOIN bonus_jornada
+    ON record.source_bonus_id = bonus_id
+)
+ 
+SELECT u30.globo_id, IF(ub.globo_id IS NOT NULL, 1, 0) AS flag_usou_o_bonus
+FROM jogaram_ultimos_30_dias u30
+LEFT JOIN jogaram_ultimos_7_dias u7
+  ON u30.globo_id = u7.globo_id
+LEFT JOIN usaram_o_bonus ub
+  ON u30.globo_id = ub.globo_id
+WHERE u7.globo_id IS NULL

@@ -1,0 +1,13 @@
+config {
+  type: "table",
+  name: "E2_conteudos_consumidos_usuarios",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_E2_conteudos_consumidos_usuarios'],
+}
+
+
+SELECT DISTINCT
+  globo_id, program_id
+FROM ${ref("consumo", "series_history")} sh
+INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} USING (globo_id)
+WHERE sh.horas_consumidas > 0.25 

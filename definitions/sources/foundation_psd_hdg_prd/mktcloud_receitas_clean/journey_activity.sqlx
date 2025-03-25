@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "journey_activity",
+    schema: "mktcloud_receitas_clean",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

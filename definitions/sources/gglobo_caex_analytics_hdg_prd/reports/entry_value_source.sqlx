@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-caex-analytics-hdg-prd",
+  schema: "reports",
+  name: "entry_value_source",
+  description: ""
+}

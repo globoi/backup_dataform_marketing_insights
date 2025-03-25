@@ -1,0 +1,23 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_jornada_usuarios_sem_time', 'schedule_cron=30 9 * * *'],
+    name: 'mktflow_jornada_usuarios_sem_time',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+
+SELECT distinct USERID as globo_id
+FROM --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.time_unificado`
+${ref('ge_growth_time_coracao', 'time_unificado')}
+where GE_declared_team_id is null
+and LENGTH(USERID) - LENGTH(REPLACE(USERID, '-', '')) =4 
+--- Faz a passagem dos globos_id sem hífen e colocando hífen, tirando da query os anonimous

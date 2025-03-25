@@ -1,0 +1,22 @@
+config {
+  type: 'assertion',
+  tags: ["schedule_tag=mktcloud_clean_bounce_assert",
+         "schedule_cron=30 8 * * *",
+         "schedule_retry=3"],
+}
+SELECT * FROM
+  (
+    SELECT COUNT(1) as ct 
+
+    FROM
+      ${ref('sales_gold', 'subscription_state')} ss
+    JOIN ${ref('sales_gold', 'subscription_details')} sd ON ss.object_id = sd.id
+    JOIN ${ref('sales_gold', 'product_details')} pd ON sd.product_id = pd.id
+    WHERE
+      DATE(ss.state_date) = CURRENT_DATE -1
+    AND (lower(ss.state) like '%active%'
+    or lower(ss.state) not like '%active_coupon%' )
+      AND LOWER(pd.name) LIKE '%globoplay%'
+  )
+WHERE
+  ct = 0

@@ -1,0 +1,97 @@
+config {
+    type: "table",
+    schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_interacao_gshow',
+        "schedule_cron=0 13 * * *"
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "bbb_25",
+            owner: "martech",
+            horario: "13h00min"
+        }
+    },
+    description: 'Tabela com os usuários que estão interagindo com o programa BBB 25 via gshow.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        semana_votacao: 'Semana em que o usuário votou no BBB 25.',
+        pageviews_bbb_25: 'Quantidade de pageviews por semana de cada usuário.',
+        visitas_bbb_25: 'Quantidade de visitas por semana de cada usuário.',
+        votos_bbb_25: 'Quantidade de votos por semana.',
+        qtd_materias_BBB23: 'Quantidade de materias que o usuário interagiu durante o BBB 23.',
+        qtd_sessoes_BBB23: 'Quantidade de sessões distintas do usuário durante o BBB 23.',
+        qtd_conteudos_BBB23: 'Quantidade de conteúdos do BBB 23 acessados pelo usuário durante o programa de 23.',
+        qtd_votos_BBB23: 'Quantidade de votos durante o BBB 23.',
+        qtd_materias_BBB24: 'Quantidade de materias que o usuários interagiu durante o BBB 24.',
+        qtd_sessoes_BBB24: 'Quantidade de sessões distintas do usuário durante o BBB 24.',
+        qtd_conteudos_BBB24: 'Quantidade de conteúdos do BBB 24 acessados pelo usuário durante o programa de 24.',
+        qtd_votos_BBB24: 'Quantidade de votos durante o BBB 24.'}
+
+}
+
+WITH
+  votacao AS (
+  SELECT
+    DATE_TRUNC(DATA,WEEK(MONDAY)) AS semana_votacao,
+    globoId AS globo_id,
+    COUNTIF(tipoConsumo IN ('pageview',
+        'screenview')) AS pageviews_bbb_25,
+    COUNT(DISTINCT
+    IF
+      (visitas = 1, sessionId, NULL)) AS visitas_bbb_25,
+    COUNTIF(tipoConsumo NOT IN('pageview',
+        'screenview')
+      AND B.eventCategory = 'Votacao Interatividade'
+      AND B.eventLabel = 'Status - Sucesso') AS votos_bbb_25
+  FROM
+    ${ref('foundation_gshow', 'foundation_gshow_sessions_v3')} AS A,
+    UNNEST(A.hits) AS B
+  WHERE
+    DATA >='2025-01-13'
+    AND pagePath LIKE '%/realities/bbb/%'
+    AND (pagePath LIKE '%/voto-unico/votacao/%'
+      OR pagePath LIKE '%/voto-da-torcida/votacao/%')
+    AND LENGTH(globoId) - LENGTH(REPLACE(globoId, '-', '')) = 4
+  GROUP BY
+    1,
+    2
+  UNION DISTINCT
+  SELECT
+    DATE_TRUNC(DATA,WEEK(MONDAY)) AS semana_votacao,
+    globoId AS globo_id,
+    COUNTIF(tipoConsumo IN ('pageview',
+        'screenview')) AS pageviews_bbb_25,
+    COUNT(DISTINCT
+    IF
+      (visitas = 1, sessionId, NULL)) AS visitas_bbb_25,
+    COUNTIF(tipoConsumo NOT IN('pageview',
+        'screenview')
+      AND B.eventCategory = 'Votacao Interatividade'
+      AND B.eventLabel = 'Status - Sucesso') AS votos_bbb_25
+  FROM
+    ${ref('foundation_gshow', 'foundation_gshow_sessions_v3')} AS A,
+    UNNEST(A.hits) AS B
+  WHERE
+    DATA >='2025-01-13'
+    AND pagePath LIKE '%/realities/bbb/%'
+    AND (pagePath LIKE '%/voto-unico/votacao/%'
+      OR pagePath LIKE '%/voto-da-torcida/votacao/%')
+    AND LENGTH(globoId) - LENGTH(REPLACE(globoId, '-', '')) = 4
+  GROUP BY
+    1,
+    2)
+SELECT distinct *
+ except(qtd_materias_BBB23,qtd_sessoes_BBB23,qtd_conteudos_BBB23,qtd_votos_BBB23,qtd_materias_BBB24,qtd_sessoes_BBB24,qtd_conteudos_BBB24,qtd_votos_BBB24),
+ifnull(qtd_materias_BBB23,0) as qtd_materias_BBB23,
+ifnull(qtd_sessoes_BBB23,0) as qtd_sessoes_BBB23	,	
+ifnull(qtd_conteudos_BBB23,0) as qtd_conteudos_BBB23,	
+ifnull(qtd_votos_BBB23,0) as qtd_votos_BBB23,
+ifnull(qtd_materias_BBB24,0) as qtd_materias_BBB24,		
+ifnull(qtd_sessoes_BBB24,0) as qtd_sessoes_BBB24,	
+ifnull(qtd_conteudos_BBB24,0) as qtd_conteudos_BBB24,	
+ifnull(qtd_votos_BBB24,0) as qtd_votos_BBB24	
+FROM
+  votacao
+LEFT JOIN
+  ${ref('bbb_25', 'historico_gshow_bbb')}using(globo_id)

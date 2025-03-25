@@ -1,0 +1,13 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=segment_api_permutive_retro_cross_2024'],
+    name: 'permutive_retro_cross_2024',
+    schema: 'segment_api',
+    description: 'retrospectiva 2024 dos produtos ge, g1, gshow, receitas, home e cartola',
+    columns: {}
+}
+
+SELECT
+  DISTINCT globoid AS user_id
+FROM
+  ${ref("retrospectiva", "retrospectiva_2024_vf")}

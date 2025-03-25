@@ -1,0 +1,76 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_carrinho_gp_padrao'],
+  name: 'permutive_carrinho_gp_padrao',
+  schema: 'segment_api',
+  description: 'base de carrinho abandonda GP separado pelo pacote globoplay padrão',
+  columns: {
+  }
+}
+WITH base AS (SELECT DISTINCT globoId
+, MAX(event_date) AS event_date
+, portfolioName
+--FROM `gglobo-mkt-ins-hdg-prd.jornadas_mkt.mktflow_carrinho_abandonado`
+FROM ${ref("jornadas_mkt","mktflow_carrinho_abandonado")}
+WHERE portfolioName IN ('"Globoplay Padrão"','"Globoplay Padrão com Anúncios"','"Globoplay Premium"') 
+GROUP BY ALL
+ORDER BY portfolioName ASC),
+
+gids AS (SELECT DISTINCT globoId
+FROM base
+),
+
+padrao AS (SELECT DISTINCT globoId
+, MAX(event_date) AS event_date_Globoplay_Padrao
+, portfolioName AS Globoplay_Padrao
+FROM base
+WHERE portfolioName IN ('"Globoplay Padrão"')--,'"Globoplay Padrão com Anúncios"','"Globoplay Premium"') 
+GROUP BY ALL
+ORDER BY portfolioName ASC),
+
+padraoads AS (SELECT DISTINCT globoId
+, MAX(event_date) AS event_date_Globoplay_Padrao_ADS
+, portfolioName AS Globoplay_Padrao_ADS
+FROM base
+WHERE portfolioName IN ('"Globoplay Padrão com Anúncios"')--,'"Globoplay Padrão"','"Globoplay Premium"') 
+GROUP BY ALL
+ORDER BY portfolioName ASC),
+
+premium AS (SELECT DISTINCT globoId
+, MAX(event_date) AS event_date_Globoplay_Premium
+, portfolioName  AS Globoplay_Premium
+FROM base
+WHERE portfolioName IN ('"Globoplay Premium"')--,'"Globoplay Padrão"','"Globoplay Padrão com Anúncios"') 
+GROUP BY ALL
+ORDER BY portfolioName ASC),
+
+dados AS (
+SELECT
+DISTINCT a.globoId
+, b.event_date_Globoplay_Padrao
+, b.Globoplay_Padrao
+, c.event_date_Globoplay_Padrao_ADS
+, c.Globoplay_Padrao_ADS
+, d.event_date_Globoplay_Premium
+, d.Globoplay_Premium
+FROM gids AS a
+LEFT JOIN padrao AS b ON a.globoId = b.globoId
+LEFT JOIN padraoads AS c ON a.globoId = c.globoId
+LEFT JOIN premium AS d ON a.globoId = d.globoId
+),
+
+regra AS (
+SELECT DISTINCT globoId
+, CASE 
+WHEN event_date_Globoplay_Padrao >= event_date_Globoplay_Padrao_ADS OR event_date_Globoplay_Padrao >= event_date_Globoplay_Premium OR
+event_date_Globoplay_Padrao IS NOT NULL THEN "Globoplay Padrao"
+WHEN event_date_Globoplay_Padrao_ADS >= event_date_Globoplay_Padrao OR event_date_Globoplay_Padrao_ADS >= event_date_Globoplay_Premium OR
+event_date_Globoplay_Padrao_ADS IS NOT NULL THEN "Globoplay Padrao ADS"
+WHEN event_date_Globoplay_Premium >= event_date_Globoplay_Padrao OR event_date_Globoplay_Premium >= event_date_Globoplay_Padrao_ADS OR
+event_date_Globoplay_Premium IS NOT NULL THEN "Globoplay Premium"
+END AS ultimo_produto
+FROM dados)
+
+SELECT distinct globoId AS user_id 
+FROM regra
+WHERE ultimo_produto = "Globoplay Padrao" 

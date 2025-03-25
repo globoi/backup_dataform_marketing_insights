@@ -1,0 +1,46 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_usuarios_cadastrados', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_automatica_ex_usuarios_cadastrados',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  depositaram AS (
+  SELECT
+    globo_id,
+    MAX(request_datetime) AS latest_deposit
+  FROM
+    -- `gglobo-caex-analytics-hdg-prd.analytics.f_deposit`
+    ${ref("analytics", "f_deposit")}
+  WHERE
+    status_ds = "PROCESSED"
+  GROUP BY
+    globo_id )
+SELECT
+  a.globo_id,
+  a.created_at AS create_date,
+  CASE
+    WHEN d.globo_id IS NULL THEN 0
+  ELSE
+  1
+END
+  AS flag_ja_depositou,
+  latest_deposit AS dt_ultimo_deposito
+FROM
+  -- `gglobo-caex-analytics-hdg-prd.analytics.d_account` a
+  ${ref("analytics", "d_account")} a
+LEFT JOIN
+  depositaram d
+ON
+  a.globo_id = d.globo_id

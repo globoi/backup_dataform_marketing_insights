@@ -1,0 +1,25 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_baseativa'],
+  name: 'mktflow_assinante_tier1_cluster_baseativa',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "09h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")} e,
+UNNEST (info) as info_trial
+WHERE info_trial.assinatura_gplay = "nacional"
+AND info_trial.mais_canais = false

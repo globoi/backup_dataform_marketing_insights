@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-cartola-hdg-prd",
+  schema: "report_staging",
+  name: "report_temporada",
+  description: ""
+}

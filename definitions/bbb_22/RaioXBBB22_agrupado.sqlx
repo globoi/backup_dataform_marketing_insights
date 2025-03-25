@@ -1,0 +1,445 @@
+config {
+  type: 'table',
+  name: 'RaioXBBB22_agrupado',
+  schema: 'bbb_22',
+  tags: ['bbb_22'],
+  description: '',
+  columns: {}
+}
+
+WITH
+step_1 AS (
+  SELECT
+    globo_id,
+    CancelouVol2020,
+    CancelouVol2021,
+    CancelouVol2022,
+    Status_Opt_In,
+    assinou_2021,
+    assinou_2022,
+    Cluster_bbb,
+    soma_horas,
+    Ao_vivo_globo_horas,
+    Filmes_horas,
+    Mais_Canais_horas,
+    Novela_horas,
+    Series_horas,
+    outros_conteudos_horas,
+    semana
+  FROM
+    ${ref("bbb_22", "Raiox_BBB_22_historico")}
+),
+
+step_2 AS (
+  SELECT *
+  FROM
+    step_1
+    PIVOT(
+      SUM(soma_horas) sum_soma_horas,
+      SUM(Ao_vivo_globo_horas) sum_ao_vivo_globo_horas,
+      SUM(Filmes_horas) sum_filmes_horas,
+      SUM(Mais_Canais_horas) sum_mais_canais_horas,
+      SUM(Novela_horas) sum_novelas_horas,
+      SUM(Series_horas) sum_series_horas,
+      SUM(outros_conteudos_horas) sum_outros_conteudos_horas,
+      COUNT(DISTINCT(semana)) count_distinct_semana
+      FOR Cluster_bbb
+      IN ("0. No Live" nolive, "1. Light User" lightuser, "2. Mid-Light User" midlightuser, "3. Mid-Heavy User" midheavyuser, "4. Heavy User" heavyuser)
+    )
+),
+
+step_3 AS (
+  SELECT
+    globo_id,
+    CancelouVol2020,
+    CancelouVol2021,
+    CancelouVol2022,
+    Status_Opt_In,
+    assinou_2021,
+    assinou_2022,
+    count_distinct_semana_nolive,
+    count_distinct_semana_lightuser,
+    count_distinct_semana_midlightuser,
+    count_distinct_semana_midheavyuser,
+    count_distinct_semana_heavyuser,
+    (
+      COALESCE(sum_soma_horas_nolive,0) +
+      COALESCE(sum_soma_horas_lightuser,0) +
+      COALESCE(sum_soma_horas_midlightuser,0) + 
+      COALESCE(sum_soma_horas_midheavyuser,0) +
+      COALESCE(sum_soma_horas_heavyuser, 0)
+    ) AS Horas_BBB,
+    (
+      COALESCE(sum_filmes_horas_nolive, 0) +
+      COALESCE(sum_filmes_horas_lightuser, 0) +
+      COALESCE(sum_filmes_horas_midlightuser, 0) +
+      COALESCE(sum_filmes_horas_midheavyuser, 0) +
+      COALESCE(sum_filmes_horas_heavyuser, 0) +
+      COALESCE(sum_mais_canais_horas_nolive, 0) +
+      COALESCE(sum_mais_canais_horas_lightuser, 0) +
+      COALESCE(sum_mais_canais_horas_midlightuser, 0) +
+      COALESCE(sum_mais_canais_horas_midheavyuser, 0) +
+      COALESCE(sum_mais_canais_horas_heavyuser, 0) +
+      COALESCE(sum_novelas_horas_nolive, 0) +
+      COALESCE(sum_novelas_horas_lightuser, 0) +
+      COALESCE(sum_novelas_horas_midlightuser, 0) +
+      COALESCE(sum_novelas_horas_midheavyuser, 0) +
+      COALESCE(sum_novelas_horas_heavyuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_nolive, 0) +
+      COALESCE(sum_outros_conteudos_horas_lightuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_midlightuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_midheavyuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_heavyuser, 0) +
+      COALESCE(sum_series_horas_nolive, 0) +
+      COALESCE(sum_series_horas_lightuser, 0) +
+      COALESCE(sum_series_horas_midlightuser, 0) +
+      COALESCE(sum_series_horas_midheavyuser, 0) +
+      COALESCE(sum_series_horas_heavyuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_nolive, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_lightuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_midlightuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_midheavyuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_heavyuser, 0) +
+      COALESCE(sum_soma_horas_nolive,0) +
+      COALESCE(sum_soma_horas_lightuser,0) +
+      COALESCE(sum_soma_horas_midlightuser,0) + 
+      COALESCE(sum_soma_horas_midheavyuser,0) +
+      COALESCE(sum_soma_horas_heavyuser, 0)
+    ) AS Horas_Total,
+    (
+      COALESCE(sum_mais_canais_horas_nolive, 0) +
+      COALESCE(sum_mais_canais_horas_lightuser, 0) +
+      COALESCE(sum_mais_canais_horas_midlightuser, 0) +
+      COALESCE(sum_mais_canais_horas_midheavyuser, 0) +
+      COALESCE(sum_mais_canais_horas_heavyuser, 0) 
+    ) AS Horas_Mais_canais,
+    (
+      COALESCE(sum_novelas_horas_nolive, 0) +
+      COALESCE(sum_novelas_horas_lightuser, 0) +
+      COALESCE(sum_novelas_horas_midlightuser, 0) +
+      COALESCE(sum_novelas_horas_midheavyuser, 0) +
+      COALESCE(sum_novelas_horas_heavyuser, 0)
+    ) AS Horas_Novela,
+    (
+      COALESCE(sum_outros_conteudos_horas_nolive, 0) +
+      COALESCE(sum_outros_conteudos_horas_lightuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_midlightuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_midheavyuser, 0) +
+      COALESCE(sum_outros_conteudos_horas_heavyuser, 0)
+    ) AS Horas_Outros_Conteudos,
+    (
+      COALESCE(sum_series_horas_nolive, 0) +
+      COALESCE(sum_series_horas_lightuser, 0) +
+      COALESCE(sum_series_horas_midlightuser, 0) +
+      COALESCE(sum_series_horas_midheavyuser, 0) +
+      COALESCE(sum_series_horas_heavyuser, 0)      
+    ) AS Horas_serie,
+    (
+      COALESCE(sum_ao_vivo_globo_horas_nolive, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_lightuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_midlightuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_midheavyuser, 0) +
+      COALESCE(sum_ao_vivo_globo_horas_heavyuser, 0)
+    ) AS Horas_Ao_Vivo
+  FROM
+    step_2
+),
+
+step_4 AS (
+  SELECT
+  *,
+    CASE
+      WHEN
+        (Horas_Novela > Horas_Ao_Vivo) 
+        AND (Horas_Novela > Horas_Mais_Canais)
+        AND (Horas_Novela > Horas_Outros_Conteudos)
+        AND (Horas_Novela > Horas_Serie) THEN 'Novela'
+      WHEN
+        (Horas_Serie > Horas_Ao_Vivo)
+        AND (Horas_Serie > Horas_Mais_Canais)
+        AND (Horas_Serie > Horas_Outros_Conteudos)
+        AND (Horas_Serie > Horas_Novela) THEN 'Série'
+      WHEN 
+        (Horas_Mais_Canais > Horas_Ao_Vivo)
+        AND (Horas_Mais_Canais > Horas_Serie)
+        AND (Horas_Mais_Canais > Horas_Outros_Conteudos)
+        AND (Horas_Mais_Canais > Horas_Novela) THEN 'Mais Canais'
+      WHEN
+        (Horas_Ao_Vivo > Horas_Mais_Canais)
+        AND (Horas_Ao_Vivo > Horas_Serie)
+        AND (Horas_Ao_Vivo > Horas_Outros_Conteudos)
+        AND (Horas_Ao_Vivo > Horas_Novela) THEN 'Ao Vivo TVG'
+      WHEN
+        (Horas_Outros_Conteudos > Horas_Mais_Canais)
+        AND (Horas_Outros_Conteudos > Horas_Serie)
+        AND (Horas_Outros_Conteudos > Horas_Ao_Vivo)
+        AND (Horas_Outros_Conteudos > Horas_Novela) THEN 'Outros Conteúdos'
+      ELSE 'Somente BBB'
+    END AS Cluster_Conteudo,
+    CASE
+      WHEN 
+        (Horas_Mais_Canais < 1)
+        AND(Horas_Serie < 1)
+        AND(Horas_Novela < 1)
+        AND(Horas_Ao_Vivo > Horas_Outros_Conteudos) THEN 'Ao Vivo TVG'
+      WHEN 
+        (Horas_Mais_Canais < 1)
+        AND(Horas_Serie < 1)
+        AND(Horas_Novela < 1)
+        AND(Horas_Outros_Conteudos> Horas_Ao_Vivo) THEN 'Outros Conteúdos'
+      WHEN
+        (Horas_Novela > Horas_Mais_Canais)
+        AND (Horas_Novela > Horas_Serie) THEN 'Novela'
+      WHEN
+        (Horas_Serie > Horas_Mais_Canais)
+        AND (Horas_Serie > Horas_Novela) THEN 'Série'
+      WHEN
+        (Horas_Mais_Canais > Horas_Serie)
+        AND (Horas_Mais_Canais > Horas_Novela) THEN 'Mais Canais'
+      ELSE 'Somente BBB'
+    END AS Cluster_Conteudo_Reduzido
+  FROM
+    step_3
+),
+
+step_5 AS (
+  SELECT
+    globo_id,
+    Horas_BBB,
+    Horas_Total,
+    COALESCE(count_distinct_semana_nolive,0) AS _0_NoLive,
+    COALESCE(count_distinct_semana_lightuser,0) AS _1_LightUser,
+    COALESCE(count_distinct_semana_midlightuser,0) AS _2_Mid_LightUser,
+    COALESCE(count_distinct_semana_midheavyuser,0) AS _3_Mid_HeavyUser,
+    COALESCE(count_distinct_semana_heavyuser,0) AS _4_HeavyUser,
+    CancelouVol2020,
+    CancelouVol2021,
+    CancelouVol2022,
+    assinou_2021,
+    assinou_2022,
+    Status_Opt_In,
+    Cluster_Conteudo,
+    Cluster_Conteudo_Reduzido
+  FROM
+    step_4
+),
+
+step_6 AS (
+  SELECT
+    *,
+    (DATE_DIFF(MAX_of_semana, MIN_of_semana, DAY)/7) + 1 AS Semanas_Total
+  FROM
+    step_5
+    LEFT JOIN ${ref("bbb_22", "Entrada_no_Cluster_BBB_22_historico")} USING(globo_id)
+    LEFT JOIN ${ref("bbb_22", "Max_Semana_BBB_22_historico")} USING(assinou_2022)
+),
+
+step_7 AS (
+  SELECT 
+    *,
+    (
+      Semanas_Total - _1_LightUser - _0_NoLive - _2_Mid_LightUser - _3_Mid_HeavyUser - _4_HeavyUser
+    ) AS Fora_Cluster,
+  ROUND(SAFE_DIVIDE(Horas_BBB, Horas_Total), 2) AS Share_Total_BBB
+  FROM
+    step_6
+),
+
+step_8 AS (
+  SELECT
+    *,
+    CASE
+    WHEN
+      _4_HeavyUser >= _3_Mid_HeavyUser
+      AND _4_HeavyUser >= _2_Mid_LightUser
+      AND _4_HeavyUser >= _1_LightUser
+      AND _4_HeavyUser >= _0_NoLive
+      AND _4_HeavyUser >= Fora_Cluster
+      THEN '4.HeavyUser'
+    WHEN
+      _3_Mid_HeavyUser >= _4_HeavyUser
+      AND _3_Mid_HeavyUser >= _2_Mid_LightUser
+      AND _3_Mid_HeavyUser >= _1_LightUser
+      AND _3_Mid_HeavyUser >= _0_NoLive
+      AND _3_Mid_HeavyUser>= Fora_Cluster
+      THEN '3.Mid-HeavyUser'
+    WHEN
+      _2_Mid_LightUser >= _4_HeavyUser
+      AND _2_Mid_LightUser >= _3_Mid_HeavyUser
+      AND _2_Mid_LightUser >= _1_LightUser
+      AND _2_Mid_LightUser >= _0_NoLive
+      AND _2_Mid_LightUser>= Fora_Cluster
+      THEN '2.Mid-LightUser'
+    WHEN
+      _1_LightUser >= _4_HeavyUser
+      AND _1_LightUser >= _3_Mid_HeavyUser
+      AND _1_LightUser >= _2_Mid_LightUser
+      AND _1_LightUser >= _0_NoLive
+      AND _1_LightUser >= Fora_Cluster
+      THEN '1.LightUser'
+    WHEN
+      _0_NoLive >= _4_HeavyUser
+      AND _0_NoLive >= _3_Mid_HeavyUser
+      AND _0_NoLive >= _2_Mid_LightUser
+      AND _0_NoLive >= _1_LightUser
+      AND _0_NoLive >= Fora_Cluster
+      THEN '0.NoLive'
+    ELSE 'Fora_Cluster'
+    END AS Cluster_BBB_Acumulado,
+    CASE
+      WHEN Share_Total_BBB >= 0.8 THEN '2. Alta Concentração'
+      WHEN Share_Total_BBB >= 0.5 THEN '1. Média Concentração'
+    ELSE '0. Diversificado'
+    END AS Cluster_Share_BBB_Total  
+  FROM
+    step_7
+),
+
+step_9 AS (
+  SELECT
+    *,
+    CASE
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '0.NoLive'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 1
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '4.HeavyUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 2
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 3
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 4
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '1.LightUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 5
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '0.NoLive'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 6
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '4.HeavyUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 7
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 8
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 9
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '1.LightUser'
+      AND Cluster_Share_BBB_Total = '2. Alta Concentração' THEN 10
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '0.NoLive'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 11
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '4.HeavyUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 12
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 13
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 14
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '1.LightUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 15
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '0.NoLive'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 16
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '4.HeavyUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 17
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 18
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 19
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '1.LightUser'
+      AND Cluster_Share_BBB_Total = '1. Média Concentração' THEN 20
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '0. Diversificado' THEN 21
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '0. Diversificado' THEN 22
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '3.Mid-HeavyUser'
+      AND Cluster_Share_BBB_Total = '0. Diversificado' THEN 23
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = '2.Mid-LightUser'
+      AND Cluster_Share_BBB_Total = '0. Diversificado' THEN 24
+    WHEN assinou_2022
+      AND Cluster_BBB_Acumulado = 'Fora_Cluster' THEN 25
+    WHEN NOT assinou_2022
+      AND Cluster_BBB_Acumulado = 'Fora_Cluster' THEN 27
+    ELSE 25
+    END AS Risco_Churn_2022,
+    (
+      _0_NoLive
+      + _1_LightUser
+      + _2_Mid_LightUser
+      + _3_Mid_HeavyUser
+      + _4_HeavyUser
+    ) AS Semanas_Cluster_BBB
+  FROM
+    step_8
+    LEFT JOIN 
+    (SELECT * EXCEPT (Status_Opt_In) FROM ${ref("comunicacao", "ultima_comunicacao_assinante")} )
+    USING (globo_id)
+),
+
+step_10 AS (
+  SELECT
+    SAFE_DIVIDE(Semanas_Cluster_BBB, Semanas_Total) AS Share_Semanas_BBB,
+    Semanas_Cluster_BBB,
+    Risco_Churn_2022,
+    Cluster_Share_BBB_Total,
+    Share_Total_BBB,
+    Cluster_BBB_Acumulado,
+    Fora_Cluster,
+    Semanas_Total,
+    globo_id,
+    Horas_BBB,
+    Horas_Total,
+    _0_NoLive,
+    _1_LightUser,
+    _2_Mid_LightUser,
+    _3_Mid_HeavyUser,
+    _4_HeavyUser,
+    CancelouVol2020,
+    CancelouVol2021,
+    CancelouVol2022,
+    assinou_2021,
+    assinou_2022,
+    MIN_of_semana,
+    MAX_of_semana,
+    tipo_assinante,
+    canal_compra,
+    produto,
+    gender,
+    age,
+    data_ultimo_consumo,
+    telefone,
+    endereco,
+    Produto_Contratado,
+    Status_Opt_In,
+    Perfil_Email,
+    Perfil_Uso_Push,
+    Flag_Abriu_Push_30D,
+    Flag_Recebeu_Push_30D,
+    Flag_Abriu_App_30D,
+    Flag_Abriu_Email_30D,
+    Flag_Recebeu_Email_30D,
+    Cluster_Conteudo,
+    Cluster_Conteudo_Reduzido
+  FROM
+    step_9
+)
+
+SELECT
+  DISTINCT *
+FROM
+  step_10

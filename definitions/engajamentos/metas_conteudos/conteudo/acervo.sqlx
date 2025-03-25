@@ -1,0 +1,67 @@
+config {
+  type: "table",
+  name: "acervo",
+  schema: "conteudo",
+  tags: ['conteudo_staging_1',
+        "schedule_tag=conteudo_acervo",
+        "schedule_cron=0 7 * * *"
+  ]
+}
+
+WITH generos as (
+SELECT
+  id_programa,
+  ROW_NUMBER() OVER (PARTITION BY id_programa) AS row_number,
+  generos.Name AS genero_nome
+
+FROM
+  ${ref('conteudo', 'vw_catalogo_globoplay')}, UNNEST(generos) AS generos
+
+QUALIFY row_number <= 2
+),
+subgeneros AS (
+  SELECT 
+    t1.id_programa, 
+    t1.genero_nome AS Subgenero_1,
+    t2.genero_nome AS Subgenero_2
+  FROM generos AS t1
+  LEFT join generos AS t2 ON t2.row_number = 2 AND t1.id_programa = t2.id_programa
+  WHERE t1.row_number = 1
+)
+
+SELECT
+  id_programa AS id,
+  titulo_programa AS title,
+  titulo_canal AS channel_title,
+  titulo_original_programa AS Ttulo_Original,
+  ds_deal_subtype AS Categorizao,
+  IF(conteudo_exclusivo, "Sim", "Não") AS Exclusividade,
+  CAST(NULL AS STRING) AS Ineditismo,
+  CASE cc_nacional
+    WHEN "Sim" THEN "Nacional"
+    WHEN "Não" THEN "Internacional"
+    ELSE CAST(NULL AS STRING)
+  END AS Nacionalidade, 
+  nm_deal_company AS Licenciantes,
+  COALESCE(subgeneros.Subgenero_1, subgeneros.Subgenero_2) AS genero,
+  subgeneros.Subgenero_1,
+  subgeneros.Subgenero_2,
+  CAST(NULL AS STRING) AS Protagonismo,--TODO
+  CAST(NULL AS STRING) AS ProceduralSerializado,--TODO
+  titulo_original_programa AS Titulo_Original_Tratado,
+  ds_deal_subtype AS Categoria_Tratada,
+  CASE cc_nacional
+    WHEN "Sim" THEN "Nacional"
+    WHEN "Não" THEN "Internacional"
+    ELSE CAST(NULL AS STRING)
+  END AS Nacionalinternacional_Tratado,
+  nm_deal_company AS Studio_Tratado,
+  COALESCE(subgeneros.Subgenero_1, subgeneros.Subgenero_2) AS Genero_Tratado,
+  subgeneros.Subgenero_1 AS Subgenero_1_Tratado,
+  subgeneros.Subgenero_2 AS Subgenero_2_Tratado,
+  CAST(NULL AS STRING) AS Protagonismo_Tratado,--TODO
+  CAST(NULL AS STRING) AS ProceduralSerializado_Tratado,--TODO
+  cat.* EXCEPT(Nacionalidade)
+FROM
+  ${ref('conteudo', 'vw_catalogo_globoplay')} as cat
+LEFT JOIN subgeneros USING(id_programa)

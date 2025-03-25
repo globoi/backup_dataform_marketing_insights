@@ -1,0 +1,37 @@
+config {
+  type: 'table',
+  tags: ['consumo_copa'],
+  name: 'Retencao_copa',
+  schema: 'copa_2022',
+  description: '',
+  columns: {}
+}
+
+with base_retencao_copa as (
+  SELECT
+    distinct a.userId,
+    b.hrs_totais_copa as hrs_copa ,
+    sum(a.hours_watched) as hrs_totais
+  FROM
+    ${ref("consumo_enriched", "impression")} as a
+    inner join ${ref("copa_2022", "Base_Copa_Agrupada")} as b on a.userId = b.globo_id
+  where
+    a.date between "2022-11-20"
+    and "2022-12-18"
+    and b.mais_canais = true
+    and b.dt_assinatura_comeco >= "2022-11-20"
+  group by
+    a.userId, b.hrs_totais_copa
+)
+select
+  distinct d.globo_id,
+  case
+    when (hrs_copa / hrs_totais) > 0.6 then "Concentrado"
+    when (hrs_copa / hrs_totais) <= 0.6 then "Diversificado"
+    else "erro"
+  end as retencao_copa
+from
+  base_retencao_copa as c
+  inner join ${ref("copa_2022", "ultima_comunicacao_geral")} as d on c.userId = d.globo_id
+where
+  d.tipo_cadastro = "Assinante"

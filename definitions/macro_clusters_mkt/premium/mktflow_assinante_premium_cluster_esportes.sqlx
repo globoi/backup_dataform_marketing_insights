@@ -1,0 +1,145 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_esportes',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_esportes',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      tags: "",
+      owner: "martech" ,
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: 'assinantes premium que consumiram programas vod do genero esporte ou programas ao vivo do genero esporte ou futebol nos ultimos 180 dias ou navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias.',
+  columns: {
+  },
+}
+
+--macro cluster premium esportes
+
+--assinantes que consumiram programas vod do genero esporte ou programas ao vivo do genero esporte ou futebol nos ultimos 180 dias ou navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias.
+
+with 
+consumo_em_genero_esporte as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND program_subset = 'sports'
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+consumo_em_programas_ao_vivo_de_esporte as (
+  SELECT distinct globoid, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')} 
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa in ('ESPORTE')
+  GROUP BY ALL 
+  HAVING hrs_consumidas >= 0.5
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+  SELECT globo_id, 'consumo esporte' as base
+  FROM consumo_em_genero_esporte
+  
+  UNION DISTINCT
+  
+  SELECT globoid as globo_id, 'consumo esporte' as base
+  FROM consumo_em_programas_ao_vivo_de_esporte
+),
+
+--assinantes premium que navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias
+
+acesso_ge_ultimos15d as (
+
+  with acesso as (
+    SELECT globoId as globo_id, COUNT(*) as quantidade
+    FROM ${ref('foundation_gshow','foundation_gshow_sessions_v3')} w,
+    UNNEST (w.hits) h
+    WHERE data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 15 DAY)
+      AND h.provider = "cadun"
+      AND globoId is not null
+    GROUP BY globo_id
+    HAVING COUNT(*) >= 15
+  )
+
+  SELECT distinct a.globo_id, 'acesso GE' as base
+  FROM acesso a
+  INNER JOIN ${ref('usuarios','base_ativa_pagante_com_trial_new')} b
+    ON a.globo_id = b.globo_id,
+  UNNEST (info) as info_trial 
+  WHERE info_trial.mais_canais = true
+    AND a.globo_id is not null
+
+),
+
+--Ex-assinantes de Premiere, Telecine e Premiere, Globoplay + canais ao vivo e Premiere, Globoplay e Premiere, Premiere e Combate
+
+ex_ass_premiere as (
+  SELECT distinct globoid as globo_id, 'ex-assinante premiere' as base
+  FROM ${ref('Time_Inteligencia','CRM_ExAssinantes_Premiere')} a
+  INNER JOIN ${ref('usuarios','base_ativa_pagante_com_trial_new')} b
+    ON a.globoid = b.globo_id,
+  UNNEST (info) as info_trial 
+  WHERE info_trial.mais_canais = true
+),
+
+--Ex-assinantes de Combate, Globoplay e Combate, Premiere e Combate
+
+ex_ass_combate as (
+  SELECT distinct globoid as globo_id, 'ex-assinante combate' as base
+  FROM ${ref('Time_Inteligencia','CRM_ExAssinantes_Combate')} a
+  INNER JOIN ${ref('usuarios','base_ativa_pagante_com_trial_new')} b
+    ON a.globoid = b.globo_id,
+  UNNEST (info) as info_trial
+  WHERE info_trial.mais_canais = true
+),
+
+--uniao de todos os atuais usuarios assinantes premium que:
+--consumiram programas vod do genero esporte ou programas ao vivo do genero esporte ou futebol nos ultimos 180 dias, ou
+--navegaram em editorias do GE pelo menos 15 vezes nos últimos 15 dias, ou
+--são ex-assinantes de produtos com premiere, ou 
+--são ex-assinantes de produtos com combate
+
+basefinal as (
+  WITH uniao AS (
+    SELECT DISTINCT globo_id, base FROM uniao_consumo_vod_e_ao_vivo
+    
+    UNION DISTINCT
+    
+    SELECT DISTINCT globo_id, base FROM acesso_ge_ultimos15d
+
+    UNION DISTINCT
+
+    SELECT DISTINCT globo_id, base FROM ex_ass_premiere
+
+    UNION DISTINCT 
+    
+    SELECT DISTINCT globo_id, base FROM ex_ass_combate
+  ),
+
+ base_ordenada as (
+    SELECT *
+    FROM uniao
+    ORDER BY 1,2
+  )
+  
+  --tirando réplicas de GLOBO_ID da base_ordenada
+  SELECT DISTINCT globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+  FROM base_ordenada
+  GROUP BY 1
+)
+
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM ${ref('usuarios','base_ativa_pagante_com_trial_new')} e,
+UNNEST(e.info) as i
+JOIN basefinal as d
+  ON d.globo_id = e.globo_id
+WHERE i.gplay_padrao = true
+

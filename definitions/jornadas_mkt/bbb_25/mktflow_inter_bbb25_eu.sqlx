@@ -1,0 +1,45 @@
+config {
+    type: "table",
+    name: "mktflow_inter_bbb25_eu",
+    schema: 'jornadas_mkt',
+    tags: ['schedule_tag=jornadas_mkt_mktflow_inter_bbb25_eu'
+    ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_25",
+      owner: "martech" ,
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+WITH base_bbb25_inter_eu AS (
+SELECT
+    DISTINCT a.globo_id,
+    SUM(b.hours_watched) AS hrs
+FROM
+${ref("internacional","base_ativa_internacional")} AS a 
+    
+JOIN
+${ref("consumo_enriched","impression")} AS b
+
+    ON a.globo_id = b.userId
+WHERE
+    b.date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), WEEK(MONDAY)), INTERVAL 1 WEEK)
+    AND b.date < DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), WEEK(SUNDAY))
+ 
+    AND a.oferta_consumo = 'globo-play-eu'
+    AND b.program_id = 12082
+GROUP BY
+    a.globo_id
+HAVING
+    hrs >= 1
+)
+ 
+SELECT 'named_user' as identifier_type, globo_id
+FROM base_bbb25_inter_eu

@@ -1,0 +1,38 @@
+config {
+  type: "table"
+}
+
+WITH base_ponto_parada_series AS (
+  SELECT DISTINCT  globo_id, program_id,program_title
+  FROM ${ref("consumo", "base_ponto_parada_series")} 
+  WHERE (program_id = 12255 or program_id = 11611)
+  AND Ultimo_Episodio >= 2
+  AND  Dias_Ultimo_Consumo <= 60
+),
+program AS (
+  SELECT DISTINCT id, title, media_kit_resource__poster,url_for_consumption
+  FROM ${ref("conteudo_enriched", "program")} 
+  WHERE id = 12255 OR id = 11611
+),
+lista_usuarios AS (
+  SELECT base_ponto_parada_series.*,
+         media_kit_resource__poster,
+         url_for_consumption,
+  CASE
+    WHEN program_id=11611 THEN 'Algumas temporadas'
+    ELSE 'Programa completo'
+  END AS cenario,
+  CASE
+    WHEN program_id = 11611 THEN '1 a 10'
+    ELSE NULL
+  END AS temporadas_expirando,
+  CASE
+    WHEN program_id = 11611 THEN '23 de julho de 2021'
+    ELSE '31 de julho de 2021'
+  END AS data_expiracao_conteudo  
+  FROM base_ponto_parada_series
+  INNER JOIN program 
+ ON(program.id = base_ponto_parada_series.program_id)
+)
+
+SELECT * FROM lista_usuarios

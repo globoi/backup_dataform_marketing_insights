@@ -1,0 +1,67 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ass_produtos_globo_nao_pro'],
+  name: 'mktflow_base_automatica_ass_produtos_globo_nao_pro',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+
+
+--todos os assinants de gplay mais canais, combate e premiere que nao sao cartoleiros pro em 2024
+with cte1 as (
+select distinct globo_id, info.mais_canais
+from ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ba,
+unnest(ba.info) as info),
+
+assinante_mais_canais as (
+select distinct globo_id
+from cte1
+where mais_canais = true
+),
+
+assinante_combate as (
+select distinct globoid as globo_id
+from ${ref("Time_Inteligencia", "CRM_BaseAtiva_Combate")}
+where Dia = CURRENT_DATE()-1
+),
+
+assinante_premiere as (
+select distinct globoid as globo_id
+from ${ref("Time_Inteligencia", "CRM_BaseAtiva_Premiere")}
+where Dia = CURRENT_DATE()-1
+),
+
+base as (
+select globo_id
+from assinante_mais_canais
+union distinct
+select globo_id
+from assinante_combate
+union distinct
+select globo_id
+from assinante_premiere
+),
+
+cartoleiros_pro as (
+SELECT DISTINCT globo_id 
+FROM ${ref("report_staging", "report_temporada")}
+WHERE pro_em is not null
+AND temporada = 2024
+)
+
+select 'named_user' as identifier_type, base.globo_id as UUID
+from base
+left join cartoleiros_pro
+on base.globo_id = cartoleiros_pro.globo_id
+where cartoleiros_pro.globo_id is null

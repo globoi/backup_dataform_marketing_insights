@@ -1,0 +1,124 @@
+config {
+    type: "table",
+    schema: 'conteudo',
+    tags: ["conteudo",
+        "schedule_tag=conteudo_novidades_v3",
+        'schedule_cron=15 18 * * *'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "conteudo",
+            owner: "martech",
+            horario: "18h15min",
+            mktcloud: "true"
+        }
+    },
+    description: 'Tabela com os metadados das novidades da plataforma Globoplay.',
+    columns: {
+        dt_proc: "Data de processamento da tabela.",
+        program_id: "Código do programa associado ao id do programa associado ao conteúdo.",
+        program_title: "Título do programa.",
+        program_subset: "Categoria do programa.",
+        tier: "Identificador do tier do conteúdo. Ex: tier_1 = Globoplay basico e tier_2 = Globoplay + canais.",
+        release_year: "Ano de lançamento do conteúdo.",
+        created_at: "Data de criação do registro do programa.",
+        updated_at: "Data da última atualização do registro do programa.",
+        dias_estreia: "",
+        formato: "Formato do metadado. Ex: Poster.",
+        url: "Url do poster do conteúdo.",
+        url_for_consumption: "A URL com a página de consumo do vídeo, que deve ser usada sem alterações."
+    }
+}
+
+WITH
+  novidades_v3 AS (
+  SELECT
+    CURRENT_DATE() AS dt_proc,
+    p.id AS program_id,
+    p.title AS program_title,
+    p.subset AS program_subset,
+    CASE
+      WHEN p.service_id != 6807 THEN 'tier_1'
+      ELSE 'tier_2'
+  END
+    AS tier,
+    p.release_year,
+    p.created_at,
+    p.updated_at,
+    DATE_DIFF(CURRENT_DATE(), p.updated_at, DAY) AS dias_estreia,
+    list.element.format AS formato,
+    list.element.url AS url,
+    mt.url_for_consumption,
+    row_number () OVER (PARTITION BY p.id) AS rn
+  FROM
+    ${ref('clean_webmedia_metadata', 'program_most_recent')} AS p
+  INNER JOIN (
+    SELECT
+      DISTINCT id,
+      program_id,
+      original_title AS program_title,
+      status,
+      url_for_consumption
+    FROM
+      ${ref('clean_webmedia_metadata', 'video_most_recent')}
+    WHERE
+      status = 'published'
+      AND LOWER(url_for_consumption) LIKE ('%globoplay%')
+      AND kind = 'episode'
+      AND original_title IS NOT NULL
+      AND original_title != '' ) AS v
+  ON
+    v.program_id = p.id
+  INNER JOIN (
+    SELECT
+      CAST(id AS INTEGER) AS program_id,
+      title,
+      description,
+      media_kit_resources AS list,
+      url_for_consumption
+    FROM
+      ${ref('valiant_webmedia_metadata', 'programs')} AS p,
+      UNNEST(p.media_kit_resources.list) AS media_kit_resources
+    WHERE
+      release_year = 2024
+      AND LOWER(url_for_consumption) LIKE ('%globoplay%')
+    ORDER BY
+      updated_at DESC ) AS mt
+  ON
+    mt.program_id = p.id
+  WHERE
+    p.mediakit_id IS NOT NULL
+    AND p.release_year = 2024
+    AND list.element.format='poster'
+    AND subset IN ("special",
+      "varieties",
+      "humor",
+      "series",
+      "novelas",
+      "realities",
+      "kids")
+  QUALIFY
+    rn=1 ),
+  primeiro_consumo AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    Usuario_dia_0 AS SUM_of_Usuario_dia_0
+  FROM
+    ${ref('consumo', 'primeiro_consumo_usuarios')}
+    --group by 1,2
+    )
+SELECT
+  DISTINCT * EXCEPT(rn)
+FROM
+  novidades_v3
+  ---LEFT JOIN
+  --   primeiro_consumo
+  ---- USING
+  --  (program_id)
+  --where    SUM_of_Usuario_dia_0 >= 1000
+ORDER BY
+  dias_estreia ASC
+LIMIT
+  10

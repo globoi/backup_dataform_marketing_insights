@@ -1,0 +1,171 @@
+config {
+  type: 'table',
+  tags: ['consumo_copa'],
+  name: 'Base_Copa_Agrupada',
+  schema: 'copa_2022',
+  description: '',
+  columns: {}
+}
+
+with tabela as (
+  SELECT
+    globo_id,
+    case
+      when cluster_copa = '0. Sem Cluster' then 'Sem_Cluster'
+      when cluster_copa = '1. Light User' then 'Light_User'
+      when cluster_copa = '2. Medium User' then 'Medium_User'
+      when cluster_copa = '3. Heavy User' then 'Heavy_User'
+    end as cluster_copa,
+    hrs_total,
+    semana
+  FROM
+    ${ref("copa_2022", "Base_Copa_2022")}
+),
+tabela2 as (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        globo_id,
+        hrs_total,
+        cluster_copa,
+        semana
+      FROM
+        tabela
+    ) PIVOT(
+      SUM(hrs_total) hrs_total,
+      count(distinct semana) qtd_semana FOR cluster_copa in (
+        'Sem_Cluster',
+        'Light_User',
+        'Medium_User',
+        'Heavy_User'
+      )
+    )
+),
+tabela3 as (
+  select
+    globo_id,case
+      when hrs_total_Sem_Cluster is null then 0
+      else hrs_total_Sem_Cluster
+    end as hrs_total_Sem_Cluster,
+    qtd_semana_Sem_Cluster,
+    case
+      when hrs_total_Light_User is null then 0
+      else hrs_total_Light_User
+    end as hrs_total_Light_User,
+    qtd_semana_Light_User,
+    case
+      when hrs_total_Medium_User is null then 0
+      else hrs_total_Medium_User
+    end as hrs_total_Medium_User,
+    qtd_semana_Medium_User,
+    case
+      when hrs_total_Heavy_User is null then 0
+      else hrs_total_Heavy_User
+    end as hrs_total_Heavy_User,
+    qtd_semana_Heavy_User
+  from
+    tabela2
+),
+entrada_copa as (
+  select
+    globo_id,
+    min(semana) as min_semana
+  from
+    ${ref("copa_2022", "Base_Copa_2022")}
+  group by
+    1
+),
+ultima_semana as (
+  select
+    globo_id,
+    max(semana) as max_semana
+  from
+    ${ref("copa_2022", "Base_Copa_2022")}
+  group by
+    1
+),
+base_cancelamento as (
+  select
+    distinct globo_id,
+    True as Sol_CancelVol
+  from
+    ${ref("usuarios", "base_cancelamento")}
+  where
+    (
+      DATE(data_hora_cancelamento, 'America/Sao_Paulo') >= '2022-11-20'
+    )
+    and lower(AssetName) like '%globoplay%'
+),
+tabela4 as (
+  select
+    *,
+    (date_diff(max_semana, min_semana, WEEK)) + 1 as semanas_total,
+    sum(
+      hrs_total_Sem_Cluster + hrs_total_Light_User + hrs_total_Medium_User + hrs_total_Heavy_User
+    ) as hrs_totais_copa,
+    CASE
+      when min_semana is null then '0. Sem Cluster'
+      when max_semana is null then '0. Sem Cluster'
+      WHEN qtd_semana_Heavy_User >= qtd_semana_Medium_User
+      and qtd_semana_Heavy_User >= qtd_semana_Light_User
+      and qtd_semana_Heavy_User >= qtd_semana_Sem_Cluster THEN '3. Heavy User'
+      WHEN qtd_semana_Medium_User >= qtd_semana_Heavy_User
+      and qtd_semana_Medium_User >= qtd_semana_Light_User
+      and qtd_semana_Medium_User >= qtd_semana_Sem_Cluster THEN '2. Medium User'
+      WHEN qtd_semana_Light_User >= qtd_semana_Heavy_User
+      and qtd_semana_Light_User >= qtd_semana_Medium_User
+      and qtd_semana_Light_User >= qtd_semana_Sem_Cluster THEN '1. Light User'
+      WHEN qtd_semana_Sem_Cluster >= qtd_semana_Heavy_User
+      and qtd_semana_Sem_Cluster >= qtd_semana_Medium_User
+      and qtd_semana_Sem_Cluster >= qtd_semana_Light_User THEN '0. Sem Cluster'
+    END as cluster_copa_acumulado,
+  from
+    tabela3
+    inner join entrada_copa using(globo_id)
+    inner join ultima_semana using(globo_id)
+    left join base_cancelamento using(globo_id)
+  group by
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+),
+usuarios as (
+select * from ${ref("copa_2022", "ultima_comunicacao_geral")}
+),
+
+tabela5 as (select
+  distinct globo_id,
+  hrs_total_Sem_Cluster,
+  qtd_semana_Sem_Cluster,
+  hrs_total_Light_User,
+  qtd_semana_Light_User,
+  hrs_total_Medium_User,
+  qtd_semana_Medium_User,
+  hrs_total_Heavy_User,
+  qtd_semana_Heavy_User,
+  min_semana,
+  max_semana,
+  semanas_total,
+  hrs_totais_copa,
+  cluster_copa_acumulado,
+  case
+    when Sol_CancelVol is null then false
+    else Sol_CancelVol
+  end as Sol_CancelVol
+from
+  tabela4)
+
+  select * from tabela5
+  left join ( select distinct globo_id, max(cluster_copa) as max_cluster_copa from ${ref("copa_2022", "Base_Copa_2022")} group by 1) using (globo_id)
+  left join usuarios using (globo_id)

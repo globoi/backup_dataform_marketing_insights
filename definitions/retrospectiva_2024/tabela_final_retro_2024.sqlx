@@ -1,0 +1,509 @@
+config {
+  type: "table",
+    name: "tabela_final",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com as informações que serão mandadas para a vx fazer a configuração da retrospectiva 2024',
+  columns: {
+    globo_id: 'id do usuário globo',
+    globo_id_hash: 'resultado do hash entre o id globo + a string Retrospectiva24',
+    primeiro_play_program_id: 'id do primeiro conteudo que o usuário deu play em 2024',
+    primeiro_play_2024: 'titulo do primeiro conteudo que o usuário deu play em 2024',
+    primeiro_play_2024_program_poster_url: 'poster do primeiro conteudo que o usuário deu play em 2024',
+    horas_total: 'somatorio total de horas que o usuário consumiu em 2024',
+    qtd_dias_assistidos: 'quantidade de dias que o usuário consumiu baseado em quantas horas ele assistiu',
+    subset_mais_assistido: 'tipo de conteudo mais assisido em horas pelo usuário',
+    serie_bindge_maratonada_program_id: 'id da série completada pelo usuário em 2024',
+    serie_bindge_maratonada_program_title: 'titulo da série completada pelo usuário em 2024',
+    serie_bindge_maratonada_dias: 'quantidade de dias em que a série foi completada pelo usuário em 2024',
+    serie_bindge_maratonada_horas: 'quantidade de horas em que a série foi completada pelo usuário em 2024',
+    serie_bindge_maratonada_program_poster_url: 'poster da série completada pelo usuário em 2024',
+    program_title_rec1: 'titulo da recomendação 1 ',
+    program_poster_url_rec1: 'poster da recomendação 1 ',
+    url_add_minha_lista_rec1: 'url de adicionar na lista da recomendação 1',
+    program_title_rec2: 'titulo da recomendação 2',
+    program_poster_url_rec2: 'poster da recomendação 2',
+    url_add_minha_lista_rec2: 'url de adicionar na lista da recomendação 2',
+    program_title_rec3: 'titulo da recomendação 3',
+    program_poster_url_rec3: 'poster da recomendação 3',
+    url_add_minha_lista_rec3: 'url de adicionar na lista da recomendação 3',
+    badge_infantil: 'verifica se o usuário possui badge infantil',
+    badge_reality: 'verifica se o usuário possui badge de reality',
+    badge_esportista: 'verifica se o usuário possui badge esportista',
+    badge_ecletico: 'verifica se o usuário possui badge ecletico',
+    badge_docs: 'verifica se o usuário possui badge de documentario',
+    badge_cinefilo: 'verifica se o usuário possui badge cinefilo',
+    badge_maratonista: 'verifica se o usuário possui badge de series',
+    badge_musical: 'verifica se o usuário possui badge de musica',
+    badge_noveleiro: 'verifica se o usuário possui badge de novela',
+    badge_humorista: 'verifica se o usuário possui badge de humor',
+    badge_aovivo: 'verifica se o usuário possui badge de ao vivo',
+    badge_antenado: 'verifica se o usuário possui badge de jornalismo',
+    program_title_top_1: 'titulo do top 1 do usuario',
+    program_id_top_1: 'id do top 1 do usuario',
+    program_poster_url_top_1: 'poster do top 1 do usuario',
+    program_title_top_2: 'titulo do top 2 do usuario',
+    program_id_top_2: 'id do top 2 do usuario',
+    program_poster_url_top_2: 'poster do top 2 do usuario',
+    program_title_top_3: 'titulo do top 3 do usuario',
+    program_id_top_3: 'id do top 3 do usuario',
+    program_poster_url_top_3: 'poster do top 3 do usuario',
+    program_title_top_4: 'titulo do top 4 do usuario',
+    program_id_top_4: 'id do top 4 do usuario',
+    program_poster_url_top_4: 'poster do top 4 do usuario',
+    program_title_top_5: 'titulo do top 5 do usuario',
+    program_id_top_5: 'id do top 5 do usuario',
+    program_poster_url_top_5: 'poster do top 5 do usuario',
+    programa_mais_assistido: 'título do programa mais assistido',
+    program_id_mais_assistido: 'id do programa mais assistido',
+    hrs_programa_mais_assistido: 'total de horas do programa mais assistido'
+  },
+}
+
+WITH 
+primeiro_play AS (
+SELECT 
+  c.globo_id,
+  c.timestamp AS primeiro_timestamp,
+  c.program_id AS primeiro_play_program_id,
+  c.program_title AS primeiro_play_2024_title,
+  mk.media_kit_resource__poster AS primeiro_play_2024_program_poster_url
+FROM ${ref('retrospectiva_2024','consumo_retro_2024')}  c
+JOIN ${ref('conteudo_enriched', 'program')} mk
+  ON  CAST(c.program_id AS INT) = mk.id
+  WHERE c.program_title != 'Globoplay Ao Vivo'
+  AND mk.media_kit_resource__poster IS NOT NULL
+  AND c.program_title NOT IN('USA Ao Vivo','Globoplay')
+  AND hours_watched >= 0.03
+QUALIFY ROW_NUMBER() OVER (PARTITION BY c.globo_id ORDER BY c.timestamp ASC) = 1
+), 
+
+total_horas AS (
+SELECT
+    c.globo_id, 
+    ROUND(SUM(c.hours_watched),0) AS horas_total, 
+    COUNT(DISTINCT date) AS qtd_dias_assistidos
+  FROM ${ref('retrospectiva_2024','consumo_retro_2024')} c
+  GROUP BY 1
+),
+
+media_horas as (
+  select distinct 
+    globo_id,
+    ROUND((horas_total/qtd_dias_assistidos),0) as media_hrs
+  from total_horas
+),
+
+subset_mais_assistido as (
+SELECT DISTINCT
+    c.globo_id,
+    CASE 
+        WHEN c.program_subset = 'novelas' THEN 'novelas'
+        WHEN c.program_subset = 'series' THEN 'series'
+        WHEN c.program_subset IN ('movies', 'filmes') THEN 'filmes'
+        WHEN c.program_subset = 'live' THEN 'ao vivo'
+        WHEN c.program_subset = 'realities' THEN 'realities'
+        ELSE 'variedades'
+    END AS subset_mais_assistido,
+    ROUND(SUM(c.hours_watched), 2) AS total_horas_subset,
+    ROW_NUMBER() OVER (PARTITION BY c.globo_id ORDER BY SUM(c.hours_watched) DESC) AS rank
+  FROM ${ref('retrospectiva_2024','consumo_retro_2024')} c
+GROUP BY 1, 2
+QUALIFY rank = 1
+ORDER BY 1, 2 DESC
+),
+
+--SERIE MARATONADA MAIS RAPIDO, CONSIDERANDO A MARATONA POR TEMPORADA
+serie_maratonada_mais_rapido AS (
+WITH consumo_filtrado AS (
+    SELECT 
+        globo_id,
+        program_id,
+        program_title,
+        season,
+        MIN(CASE WHEN season_episode_rank = 1 AND EXTRACT(YEAR FROM primeiro_consumo) = 2024 THEN primeiro_consumo END) AS inicio_consumo,
+        MAX(CASE WHEN terminou_temporada = true THEN ultimo_consumo END) AS termino_temporada,
+        ROUND(SUM(horas_consumidas), 0) AS total_horas_consumidas
+    FROM ${ref("consumo", "series_history")}
+    WHERE EXTRACT(YEAR FROM primeiro_consumo) = 2024
+    GROUP BY globo_id, program_id, program_title, season
+),
+
+dias_consumo AS (
+    SELECT 
+        globo_id,
+        program_id,
+        program_title,
+        season,
+        inicio_consumo,
+        termino_temporada,
+        total_horas_consumidas,
+        CASE 
+            WHEN DATE_DIFF(DATE(termino_temporada), DATE(inicio_consumo), DAY) = 0 THEN 1
+            ELSE DATE_DIFF(DATE(termino_temporada), DATE(inicio_consumo), DAY)
+        END AS dias_para_concluir
+    FROM consumo_filtrado
+    WHERE inicio_consumo IS NOT NULL AND termino_temporada IS NOT NULL
+)
+
+    SELECT 
+        dc.globo_id,
+        dc.program_id AS serie_bindge_maratonada_program_id,
+        dc.program_title AS serie_bindge_maratonada_program_title,
+        MIN(dias_para_concluir) AS serie_bindge_maratonada_dias,
+        total_horas_consumidas AS serie_bindge_maratonada_horas,
+        mk.media_kit_resource__poster AS serie_bindge_maratonada_program_poster_url,
+        ROW_NUMBER() OVER (PARTITION BY dc.globo_id ORDER BY MIN(dias_para_concluir) ASC) AS rank
+    FROM dias_consumo AS dc
+    INNER JOIN ${ref('conteudo_enriched', 'program')} AS mk
+    ON CAST(dc.program_id AS INT) = mk.id
+    GROUP BY ALL
+    QUALIFY rank = 1
+),    
+
+--CRIAÇÃO DOS BADGES
+consumo_por_genero AS (
+  SELECT
+    c.globo_id,
+    g.genero,
+    SUM(c.hours_watched) AS total_hours_watched
+  FROM 
+    ${ref('retrospectiva_2024','consumo_retro_2024')} AS c
+  LEFT JOIN 
+    ${ref('retrospectiva_2024','generos_retrospectiva_2024')} AS g
+  ON 
+    c.program_id = g.program_id 
+  GROUP BY 
+    c.globo_id, g.genero
+),
+
+consumo_por_programa AS (
+  SELECT
+    globo_id,
+    program_title,
+    program_subset,
+    SUM(hours_watched) AS total_hours_watched
+  FROM
+   ${ref('retrospectiva_2024','consumo_retro_2024')}
+  GROUP BY
+    globo_id, program_title, program_subset
+),
+
+generos_consumidos AS (
+  SELECT
+    globo_id,
+    COUNT(DISTINCT genero) AS generos_diferentes
+  FROM
+    consumo_por_genero
+  WHERE
+    genero IS NOT NULL
+  GROUP BY
+    globo_id
+),
+
+badges_horas AS (
+  SELECT
+    c.globo_id,
+    -- Infantil
+    SUM(CASE WHEN c.genero IN ('Infantil') THEN c.total_hours_watched ELSE 0 END) AS horas_infantil,
+    -- Reality Lover
+    SUM(CASE WHEN c.genero IN ('Reality Show') THEN c.total_hours_watched ELSE 0 END) AS horas_reality,
+    -- Esportista
+    SUM(CASE 
+        WHEN c.genero IN ('Esporte') THEN c.total_hours_watched
+        WHEN p.program_title IN ('Premiere Ao Vivo', 'sportv Ao Vivo', 'Jogos Olimpicos Ao Vivo') THEN p.total_hours_watched
+        ELSE 0 
+    END) AS horas_esportista,
+    -- Fã de Docs
+    SUM(CASE WHEN c.genero IN ('Documentário') THEN c.total_hours_watched ELSE 0 END) AS horas_docs,
+    -- Cinéfilo
+    SUM(CASE WHEN c.genero IN ('Cinema') THEN c.total_hours_watched 
+             WHEN p.program_subset = 'movies' THEN p.total_hours_watched
+    ELSE 0 END) AS horas_cinefilo,
+    -- Maratonista
+    SUM(CASE WHEN p.program_subset = 'series' THEN p.total_hours_watched ELSE 0 END) AS horas_maratonista,
+    -- Musical
+    SUM(CASE 
+        WHEN c.genero = 'Musical' THEN c.total_hours_watched
+        WHEN p.program_title LIKE '%Rock in Rio%' THEN p.total_hours_watched
+        ELSE 0 
+    END) AS horas_musical,
+    -- Noveleiro
+    SUM(CASE WHEN p.program_subset = 'novelas' THEN p.total_hours_watched ELSE 0 END) AS horas_noveleiro,
+    -- Humorista
+    SUM(CASE WHEN c.genero = 'Comédia' THEN c.total_hours_watched ELSE 0 END) AS horas_humorista,
+    -- Ao vivaco
+    SUM(CASE WHEN p.program_subset = 'live' THEN p.total_hours_watched ELSE 0 END) AS horas_aovivo,
+    -- Antenado
+    SUM(CASE 
+        WHEN c.genero = 'Jornalismo' THEN c.total_hours_watched
+        WHEN p.program_title = 'Globonews Ao Vivo' THEN p.total_hours_watched
+        ELSE 0 
+    END) AS horas_antenado
+  FROM
+    consumo_por_genero AS c
+  LEFT JOIN
+    consumo_por_programa AS p
+  ON 
+    c.globo_id = p.globo_id
+  GROUP BY
+    c.globo_id
+),
+
+badges AS (
+SELECT
+  b.globo_id,
+  -- Badges
+  b.horas_infantil > 2 AS badge_infantil,
+  b.horas_reality > 2 AS badge_reality,
+  b.horas_esportista > 2 AS badge_esportista,
+  g.generos_diferentes > 5 AS badge_ecletico,
+  b.horas_docs > 2 AS badge_docs,
+  b.horas_cinefilo > 2 AS badge_cinefilo,
+  b.horas_maratonista > 2 AS badge_maratonista,
+  b.horas_musical > 2 AS badge_musical,
+  b.horas_noveleiro > 2 AS badge_noveleiro,
+  b.horas_humorista > 2 AS badge_humorista,
+  b.horas_aovivo > 2 AS badge_aovivo,
+  b.horas_antenado > 2 AS badge_antenado,
+  -- Formato Favorito
+  CASE 
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_infantil THEN 'infantil'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_reality THEN 'reality'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_esportista THEN 'esportista'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_docs THEN 'documentario'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_cinefilo THEN 'cinefilo'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_maratonista THEN 'maratonista'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_musical THEN 'musical'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_noveleiro THEN 'noveleiro'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_humorista THEN 'humorista'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_aovivo THEN 'ao vivo'
+    WHEN GREATEST(
+        b.horas_infantil, b.horas_reality, b.horas_esportista, b.horas_docs, b.horas_cinefilo, 
+        b.horas_maratonista, b.horas_musical, b.horas_noveleiro, b.horas_humorista, 
+        b.horas_aovivo, b.horas_antenado
+    ) = b.horas_antenado THEN 'antenado'
+    ELSE 'sem formato favorito'
+  END AS formato_favorito
+FROM
+  badges_horas AS b
+LEFT JOIN
+  generos_consumidos AS g
+ON 
+  b.globo_id = g.globo_id
+
+),
+
+--JUNÇÃO DE TODOS OS DADOS PRA GERAR A TABELA FINAL
+base_pre_final AS (
+SELECT 
+  pp.globo_id,
+  to_hex(sha256('Retrospectiva24'|| pp.globo_id)) as globo_id_hash,
+  primeiro_play_program_id, 
+  pp.primeiro_play_2024_title, 
+  primeiro_play_2024_program_poster_url, 
+  th.horas_total,
+  mh.media_hrs,
+  qtd_dias_assistidos, 
+  sa.subset_mais_assistido, 
+  serie_bindge_maratonada_program_id,
+  serie_bindge_maratonada_program_title,
+  serie_bindge_maratonada_dias,
+  serie_bindge_maratonada_horas,
+  serie_bindge_maratonada_program_poster_url,
+  program_title_rec1,
+  program_poster_url_rec1,
+  url_add_minha_lista_rec1,
+  program_title_rec2,
+  program_poster_url_rec2,
+  url_add_minha_lista_rec2,
+  program_title_rec3,
+  program_poster_url_rec3,
+  url_add_minha_lista_rec3,
+  badge_infantil,
+  badge_reality,
+  badge_esportista,
+  badge_ecletico,
+  badge_docs,
+  badge_cinefilo,
+  badge_maratonista,
+  badge_musical,
+  badge_noveleiro,
+  badge_humorista,
+  badge_aovivo,
+  badge_antenado,
+  formato_favorito,
+  program_title_top_1,
+  program_id_top_1,
+  program_poster_url_top_1,
+  horas_top_1,
+  program_title_top_2,
+  program_id_top_2,
+  program_poster_url_top_2,
+  horas_top_2,
+  program_title_top_3,
+  program_id_top_3,
+  program_poster_url_top_3,
+  horas_top_3,
+  program_title_top_4,
+  program_id_top_4,
+  program_poster_url_top_4,
+  horas_top_4,
+  program_title_top_5,
+  program_id_top_5,
+  program_poster_url_top_5,
+  horas_top_5
+FROM primeiro_play AS pp
+LEFT JOIN total_horas AS th
+    ON pp.globo_id = th.globo_id
+LEFT JOIN media_horas AS mh
+    ON pp.globo_id = mh.globo_id    
+LEFT JOIN subset_mais_assistido AS sa
+    ON pp.globo_id = sa.globo_id
+LEFT JOIN serie_maratonada_mais_rapido AS sm
+    ON pp.globo_id = sm.globo_id
+LEFT JOIN ${ref('retrospectiva_2024','recomendacao_conteudo')} AS r
+    ON pp.globo_id = r.globo_id
+LEFT JOIN badges AS bad
+    ON pp.globo_id = bad.globo_id
+LEFT JOIN ${ref('retrospectiva_2024','consumo_top5')} as tc 
+    ON pp.globo_id = tc.globo_id
+),
+
+--ADIÇÃO DA CONDIÇÃO PARA RECEBER CUPOM OU NÃO E ADIÇÃO DA COLUNA DE PROGRAMA MAIS ASSISTIDO E SUAS VARIAÇÕES
+base_pre_final_2 AS (
+SELECT e.grupo,
+  CASE
+    WHEN e.grupo LIKE '%Cancelado%' THEN TRUE
+    ELSE FALSE
+  END recebe_cupom,
+  CASE
+    WHEN bp.program_id_top_1 IS NOT NULL THEN CAST(bp.program_id_top_1 AS STRING)
+    ELSE 'nao elegivel'
+  END program_id_mais_assistido,
+  CASE
+    WHEN bp.program_title_top_1 IS NOT NULL THEN bp.program_title_top_1
+    ELSE 'nao elegivel'
+  END programa_mais_assistido,
+  CASE
+    WHEN bp.horas_top_1 IS NOT NULL THEN CAST(bp.horas_top_1 AS STRING)
+    ELSE 'nao elegivel'
+  END hrs_programa_mais_assistido,
+  CASE 
+    WHEN bp.serie_bindge_maratonada_program_title IS NOT NULL THEN TRUE
+    ELSE FALSE
+  END serie_bindge_maratonada_terminou,
+  bp.*
+FROM base_pre_final AS bp
+INNER JOIN ${ref('retrospectiva_2024','elegibilidade_2024')} AS e
+ON bp.globo_id = e.globo_id
+)
+
+--REORDENAÇÃO DE COLUNAS PARA A TABELA FINAL
+SELECT 
+grupo,
+recebe_cupom,
+globo_id,
+globo_id_hash,
+primeiro_play_2024_title,
+primeiro_play_program_id,
+primeiro_play_2024_program_poster_url,
+horas_total,
+media_hrs,
+qtd_dias_assistidos,
+subset_mais_assistido,
+programa_mais_assistido,
+program_id_mais_assistido,
+hrs_programa_mais_assistido,
+program_title_top_1,
+program_id_top_1,
+program_poster_url_top_1,
+program_title_top_2,
+program_id_top_2,
+program_poster_url_top_2,
+program_title_top_3,
+program_id_top_3,
+program_poster_url_top_3,
+program_title_top_4,
+program_id_top_4,
+program_poster_url_top_4,
+program_title_top_5,
+program_id_top_5,
+program_poster_url_top_5,
+serie_bindge_maratonada_terminou,
+serie_bindge_maratonada_program_title,
+serie_bindge_maratonada_program_id,
+serie_bindge_maratonada_dias,
+serie_bindge_maratonada_horas,
+serie_bindge_maratonada_program_poster_url,
+badge_infantil,
+badge_reality,
+badge_esportista,
+badge_ecletico,
+badge_docs,
+badge_cinefilo,
+badge_maratonista,
+badge_musical,
+badge_noveleiro,
+badge_humorista,
+badge_aovivo,
+badge_antenado,
+program_title_rec1,
+program_poster_url_rec1,
+url_add_minha_lista_rec1,
+program_title_rec2,
+program_poster_url_rec2,
+url_add_minha_lista_rec2,
+program_title_rec3,
+program_poster_url_rec3,
+url_add_minha_lista_rec3
+FROM base_pre_final_2

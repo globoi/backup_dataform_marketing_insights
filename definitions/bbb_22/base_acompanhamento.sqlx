@@ -1,0 +1,44 @@
+config {
+  type: "table",
+  schema: "bbb_22",
+  name: "base_acompanhamento",
+  tags: []
+}
+WITH base AS (
+  SELECT DISTINCT(id_asset),
+         globo_id,
+         canal_compra,
+         dt_assinatura_comeco,
+         extract(YEAR from dt_assinatura_comeco) = 2022 AS assinou_2022
+  FROM ${ref("usuarios", "base_ativa_incremental_old")} 
+  WHERE dt_proc >= "2022-04-25"
+    AND tipo_assinante = 'titular'
+),
+dc AS (
+  SELECT AssetId AS id_asset,
+        data_desistencia
+  FROM ${ref("sales_enriched", "desistencia_cancelamento")} 
+  WHERE LOWER(AssetName) LIKE "%globoplay%"
+  AND data_desistencia >= "2022-04-25"
+),
+cancelados AS (
+  SELECT * EXCEPT(globo_id)
+  FROM ${ref("bbb_22", "base_cancelados_vol")} 
+  WHERE dt_hr_cancelamento_final_ciclo >= "2022-04-25"
+),
+base_cluster AS (
+  SELECT * EXCEPT(canal_compra,
+                  assinou_2021,
+                  assinou_2022)
+FROM ${ref("bbb_22", "RaioXBBB22_agrupado")} 
+)
+
+SELECT DISTINCT * FROM base 
+LEFT JOIN cancelados 
+USING(id_asset)
+LEFT JOIN dc 
+USING(id_asset)
+LEFT JOIN base_cluster
+USING(globo_id)
+
+

@@ -1,0 +1,52 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=familiag_mkt_mktflow_base_jornada_acesso_g1_mobile_desktop',"schedule_cron=0 10 * * *"],
+  name: 'mktflow_base_jornada_acesso_g1_mobile_desktop',
+  schema: 'familiag_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "familiag_mkt",
+      urban: "list"
+    }
+  }
+}
+
+with acessou_nos_ultimos_30d as (
+select distinct 
+globoId as globo_id, 
+h.dispositivo,
+from  `gglobo-prodservdig-hdg-prd.foundation_g1.foundation_g1_sessions_v3` g1,
+UNNEST(g1.hits) h
+where g1.data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+and globoId is not null
+and bounces is null
+and visitas >= 1
+and h.provider = 'cadun'),
+
+acesso_nos_ultimos_3m as (
+select distinct 
+globoId as globo_id, 
+h.dispositivo,
+from `gglobo-prodservdig-hdg-prd.foundation_g1.foundation_g1_sessions_v3` g1,
+UNNEST(g1.hits) h
+where g1.data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 90 DAY)
+and globoId is not null
+and bounces is null
+and visitas >= 1
+and h.provider = 'cadun')
+
+select distinct a.globo_id, a.dispositivo,
+case when b.globo_id is not null then 'true' else 'false' end as acesso_g1_ultimos_30d
+from acesso_nos_ultimos_3m a
+left join acessou_nos_ultimos_30d b
+on a.globo_id = b.globo_id
+where a.dispositivo in ('mobile', 'desktop')
+order by 3 asc
+
+
+

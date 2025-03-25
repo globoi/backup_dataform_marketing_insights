@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+  tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_chega_de_trecho_25"],
+  name: 'mktflow_chega_de_trecho_25',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT DISTINCT a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} as a--`gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` a
+
+JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} as b--`gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral` b
+ ON a.userId = b.globo_id
+
+WHERE a.program_id IN (16284, 16280, 12082)
+
+AND b.tipo_cadastro = 'Logado Free'
+
+AND hours_watched > 0.033
+
+AND date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+

@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=combate_mkt_mktflow_base_combate_asset_cancelamento'],
+    name: 'mktflow_base_combate_asset_cancelamento',
+    schema: 'combate_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "combate_mkt"
+        }
+    }
+}
+select distinct globo_id, assetid
+from ${ref("sales_gold", "asset_gold")} as a--`gglobo-foundation-psd-hdg-prd.sales_gold.asset_gold`
+inner join ${ref("sales_gold", "last_subscription_state")} as b --`gglobo-foundation-psd-hdg-prd.sales_gold.last_subscription_state`
+using(globo_id)
+where asset_name like '_o_____'
+and b.state like 'in_______________'

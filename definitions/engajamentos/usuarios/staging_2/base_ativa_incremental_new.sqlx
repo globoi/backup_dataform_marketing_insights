@@ -1,0 +1,37 @@
+config {
+  type: "incremental",  
+  schema: "usuarios",
+  name: "base_ativa_incremental_new",
+  tags: ["usuarios_staging_2",
+        "schedule_tag=usuarios_base_ativa_incremental_new"
+  ],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+
+
+SELECT 
+globo_id,
+info_trial.id_asset,
+tipo_assinante,
+cast(null as string) as sistema,
+mais_canais,
+cast(null as bool) as addon_disney,
+cast(null as bool) as addon_deezer,
+Produto_Contratado,
+-- coluna em_ativacao nao sera mais utilizada
+cast(NULL as BOOL) AS em_ativacao,
+DATE(dt_assinatura_comeco) AS dt_assinatura_comeco,
+canal_compra,
+TIMESTAMP(data_hora_compra) AS data_hora_compra,
+produto,
+origem,
+assinatura_gplay,
+tempo_de_base_agrupado,
+CURRENT_DATE() as dt_proc 
+FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+UNNEST (info) as info_trial
+
+

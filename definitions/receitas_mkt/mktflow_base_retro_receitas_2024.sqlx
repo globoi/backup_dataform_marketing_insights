@@ -1,0 +1,13 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=receitas_mkt_mktflow_base_retro_receitas_2024'],
+    name: 'mktflow_base_retro_receitas_2024',
+    schema: 'receitas_mkt',
+    description: ''
+}
+
+SELECT distinct globoid AS globo_id
+, globoid_hash
+FROM --`gglobo-mkt-ins-hdg-prd.retrospectiva.retrospectiva_2024_vf`
+${ref("retrospectiva", "retrospectiva_2024_vf")}
+WHERE primeiroProduto = "receitas" 

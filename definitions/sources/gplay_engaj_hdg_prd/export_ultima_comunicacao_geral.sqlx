@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-gplay-engaj-hdg-prd",
+  schema: "palantir_export",
+  name: "export_ultima_comunicacao_geral",
+  description: ""
+}

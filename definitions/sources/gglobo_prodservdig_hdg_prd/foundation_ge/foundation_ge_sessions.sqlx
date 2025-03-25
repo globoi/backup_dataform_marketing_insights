@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-prodservdig-hdg-prd",
+  schema: "foundation_ge",
+  name: "foundation_ge_sessions",
+  description: ""
+}

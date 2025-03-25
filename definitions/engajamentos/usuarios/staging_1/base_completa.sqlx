@@ -1,0 +1,274 @@
+config {
+  type: "table",
+  name: "base_completa",
+  schema: "usuarios",
+  tags: ["usuarios_staging_1"]
+}
+
+WITH salesforce_step_1 AS (
+  SELECT
+    *,
+    DATETIME(CURRENT_TIMESTAMP(), 'America/Sao_Paulo') AS today,
+    DATE_SUB(DATETIME(CURRENT_TIMESTAMP(), 'America/Sao_Paulo'), INTERVAL 1 DAY) AS yesterday
+  FROM ${ref("sales_clean", "asset")} AS asset
+  LEFT OUTER JOIN 
+    (SELECT AccountID, globo_id FROM ${ref("sales_clean", "account")} WHERE table_suffix > '2019-01-01') AS account
+    USING (AccountID) 
+  LEFT OUTER JOIN 
+    (SELECT OrderID, Status as order_status FROM ${ref("sales_clean", "order")} WHERE table_suffix > '2019-01-01') AS order_
+    USING (OrderID)
+  LEFT OUTER JOIN 
+    (SELECT Product2Id, ProductCode, ProductCodeUnique__c FROM ${ref("sales_clean", "product2")}) AS product2
+    USING (Product2Id)
+  WHERE table_suffix > '2019-01-01'
+),
+
+salesforce_step_2 AS (
+  SELECT 
+    *,
+    CASE 
+        WHEN 
+        (canal_cancelamento = 'Minha Conta' AND (status = 'Em Cancelamento' OR dt_cancelamento_final_ciclo >= DATE(yesterday)))
+    THEN 
+      'Ativo'
+    ELSE 
+      status 
+    END AS status_calculado,
+    (periodo_trial_form > 0) AS teve_degustacao,
+    (assinatura_id IS NOT NULL) as cliente_migrado
+  FROM salesforce_step_1
+  WHERE
+    DATE(data_hora_compra, 'America/Sao_Paulo') < DATE(today) AND
+    LOWER(AssetName) LIKE '%globoplay%' AND
+    LOWER(ProductCode) NOT LIKE '%cort%' AND
+    LOWER(ProductCode) NOT LIKE '%internacional%' AND
+    LOWER(status_integracao) = 'sucesso' AND
+    LOWER(order_status) = 'activated' AND
+    visivel_cesta IS NOT NULL 
+),
+
+salesforce_step_3 AS (
+  SELECT 
+    *,
+    CASE 
+        WHEN data_hora_cancelamento IS NOT NULL THEN 
+          CASE 
+              WHEN DATE(dt_hr_cancelamento_final_ciclo) <= yesterday THEN dt_hr_cancelamento_final_ciclo
+              ELSE 
+                CASE
+                    WHEN dt_hr_cancelamento_final_ciclo IS NULL AND data_hora_cancelamento <= CAST(yesterday as TIMESTAMP) THEN data_hora_cancelamento
+                    END 
+          END
+    END AS dt_assinatura_fim,
+
+    CASE 
+        WHEN periodo_trial_form > 0 AND data_conversao_efetiva IS NOT NULL THEN CAST(data_conversao_efetiva as TIMESTAMP)
+        ELSE data_hora_compra
+    END AS dt_assinatura_inicio,
+
+    CASE
+        WHEN ProductCodeUnique__c LIKE '%Pro-0130%' THEN 'anual' ELSE 'mensal'
+    END AS plano
+  FROM  
+    salesforce_step_2
+),
+
+salesforce_step_4 AS (
+  SELECT 
+    AssetId, 
+    globo_id,
+    dt_assinatura_inicio, 
+    dt_assinatura_fim, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    'Titular' AS Tipo_Assinante
+  FROM salesforce_step_3
+  WHERE NOT (teve_degustacao IS True AND data_conversao_efetiva IS NULL AND cliente_migrado IS False)
+),
+
+relacionamento_step_1 AS (
+  SELECT 
+    salesforce_step_4.AssetId,
+    dt_assinatura_inicio, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    COALESCE(TIMESTAMP(EVA_Data_Hora_Fim_Relacionamento__c), dt_assinatura_fim) AS dt_assinatura_fim,
+    globo_id_dependente AS globo_id,
+    'Dependente' as Tipo_Assinante
+  FROM ${ref("sales_enriched", "relacionamento")} AS rel
+  INNER JOIN salesforce_step_4
+  ON rel.globo_id_dependente = salesforce_step_4.globo_id AND rel.AssetId = salesforce_step_4.AssetId
+),
+
+salesforce_step_5 AS (
+  SELECT 
+    AssetId,
+    dt_assinatura_inicio, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    dt_assinatura_fim,
+    globo_id,
+    Tipo_Assinante 
+    FROM salesforce_step_4 
+  UNION DISTINCT 
+  SELECT 
+    AssetId,
+    dt_assinatura_inicio, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    dt_assinatura_fim,
+    globo_id,
+    Tipo_Assinante  
+  FROM relacionamento_step_1
+),
+
+salesforce_step_6 AS (
+  SELECT * FROM salesforce_step_5
+  WHERE globo_id IS NOT NULL
+),
+
+base_ativa_pagante_1 AS (
+  SELECT 
+    *,
+    (OldValue = 'Ativo' AND NewValue = 'Suspenso') OR (OldValue = 'Ativo' AND NewValue = 'Cancelado') AS foi_desativado,
+    (OldValue = 'Suspenso' AND NewValue = 'Ativo') OR (OldValue = 'Pendente' AND NewValue = 'Ativo') AS foi_ativado
+  FROM ${ref("sales_clean", "asset_history_status")}
+  WHERE DATE(AssetHistoryCreatedDate, 'America/Sao_Paulo') = DATE(CURRENT_TIMESTAMP(), 'America/Sao_Paulo')
+),
+
+base_ativa_pagante_2 AS (
+  SELECT
+    AssetId,
+    SUM(CASE WHEN foi_desativado THEN 1 ELSE 0 END) AS foi_desativado,
+    SUM(CASE WHEN foi_ativado THEN 1 ELSE 0 END) AS foi_ativado,
+  FROM base_ativa_pagante_1
+  GROUP BY AssetId
+),
+
+salesforce_base_ativa_1 AS (
+  SELECT 
+    AssetId, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado
+  FROM salesforce_step_6
+),
+
+salesforce_base_ativa_2 AS (
+  SELECT 
+    salesforce_base_ativa_1.AssetID, 
+    status_calculado, 
+    data_conversao_efetiva, 
+    teve_degustacao, 
+    cliente_migrado,
+    (foi_desativado IS NOT NULL AND foi_desativado > 0) AS foi_desativado,
+    (foi_ativado IS NOT NULL AND foi_ativado > 0) AS foi_ativado,
+    (data_conversao_efetiva IS NOT NULL AND DATE(data_conversao_efetiva) < DATE(CURRENT_TIMESTAMP(), 'America/Sao_Paulo')) AS convertido_nao_hoje
+  FROM salesforce_base_ativa_1
+  LEFT OUTER JOIN base_ativa_pagante_2
+  ON salesforce_base_ativa_1.AssetId = base_ativa_pagante_2.AssetId
+),
+
+salesforce_base_ativa_3 AS (
+  SELECT
+    AssetID,
+    status_calculado as status_regra
+  FROM salesforce_base_ativa_2
+  WHERE ((status_calculado = 'Ativo') OR (foi_desativado AND status_calculado != 'Ativo'))
+  AND NOT (foi_ativado AND status_calculado = 'Ativo')
+  AND ((teve_degustacao AND convertido_nao_hoje) OR (NOT teve_degustacao OR cliente_migrado))
+),
+
+salesforce_step_7 AS (
+  SELECT 
+    AssetId,
+    globo_id,
+    dt_assinatura_inicio,
+    dt_assinatura_fim,
+    status_calculado,
+    status_regra,
+    data_conversao_efetiva,
+    teve_degustacao,
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    Tipo_Assinante
+  FROM salesforce_step_6
+  LEFT JOIN salesforce_base_ativa_3
+  USING (AssetID)
+),
+
+base_legado_step_1 AS (
+  SELECT 
+    *,
+    'Salesforce' as sistema
+  FROM ${ref("palantir_export", "export_base_legado")}
+),
+
+base_completa_step_1 AS (
+  SELECT
+    AssetId,
+    globo_id,
+    dt_assinatura_inicio,
+    dt_assinatura_fim,
+    status_calculado,
+    status_regra,
+    data_conversao_efetiva,
+    teve_degustacao,
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    Tipo_Assinante,
+    'Salesforce' AS sistema
+    FROM salesforce_step_7
+    UNION DISTINCT
+    SELECT
+    CAST(AssetId as STRING),
+    globo_id,
+    dt_assinatura_inicio,
+    dt_assinatura_fim,
+    status_calculado,
+    status_regra,
+    data_conversao_efetiva,
+    teve_degustacao,
+    cliente_migrado,
+    data_da_suspensao,
+    canal_compra,
+    plano,
+    Tipo_Assinante,
+    'Legado' AS sistema
+    FROM base_legado_step_1
+)
+
+SELECT 
+  *,
+  DATE_DIFF(
+    LAST_DAY(CAST(dt_assinatura_inicio AS DATE)),
+    CAST(dt_assinatura_inicio AS DATE),
+    DAY)
+  AS dif_last_date
+FROM base_completa_step_1
+

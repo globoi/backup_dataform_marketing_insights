@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_20",
+  name: "status_Erick_historico",
+  description: ""
+}

@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  name: "perfil",
+  schema: "usuarios",
+  tags: ["usuarios_staging_4",
+        "schedule_tag=usuarios_perfil"
+  ]
+}
+
+WITH step_1 AS (
+  SELECT 
+    globo_id, 
+    dt_assinatura_comeco, 
+    produto, 
+    gender, 
+    age, 
+    data_ultimo_consumo, 
+    inativo, 
+    ultimo_consumo, 
+    first_play, 
+    mais_canais, 
+    canal_compra
+  FROM
+    ${ref('usuarios','perfil_assinantes_ativo_reduzido')}
+  GROUP BY globo_id, dt_assinatura_comeco, produto, gender, age, data_ultimo_consumo, inativo, ultimo_consumo, first_play, mais_canais, canal_compra
+)
+
+SELECT 
+  * EXCEPT(data_ultimo_consumo),
+  DATE_TRUNC(data_ultimo_consumo, DAY) AS data_ultimo_consumo
+FROM
+  step_1

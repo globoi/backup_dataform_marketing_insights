@@ -1,0 +1,296 @@
+config {
+  type: "table",
+  name: 'base_taf',
+  schema: 'consumo'
+}
+
+WITH all_content AS (
+  SELECT
+    id AS mediaid,
+    kind,
+    status,
+    episode
+  FROM
+    ${ref('conteudo_enriched','all_content')}
+  WHERE
+    program_id = 23160
+),
+usuarios AS (
+  SELECT
+    * REPLACE(
+      DATE(dt_assinatura_comeco, "America/Sao_Paulo") AS dt_assinatura_comeco
+    )
+  FROM     ${ref('comunicacao','ultima_comunicacao_geral')}
+),
+consumo_trailer AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    TRUE AS assistiu_trailer
+  FROM ${ref('consumo_enriched','all_impression')}
+  WHERE
+    date >= "2022-09-15"
+    AND mediaid = 10943265
+),
+consumo_recap AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    TRUE AS assistiu_recap
+  FROM
+   ${ref('consumo_enriched','all_impression')}
+  WHERE
+    date >= "2023-03-27"
+    AND mediaid in (11379855, 11379856, 11379857, 11394764, 11394801)
+),
+consumo_trechos_1 AS (
+  SELECT
+    ai.userid,
+    ai.mediaid,
+    MIN(date) OVER (PARTITION BY userid, program_id) AS data_min_trecho,
+    MAX(date) OVER (PARTITION BY userid, program_id) AS data_max_trecho
+  FROM
+    ${ref('consumo_enriched','all_impression')} ai
+    INNER JOIN all_content USING (mediaid)
+  WHERE
+    date >= "2022-10-19"
+    AND kind IN ('excerpt', 'extra')
+),
+consumo_trechos AS (
+  SELECT
+    userid AS globo_id,
+    data_min_trecho,
+    data_max_trecho,
+    COUNT(DISTINCT mediaid) AS qtd_trechos
+  FROM
+    consumo_trechos_1
+  GROUP BY
+    userid,
+    data_min_trecho,
+    data_max_trecho
+),
+consumo_live AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    TRUE AS assistiu_live
+  FROM
+    ${ref('consumo_enriched','all_impression')}
+  WHERE
+    date BETWEEN "2022-10-19"
+    AND "2022-10-20"
+    AND mediaid IN (11019225, 11019219)
+),
+consumo_semana_1_1 AS (
+  SELECT
+    userid,
+    IF(
+      mediaid IN (11019225, 11019219),
+      11031381,
+      mediaid
+    ) AS mediaid,
+    MIN(date) OVER (PARTITION BY userid, program_id) AS data_comeco_semana_1,
+    MAX(date) OVER (PARTITION BY userid, program_id) AS data_fim_semana_1
+  FROM
+    ${ref('consumo_enriched','all_impression')}
+  WHERE
+    date >= "2022-10-19"
+    AND mediaid IN (
+      11019225,
+      11019219,
+      11031381,
+      11018434,
+      11025687,
+      11025701,
+      11019184
+    )
+),
+consumo_semana_1 AS (
+  SELECT
+    userid AS globo_id,
+    data_comeco_semana_1,
+    data_fim_semana_1,
+    COUNT(DISTINCT mediaid) AS qtd_midias_semana_1
+  FROM
+    consumo_semana_1_1
+  GROUP BY
+    userid,
+    data_comeco_semana_1,
+    data_fim_semana_1
+),
+consumo_eps_1 AS (
+  SELECT
+    userid AS globo_id,
+    IF(
+      mediaid IN (11019225, 11019219),
+      11031381,
+      mediaid
+    ) AS mediaid,
+    hours_watched,
+    date
+  FROM
+    ${ref('consumo_enriched','all_impression')}
+  WHERE
+    date >= "2022-10-19"
+    AND program_id = 23160
+),
+consumo_all as (
+  select
+    globo_id,
+    min(date) as data_comeco_taf_all,
+    max(date) as data_fim_taf_all
+  from
+    consumo_eps_1
+  group by
+    1
+),
+consumo_eps_2 AS (
+  SELECT
+    globo_id,
+    MAX(episode) AS max_episode,
+    SUM(hours_watched) AS horas_total,
+    COUNT(DISTINCT mediaid) AS qtd_midias_total,
+    COUNT(DISTINCT date) AS qtd_dias_total,
+    MIN(date) AS data_comeco_taf,
+    MAX(date) AS data_fim_taf
+  FROM
+    consumo_eps_1
+    INNER JOIN all_content USING (mediaid)
+  WHERE
+    status = "published"
+    AND kind = "episode"
+  GROUP BY
+    globo_id
+),
+consumo_eps AS (
+  SELECT
+    *,
+    CASE
+      WHEN max_episode <= 1 THEN '0. Curioso'
+      WHEN max_episode BETWEEN 2
+      AND 44 THEN '1.0. Assistindo Parte 1'
+      WHEN max_episode = 45 THEN '1.1. Terminou Parte 1'
+      WHEN max_episode BETWEEN 46
+      AND 84 THEN '2.0. Assistindo Parte 2'
+      WHEN max_episode = 85 THEN '2.1. Terminou Parte 2'
+      ELSE '0. Curioso'
+    END AS Cluster_taf
+  FROM
+    consumo_eps_2
+),
+consumo_taf_all AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    date,
+    mediaid
+  FROM
+    ${ref('consumo_enriched','all_impression')}
+  WHERE
+    program_id = 23160
+),
+cancel AS (
+  SELECT
+    DISTINCT globo_id,
+    TRUE AS Sol_CancelVol
+  FROM ${ref('usuarios','base_cancelamento')}
+  WHERE
+    data_hora_cancelamento >= "2022-10-19"
+    AND LOWER(AssetName) LIKE "%globoplay%"
+),
+
+consumo_penultimo_ep as (
+
+select DISTINCT globo_id, true as assistiu_live_penultimo_ep from consumo_taf_all
+where mediaid in (11019225,11019219) and date between '2023-05-30' and '2023-05-31'
+
+),
+
+consumo_ultimo_ep as (
+
+select DISTINCT globo_id, true as assistiu_live_ultimo_ep from consumo_taf_all
+where mediaid in (11019225,11019219) and date between '2023-06-01' and '2023-06-02'
+
+),
+
+base AS (
+  SELECT
+    * REPLACE (
+      COALESCE(Sol_CancelVol, FALSE) AS Sol_CancelVol,
+      COALESCE(assistiu_trailer, FALSE) AS assistiu_trailer,
+      COALESCE(assistiu_live, FALSE) AS assistiu_live,
+      COALESCE(assistiu_recap, FALSE) AS assistiu_recap,
+      IF(
+        produto IS NULL
+        AND tipo_assinante = "logado free",
+        "Free",
+        produto
+      ) AS produto,
+      IF(
+        Cluster_taf IS NULL,
+        "0. Curioso",
+        Cluster_taf
+      ) AS Cluster_taf
+    ),
+    data_min_trecho IS NOT NULL AS assistiu_trechos
+  FROM
+    usuarios
+    INNER JOIN consumo_taf_all USING (globo_id)
+    LEFT JOIN consumo_eps USING (globo_id)
+    left join consumo_all using(globo_id)
+    LEFT JOIN consumo_trailer USING (globo_id)
+    left join consumo_recap using(globo_id)
+    LEFT JOIN consumo_trechos USING (globo_id)
+    LEFT JOIN consumo_live USING (globo_id)
+    LEFT JOIN consumo_semana_1 USING (globo_id)
+    LEFT JOIN cancel USING (globo_id)
+    left join consumo_penultimo_ep using(globo_id)
+    left join consumo_ultimo_ep using(globo_id)
+
+)
+SELECT
+  distinct globo_id,
+  tipo_cadastro,
+  tipo_assinante,
+  dt_assinatura_comeco,
+  produto,
+  canal_compra,
+  tempo_de_base_agrupado,
+  assistiu_trailer,
+  assistiu_trechos,
+  qtd_trechos,
+  data_min_trecho,
+  data_max_trecho,
+  assistiu_live,
+  data_comeco_semana_1,
+  data_fim_semana_1,
+  qtd_midias_semana_1,
+  horas_total,
+  qtd_midias_total,
+  qtd_dias_total,
+  max_episode,
+  data_comeco_taf,
+  data_fim_taf,
+  data_comeco_taf_all,
+  data_fim_taf_all,
+  assistiu_recap,
+  Cluster_taf,
+ case when assistiu_live_penultimo_ep is null then false else assistiu_live_penultimo_ep end as assistiu_live_penultimo_ep,
+ case when assistiu_live_ultimo_ep is null then false else assistiu_live_ultimo_ep end as assistiu_live_ultimo_ep,
+  Sol_CancelVol,
+  email_perfil_30D,
+  email_ultimo_data_enviado,
+  email_ultimo_data_aberto,
+  email_qtd_enviado_30D,
+  email_qtd_aberto_30D,
+  push_ultimo_data_enviado,
+  push_ultimo_data_aberto,
+  push_ultimo_titulo_aberto,
+  push_qtd_enviado_30D,
+  push_perfil_uso,
+  appopen_ultimo_data,
+  email_flag_enviado_30D,
+  email_flag_aberto_30D,
+  push_flag_enviado_30D,
+  appopen_flag_30D,
+  push_flag_aberto_30D,
+  whatsapp_optin_status,
+  whatsapp_optin_datetime
+FROM
+  base

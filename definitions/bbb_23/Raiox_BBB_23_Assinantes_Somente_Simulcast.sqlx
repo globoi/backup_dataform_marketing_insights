@@ -1,0 +1,97 @@
+  config {
+    type: 'table',
+    name: 'Raiox_BBB_23_Assinantes_Somente_Simulcast',
+    schema: 'bbb_23',
+    tags: ['bbb_23','bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+    }
+  },
+  description: 'Tabela com os assinantes que assistiram pelo menos 15 minutos do programa Big Brother Brasil SOMENTE no ao vivo do simulcast.',
+  columns: {globo_id: 'Código que identifica o usuário.',
+  canal: 'Canal em que o assinante assistiu o programa. Ex: Globo/Multishow.',
+  programa: 'Nome do programa que o assinante assistiu.',
+  semana: 'Semana em que o assinante assistiu ao programa.',
+  frequencia_ao_vivo: 'Quantos dias na semana o assinante assistiu ao programa.',
+  total_horas_ao_vivo_bbb: 'Total de horas que o assinante assistiu ao programa na semana.'
+
+  }
+
+}
+
+WITH
+  tabela AS (
+  SELECT
+    *
+  FROM
+    ${ref("bbb_23", "Consumo_ao_vivo_bbb")}
+  WHERE
+    total_horas_ao_vivo_bbb >=0.25)
+SELECT
+  t.globo_id,
+  t.canal,
+  t.programa,
+  t.semana,
+  t.frequencia_ao_vivo,
+  t.total_horas_ao_vivo_bbb,
+  tipo_assinante,
+  mais_canais,
+  Produto_Contratado AS produto_contratado,
+  dt_assinatura_comeco,
+  canal_compra,
+  produto,
+  assinatura_gplay,
+  cancelou_vol_20,
+  consumiu_bbb_21,
+  cancelou_vol_21,
+  consumiu_bbb_22,
+  cancelou_vol_22,
+  sol_cancel_vol_23
+FROM
+  tabela AS t
+FULL OUTER JOIN (
+  SELECT
+    DISTINCT globo_id,
+    id_asset
+  FROM
+     ${ref("bbb_23","Raiox_BBB_23_Assinantes")}) AS r
+USING
+  (globo_id)
+INNER JOIN (
+  SELECT
+    DISTINCT globo_id,
+    cancelou_vol_20,
+    consumiu_bbb_21,
+    cancelou_vol_21,
+    consumiu_bbb_22,
+    cancelou_vol_22,
+    sol_cancel_vol_23
+  FROM
+    ${ref("bbb_23","Base_Dados_Assinantes_BBB_23")})
+USING
+  (globo_id)
+INNER JOIN (
+  SELECT
+    DISTINCT globo_id,
+    tipo_assinante,
+    mais_canais,
+    Produto_Contratado AS produto_contratado,
+    MIN(dt_assinatura_comeco) OVER(PARTITION BY globo_id) AS dt_assinatura_comeco,
+    canal_compra,
+    produto,
+    assinatura_gplay
+  FROM
+    ${ref("usuarios","base_ativa_incremental_old")}
+  WHERE
+    dt_proc >= '2023-01-16'
+    AND tipo_assinante != 'trial'
+    AND assinatura_gplay = 'nacional' ) AS b
+USING
+  (globo_id)
+WHERE
+  id_asset IS NULL

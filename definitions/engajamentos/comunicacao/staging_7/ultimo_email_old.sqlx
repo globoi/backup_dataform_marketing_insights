@@ -1,0 +1,191 @@
+config {
+  type: "table",
+  name: "ultimo_email_old",
+  schema: "comunicacao",
+  tags: [],
+}
+
+WITH consumo AS (
+  SELECT 
+    userid AS GLOBO_ID,
+    COUNT(userid) AS Plays,
+    SUM(hours_watched) AS Horas_30_Dias,
+    COUNT(DISTINCT program_title) AS Qtd_Programas_30_Dias,
+    COUNT(DISTINCT program_subset) AS Qtd_Subset_30_Dias,
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+
+  GROUP BY userid
+),
+
+email_step_1 AS (
+  SELECT 
+    globo_id,
+    IF(was_opened, 1, 0) AS Abertos,
+    IF(open_date IS NULL, CAST(Null AS INT), IF(DATE_DIFF(CURRENT_DATE(), CAST(open_date AS DATE), DAY) <= 30, 1, 0)) AS Abertos_30D,
+    IF(open_date IS NULL, CAST(Null AS INT), IF(DATE_DIFF(CURRENT_DATE(), CAST(open_date AS DATE), DAY) <= 90, 1, 0)) AS Abertos_90D,
+    IF(send_date IS NULL, CAST(Null AS INT), IF(DATE_DIFF(CURRENT_DATE(), CAST(send_date AS DATE), DAY) <= 30, 1, 0)) AS Enviados_30D,
+    IF(send_date IS NULL, CAST(Null AS INT), IF(DATE_DIFF(CURRENT_DATE(), CAST(send_date AS DATE), DAY) <= 90, 1, 0)) AS Enviados_90D,
+    open_date,
+    click_date,
+    send_date
+  FROM 
+    ${ref("mkt_derived", "email_send")} AS email
+  WHERE date <= CURRENT_DATE()
+),
+
+email_step_2 AS (
+SELECT 
+  globo_id,
+  MAX(open_date) AS MAX_of_open_date,
+  MAX(click_date) AS MAX_of_click_date,
+  MAX(send_date) AS MAX_of_send_date,
+  SUM(Abertos) AS SUM_of_Abertos,
+  COUNT(globo_id) AS COUNT,
+  SUM(Abertos_30D) AS SUM_of_Abertos_30D,
+  SUM(Abertos_90D) AS SUM_of_Abertos_90D,
+  SUM(Enviados_30D) AS SUM_of_Enviados_30D,
+  SUM(Enviados_90D) AS SUM_of_Enviados_90D,
+FROM email_step_1
+GROUP BY globo_id
+),
+
+base_ativa AS (
+  SELECT 
+    globo_id, 
+    tipo_assinante, 
+    canal_compra, 
+    tempo_de_base_agrupado,
+    globo_id AS new_globo_id
+  FROM ${ref("usuarios", "base_ativa_pagante_com_trial")} 
+),
+
+perfil AS (
+  SELECT
+    globo_id AS new_globo_id,
+    dt_assinatura_comeco, 
+    produto, 
+    gender, 
+    age, 
+    data_ultimo_consumo, 
+    inativo, 
+    ultimo_consumo, 
+    first_play, 
+    mais_canais
+  FROM
+    ${ref("usuarios", "perfil")} AS email 
+),
+
+email_base_step_1 AS (
+  SELECT 
+    globo_id, 
+    new_globo_id, 
+    MAX_of_send_date, 
+    MAX_of_open_date, 
+    MAX_of_click_date, 
+    SUM_of_Abertos, 
+    COUNT, 
+    SUM_of_Enviados_90D, 
+    SUM_of_Enviados_30D, 
+    SUM_of_Abertos_30D, 
+    SUM_of_Abertos_90D,
+    MAX(tipo_assinante) AS MAX_of_new_tipo_assinante,
+    MAX(canal_compra) AS MAX_of_new_canal_compra,
+    MAX(tempo_de_base_agrupado) AS MAX_of_new_tempo_de_base_agrupado,
+  FROM email_step_2
+  FULL OUTER JOIN base_ativa USING(globo_id)
+  WHERE new_globo_id IS NOT NULL
+  GROUP BY globo_id, new_globo_id, MAX_of_send_date, MAX_of_open_date, MAX_of_click_date, SUM_of_Abertos, COUNT, SUM_of_Enviados_90D, SUM_of_Enviados_30D, SUM_of_Abertos_30D, SUM_of_Abertos_90D
+),
+
+email_base_step_2 AS (
+  SELECT
+    DISTINCT
+    IF(age<15 OR age>90, CAST(NULL AS INT), age) AS Idade,
+    MAX_of_send_date AS Data_Envio,
+    MAX_of_open_date AS Data_Abertura,
+    MAX_of_click_date AS Data_Click,
+    MAX_of_new_tipo_assinante AS Tipo_assinante,
+    MAX_of_new_canal_compra AS Canal_compra,
+    MAX_of_new_tempo_de_base_agrupado AS Tempo_de_base,
+    produto AS Produto,
+    gender AS Genero,
+    inativo AS Inativo,
+    first_play AS Primeiro_Play,
+    data_ultimo_consumo AS Data_ultimo_consumo,
+    ultimo_consumo AS Ultimo_consumo,
+    SUM_of_Abertos AS Abertos_Total,
+    COUNT AS Enviados_Total,
+    SUM_of_Enviados_90D AS Enviados_90D,
+    SUM_of_Enviados_30D AS Enviados_30D,
+    SUM_of_Abertos_30D AS Abertos_30D,
+    SUM_of_Abertos_90D AS Abertos_90D,
+    new_globo_id AS GLOBO_ID_2,
+    dt_assinatura_comeco,
+    mais_canais
+  FROM email_base_step_1
+  LEFT JOIN perfil USING(new_globo_id)
+),
+
+base_final_step_1 AS(
+SELECT
+  *,
+  GLOBO_ID_2 AS GLOBO_ID,
+  SAFE_DIVIDE(Abertos_Total, Enviados_Total) AS Perc_Abertos,
+  SAFE_DIVIDE(Abertos_30D, Enviados_30D) AS Perc_Abertos_30D,
+  SAFE_DIVIDE(Abertos_90D, Enviados_90D) AS Perc_Abertos_90D,
+FROM email_base_step_2
+),
+
+base_final_step_2 AS(
+  SELECT 
+    *,
+    CASE
+    WHEN Perc_Abertos_30D >=0.5 OR Perc_Abertos_30D >= 5 THEN '3. Heavy User'
+    WHEN Perc_Abertos_30D = 0 THEN '0. No user'
+    WHEN Perc_Abertos_30D IS NULL THEN '0. No user'
+    WHEN Perc_Abertos_30D < 0.25 THEN '1. Light User ' -- existe esse espaço no fim da string no código original
+    WHEN Perc_Abertos_30D < 0.5 THEN '2. Medium User'
+    ELSE 'Outros'
+    END AS Perfil_Email
+  FROM base_final_step_1
+)
+
+SELECT 
+  Perfil_Email,
+  perc_Abertos_90D,
+  perc_Abertos_30D,
+  perc_Abertos,
+  GLOBO_ID,
+  Data_Envio,
+  Data_Abertura,
+  Data_Click,
+  Tipo_assinante,
+  Canal_compra,
+  Tempo_de_base,
+  dt_assinatura_comeco,
+  Produto,
+  Idade,
+  Genero,
+  Inativo,
+  Primeiro_Play,
+  Data_ultimo_consumo,
+  Ultimo_consumo,
+  Abertos_Total,
+  Enviados_Total,
+  Enviados_90D,
+  Enviados_30D,
+  Abertos_30D,
+  Abertos_90D,
+  mais_canais,
+  Plays,
+  Horas_30_Dias,
+  Qtd_Programas_30_Dias,
+  Qtd_Subset_30_Dias
+
+FROM base_final_step_2
+LEFT JOIN consumo USING(GLOBO_ID)
+
+

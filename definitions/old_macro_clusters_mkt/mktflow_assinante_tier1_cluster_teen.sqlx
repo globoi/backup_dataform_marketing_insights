@@ -1,0 +1,107 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_teen'],
+  name: 'mktflow_assinante_tier1_cluster_teen',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--macro cluster tier 1 conteúdos teen
+--assinantes tier 1 que consumiram conteudos teen vod ou malhacao ao vivo nos ultimos 365 dias.
+
+--programas considerados em "outrosconteudos_teen":
+--A Cara do Pai	9840
+--Academia de Dança	13139
+--Clara E o Chuveiro Do Tempo	13512
+--Flora Encantada	13578
+--H2O Meninas Sereias	13086
+--In The Long Run - A Longo Prazo	11670
+--Malhação - Id	16888
+--Malhação - Toda Forma de Amar	11225
+--Malhação - Viva a Diferença	10003
+--Malhação 1995	13016
+--Malhação 1997	17230
+--Malhação 2008	12989
+--Malhação 2009	13765
+--Malhação 2010	2534
+--Malhação 2011	5409
+--Malhação 2012	6969
+--Malhação 2013	7608
+--Malhação 2014	8143
+--Malhação Pro Dia Nascer Feliz	9620
+--Malhação Seu Lugar no Mundo	8886
+--Malhação Sonhos	13457
+--Malhação – Vidas Brasileiras	10409
+--Malory Towers: Escola Para Meninas	13226
+--Marta & Eva	20135
+--Márika: Detetives em Ação	14201
+--No Escuro	13248
+--Sandy & Junior	11350
+--Sandy e Junior: A História	12571
+--Sandy e Junior: Nossa História	12678
+--Sem Saída	12878
+--The Magicians – Escola de Magia	11608
+--Theodosia	19710
+--Todo Mundo Odeia o Chris	11672
+--Turma da Mônica – A Série	20256
+--Vlog da Berê	12591
+
+with todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.program.subset, c.program.metadata_scheme, c.program.format
+FROM  ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_teen as (
+SELECT *
+FROM todos_os_generos
+WHERE name in ('Infantojuvenil','Teen','Jovem adulto')
+),
+
+outrosconteudos_teen as (
+SELECT *
+FROM todos_os_generos
+WHERE id in (12571,11670,12678,11608,9840,11350,20135,19710,13139,13086,20256,14201,13226,13578,13512,16888,11225,10003,13016,17230,12989,13765,2534,5409,6969,7608,8143,9620,8886,13457,10409)
+),
+
+union_teen as (
+SELECT * FROM genero_teen
+UNION DISTINCT
+SELECT * FROM outrosconteudos_teen
+),
+
+consumo_em_genero_teen as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN union_teen b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_malhacao_ao_vivo as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND programa in ('MALHACAO')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo teen' as base
+FROM consumo_em_genero_teen
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo teen' as base
+FROM consumo_em_malhacao_ao_vivo)
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false

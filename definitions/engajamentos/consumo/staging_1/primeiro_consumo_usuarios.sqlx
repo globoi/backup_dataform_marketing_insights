@@ -1,0 +1,149 @@
+config {
+    type: 'table',
+    name: 'primeiro_consumo_usuarios',
+    schema: 'consumo',
+    tags: ['consumo_staging_1',
+        "schedule_tag=consumo_primeiro_consumo_usuarios"
+    ],
+    description: '',
+    columns: {}
+}
+
+WITH
+  first_play AS (
+  SELECT
+    userid,
+    program_id,
+    ROW_NUMBER() OVER(PARTITION BY userid, program_id ORDER BY timestamp) AS pc,
+    timestamp AS first_play_timestamp
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  WHERE
+    is_full_content
+  QUALIFY
+    pc = 1 ),
+  impression_step_1 AS (
+  SELECT
+    imp.userid,
+    imp.program_id,
+    imp.`timestamp`,
+    DATE(imp.`timestamp`, "America/Sao_Paulo") AS Primeiro_consumo,
+    fp.first_play_timestamp AS pc,
+    `date`
+  FROM
+    ${ref('consumo_enriched', 'impression')} imp
+  LEFT JOIN
+    first_play fp
+  USING
+    (userid,
+      program_id)
+  WHERE
+    (mediaid != 8428029
+      AND mediaid != 8427870) ),
+  impression_step_2 AS (
+  SELECT
+    program_id,
+    Primeiro_consumo,
+    SUM(CASE
+        WHEN pc = `timestamp` THEN 1
+        ELSE 0
+    END
+      ) AS Usuario_dia_0,
+    COUNT(DISTINCT userid) AS Usuarios_Totais_no_Dia,
+    MAX(`date`) AS max_date
+  FROM
+    impression_step_1
+  GROUP BY
+    program_id,
+    Primeiro_consumo ),
+  impression_step_3 AS (
+  SELECT
+    *,
+    LAG(Usuario_dia_0,1) OVER(PARTITION BY program_id ORDER BY Primeiro_consumo) AS anterior,
+  FROM
+    impression_step_2 ),
+  impression_setp_4 AS (
+  SELECT
+    *,
+    COALESCE(ROUND(SAFE_DIVIDE((Usuario_dia_0 - anterior),anterior) * 100,1),0) AS delta
+  FROM
+    impression_step_3 ),
+  impression_step_5 AS (
+  SELECT
+    *,
+    LAG(delta,1) OVER(PARTITION BY program_id ORDER BY Primeiro_consumo) AS delta_anterior,
+    ROW_NUMBER() OVER(PARTITION BY program_id ORDER BY Primeiro_consumo) AS Dias_da_Publicacao,
+    DATE_ADD(Primeiro_consumo, INTERVAL 7 DAY) AS Data_7_dias_depois,
+    DATE_ADD(Primeiro_consumo, INTERVAL 15 DAY) AS Data_15_dias_depois
+  FROM
+    impression_setp_4 ),
+  impression_step_6 AS (
+  SELECT
+    *,
+    ROUND(delta - delta_anterior, 1) AS acc,
+  FROM
+    impression_step_5 ),
+  impression_day_7 AS (
+  SELECT
+    program_id,
+    Primeiro_consumo AS Data_7_dias_depois,
+    Usuario_dia_0 AS Usuario_dia_7,
+    acc AS acc_dia_7
+  FROM
+    impression_step_6 ),
+  impression_day_15 AS (
+  SELECT
+    program_id,
+    Primeiro_consumo AS Data_15_dias_depois,
+    Usuario_dia_0 AS Usuario_dia_15,
+    acc AS acc_dia_15
+  FROM
+    impression_step_6 ),
+  impression_step_7 AS (
+  SELECT
+    * EXCEPT (anterior,
+      delta_anterior),
+    COALESCE(ROUND(SAFE_DIVIDE((Usuario_dia_7 - Usuario_dia_0),Usuario_dia_0)*100,1),0) AS delta_dia_7,
+    COALESCE(ROUND(SAFE_DIVIDE((Usuario_dia_15 - Usuario_dia_0),Usuario_dia_0)*100,1),0) AS delta_dia_15
+  FROM
+    impression_step_6
+  LEFT JOIN
+    impression_day_7
+  USING
+    (program_id,
+      Data_7_dias_depois)
+  LEFT JOIN
+    impression_day_15
+  USING
+    (program_id,
+      Data_15_dias_depois) ),
+  acervo AS (
+  SELECT
+    id AS program_id,
+    channel_title,
+    Nacionalinternacional_Tratado,
+    Categoria_Tratada,
+    Exclusividade,
+    Ineditismo,
+    Studio_Tratado
+  FROM
+    ${ref('conteudo', 'acervo')} ),
+  program AS (
+  SELECT
+    id AS program_id,
+    title AS program_title,
+    subset AS program_subset
+  FROM
+    ${ref('conteudo_enriched', 'program')} )
+SELECT
+  *
+FROM
+  impression_step_7
+LEFT JOIN
+  acervo
+USING
+  (program_id)
+LEFT JOIN
+  program
+USING
+  (program_id)

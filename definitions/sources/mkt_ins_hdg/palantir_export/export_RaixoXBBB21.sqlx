@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "palantir_export",
+  name: "export_RaixoXBBB21",
+  description: ""
+}

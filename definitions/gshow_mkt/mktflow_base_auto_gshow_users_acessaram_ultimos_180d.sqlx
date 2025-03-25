@@ -1,0 +1,25 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=gshow_mkt_mktflow_base_auto_gshow_users_acessaram_ultimos_180d', 'schedule_cron=0 9 * * *'],
+    name: 'mktflow_base_auto_gshow_users_acessaram_ultimos_180d',
+    schema: 'gshow_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "gshow_mkt"
+        }
+    }
+}
+
+SELECT distinct userId as globo_id
+FROM ${ref("gshow", "common_sessions_*")} , unnest(hits) as h
+--`gglobo-horizon-data-hdg-prd.gshow.common_sessions_20241222`
+WHERE _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+ AND FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY ))
+and h.url LIKE '%gshow.globo.com%'
+and provider = 'cadun'
+and REGEXP_CONTAINS(userId, r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$')

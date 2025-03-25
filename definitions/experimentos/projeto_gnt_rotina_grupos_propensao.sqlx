@@ -1,0 +1,65 @@
+config {
+  type: 'incremental',
+  uniqueKey: ["globo_id"],
+  tags: ['schedule_tag=experimentos_projeto_gnt_cluster_propensao_relacao_grupos'],
+  name: 'projeto_gnt_cluster_propensao_relacao_grupos',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+-- Query para fazer atribuir novos consumidores gnt aos seus grupos na projeto_gnt_cluster_propensao_relacao_grupos
+
+-- Roda antes
+
+--INSERT INTO ${ref("experimentos", "projeto_gnt_cluster_propensao_relacao_grupos")}
+
+WITH
+  -- etapa com os filtros de negócio principal
+  consumo_variedades as (
+  
+WITH tier1_variaties as (
+select distinct globo_id, 'tier1 variedades' as base
+from ${ref("macro_clusters_mkt", "mktflow_assinante_tier1_cluster_variedades")}
+),
+
+
+
+ex_ass_variaties as (
+select distinct o.globo_id, 'lf variedades' as base
+from ${ref("macro_clusters_mkt", "mktflow_lf_cluster_variedades")} o
+inner join ${ref("sales_gold", "customer_details")} i
+on o.globo_id = i.globo_id)
+
+select * from tier1_variaties
+union distinct
+select * from ex_ass_variaties
+  ),
+
+  -- etapa para atribuir a grupos apenas os novos entrantes
+  novos_usuarios_distribuidos AS (
+  SELECT
+    aa.globo_id,
+    NTILE(2) OVER (ORDER BY RAND()) AS indice_grupo,
+    FROM consumo_variedades AS aa
+    -- pedaço que faz pegar apenas os novos entrantes
+    -- na primera iteração, não confere com ela mesma
+    ${when(incremental(),
+    `LEFT JOIN ${self()} AS bb ON aa.globo_id = bb.globo_id WHERE bb.globo_id IS NULL`,
+     ` `)
+     }
+  ),
+  
+  -- nomear os grupos 
+  novos_usuarios_organizados AS (
+  SELECT
+    globo_id,
+    IF (indice_grupo = 1,'Teste','Controle') AS grupo
+    FROM novos_usuarios_distribuidos
+  )
+
+SELECT
+  globo_id,
+  grupo
+  FROM novos_usuarios_organizados

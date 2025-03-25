@@ -1,0 +1,35 @@
+config {
+  type: 'table',
+  tags: ['bbb_23'],
+  name: 'mktflow_bbb23_lf_chega_de_trecho',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+with maxsemana as (    
+
+  select max(a.semana) as ultima_semana
+    from ${ref("bbb_23", "Raiox_BBB_23_LF")} as a 
+), 
+
+base_final as (
+  SELECT
+    distinct b.globo_id,
+    --(date(b.semana) - 7 ), --Linha não utilizada
+    semana
+  FROM ${ref("bbb_23", "Raiox_BBB_23_LF")} as b 
+  WHERE horas_excerpt > 0
+    OR horas_extra > 0
+    --and semana = (select ultima_semana from maxsemana) --Linha alterada para puxar da ultima semana fechada
+    AND semana = ((SELECT ultima_semana FROM maxsemana)-7)
+)
+
+SELECT distinct globo_id
+FROM base_final
+

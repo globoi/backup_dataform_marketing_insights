@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-bigdata-urban-hdg-prd",
+  schema: "clean",
+  name: "urban_app_open_event",
+  description: ""
+}

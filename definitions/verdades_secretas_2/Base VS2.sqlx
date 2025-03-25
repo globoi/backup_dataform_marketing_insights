@@ -1,0 +1,277 @@
+config {
+  type: "table",
+  name: "Base VS2",
+  schema: "vidas_secretas_2"
+}
+
+WITH inativos AS (
+  SELECT 
+    globo_id,
+    "estava_inativo" AS inatividade
+  FROM
+    ${ref("usuarios", "Dados_Basicos_dos_Assinantes")}
+  WHERE
+    dt_proc <= "2021-10-20"
+  GROUP BY
+    globo_id
+  HAVING
+    DATE_DIFF(CURRENT_DATE(), MAX(data_ultimo_consumo), DAY) >= 30
+    OR MAX(data_ultimo_consumo) IS NULL
+),
+
+assinantes AS (
+  SELECT
+    * REPLACE(
+      DATE(data_hora_compra, "America/Sao_Paulo") AS data_hora_compra
+    ),
+    IF(
+      DATE(data_hora_compra, "America/Sao_Paulo") >= "2021-10-20", 
+      "New Assinante", 
+      "Old Assinante") AS categoria_assinante
+  FROM
+    ${ref("comunicacao", "ultima_comunicacao_assinante")}
+),
+
+consumo_total AS (
+  SELECT
+    imp.userid AS globo_id,
+    ARRAY_AGG(DISTINCT program_id) AS programas
+  FROM
+    ${ref("consumo_enriched", "impression")} imp
+    INNER JOIN assinantes ass ON (ass.globo_id = imp.userid)
+  WHERE
+    imp.date >= "2021-10-20"
+  GROUP BY 
+    imp.userid
+),
+
+consumo_base AS (
+  SELECT
+    userid AS globo_id,
+    mediaid,
+    program_id,
+    hours_watched,
+    DATE(timestamp, "America/Sao_Paulo") AS timestamp
+  FROM
+    ${ref("consumo_enriched", "impression")}
+  WHERE
+    program_id = 13977
+    AND mediaid != 8427867
+    AND DATE(timestamp, "America/Sao_Paulo") >= "2021-10-20"
+),
+
+consumo_parte_1 AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_parte_1,
+    MAX(timestamp) AS data_fim_parte_1,
+    COUNT(DISTINCT mediaid) AS qtd_midias_parte_1
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (9861374,9863088,9863094,9863100,9864816,9864823,9869156,9869157,9869159,9869162)
+  GROUP BY 
+    globo_id
+),
+
+consumo_parte_2 AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_parte_2,
+    MAX(timestamp) AS data_fim_parte_2,
+    COUNT(DISTINCT mediaid) AS qtd_midias_parte_2
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (9893946,9893948,9923836,9926264,9926379,9926381,9927155,9927159,9919253,9919254)
+    AND timestamp >= "2021-11-03"
+  GROUP BY 
+    globo_id
+),
+
+consumo_parte_3 AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_parte_3,
+    MAX(timestamp) AS data_fim_parte_3,
+    COUNT(DISTINCT mediaid) AS qtd_midias_parte_3
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (9938219,9937867,9935433,10027338,10027345,10027358,10027376,10027382,10027390,10027400)
+    AND timestamp >= "2021-11-17"
+  GROUP BY 
+    globo_id
+),
+
+consumo_parte_4 AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_parte_4,
+    MAX(timestamp) AS data_fim_parte_4,
+    COUNT(DISTINCT mediaid) AS qtd_midias_parte_4
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (10061602,10061609,10061613,10061625,10061637,10061646,10061657,10061669,10061672,10061679)
+    AND timestamp >= "2021-12-01"
+  GROUP BY 
+    globo_id
+),
+
+consumo_parte_5 AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_parte_5,
+    MAX(timestamp) AS data_fim_parte_5,
+    COUNT(DISTINCT mediaid) AS qtd_midias_parte_5
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (10111476,10111477,10114073,10115743,10114808,10114810,10114813,10114815,10124383)
+    AND timestamp >= "2021-12-13"
+  GROUP BY 
+    globo_id
+),
+
+consumo_final AS (
+  SELECT
+    globo_id,
+    MIN(timestamp) AS data_comeco_final,
+    MAX(timestamp) AS data_fim_final,
+    COUNT(DISTINCT mediaid) AS qtd_midias_final
+  FROM
+    consumo_base
+  WHERE
+    mediaid IN (10126374,10126355)
+    AND timestamp >= "2021-12-17"
+  GROUP BY 
+    globo_id
+),
+
+consumo AS (
+  SELECT
+    * EXCEPT (inatividade),
+    IF(inatividade IS NULL, "estava_ativo", "inatividade") AS status_inatividade,
+    SUM(hours_watched) OVER (PARTITION BY globo_id) AS horas_total,
+    COUNT(DISTINCT mediaid) OVER (PARTITION BY globo_id) AS qtd_midias,
+    COUNT(DISTINCT timestamp) OVER (PARTITION BY globo_id) AS qtd_dias,
+    MIN(timestamp) OVER (PARTITION BY globo_id) AS data_comeco,
+    MAX(timestamp) OVER (PARTITION BY globo_id) AS data_fim
+  FROM
+    consumo_base
+    LEFT JOIN inativos USING (globo_id)
+    LEFT JOIN consumo_parte_1 USING (globo_id)
+    LEFT JOIN consumo_parte_2 USING (globo_id)
+    LEFT JOIN consumo_parte_3 USING (globo_id)
+    LEFT JOIN consumo_parte_4 USING (globo_id)
+    LEFT JOIN consumo_parte_5 USING (globo_id)
+    LEFT JOIN consumo_final USING (globo_id)
+),
+
+consumo_cluster AS (
+  SELECT
+    *,
+    CASE
+      WHEN qtd_midias <= 1 THEN '0. Curioso'
+      WHEN qtd_midias BETWEEN 2 AND 5 THEN '1. Inicio Parte 1'
+      WHEN qtd_midias BETWEEN 6 AND 10 THEN '2. Fim Parte 1'
+      WHEN qtd_midias BETWEEN 11 AND 15 THEN '3. Inicio Parte 2'
+      WHEN qtd_midias BETWEEN 16 AND 20 THEN '4. Fim Parte 2'
+      WHEN qtd_midias BETWEEN 21 AND 25 THEN '5. Inicio Parte 3'
+      WHEN qtd_midias BETWEEN 26 AND 30 THEN '6. Fim Parte 3'
+      WHEN qtd_midias BETWEEN 31 AND 35 THEN '7. Inicio Parte 4'
+      WHEN qtd_midias BETWEEN 36 AND 40 THEN '8. Fim Parte 4'
+      WHEN qtd_midias BETWEEN 41 AND 45 THEN '9. Inicio Parte 5'
+      WHEN qtd_midias BETWEEN 46 AND 49 THEN '10. Fim Parte 5'
+      WHEN qtd_midias = 50 THEN '11. Final 1'
+      WHEN qtd_midias > 50 THEN '12. Terminou'
+    END AS Cluster_vs
+  FROM
+    consumo
+),
+
+cancel AS (
+  SELECT
+    globo_id,
+    TRUE AS Sol_CancelVol
+  FROM
+    ${ref("usuarios", "base_cancelamento")}
+  WHERE
+    data_hora_cancelamento >= "2021-10-20"
+    AND LOWER(AssetName) LIKE "%globoplay%"
+)
+
+SELECT
+  globo_id,
+  id_asset,
+  tipo_assinante,
+  mais_canais,
+  dt_assinatura_comeco,
+  canal_compra,
+  data_hora_compra,
+  produto,
+  tempo_de_base_agrupado,
+  numero_dependentes,
+  gender,
+  age,
+  address_state,
+  categoria_assinante,
+  status_inatividade,
+  data_comeco_parte_1,
+  data_fim_parte_1,
+  qtd_midias_parte_1,
+  data_comeco_parte_2,
+  data_fim_parte_2,
+  qtd_midias_parte_2,
+  data_comeco_parte_3,
+  data_fim_parte_3,
+  qtd_midias_parte_3,
+  data_comeco_parte_4,
+  data_fim_parte_4,
+  qtd_midias_parte_4,
+  data_comeco_parte_5,
+  data_fim_parte_5,
+  qtd_midias_parte_5,
+  data_comeco_final,
+  data_fim_final,
+  qtd_midias_final,
+  horas_total,
+  qtd_midias,
+  qtd_dias,
+  data_comeco,
+  data_fim,
+  Cluster_vs,
+  COALESCE(Sol_CancelVol, FALSE) AS Sol_CancelVol,
+  programas,
+  first_play,
+  first_play_subset,
+  data_first_play,
+  ultimo_consumo,
+  ultimo_consumo_subset,
+  data_ultimo_consumo,
+  Produto_Contratado,
+  origem,
+  telefone,
+  Perfil_Email,
+  Data_Envio_Ultimo_Email,
+  Data_Abertura_Ultimo_Email,
+  Emails_Enviados_30D,
+  Emails_Abertos_30D,
+  Data_Recebimento_Ultimo_Push,
+  Data_Abertura_Ultimo_Push,
+  Push_Titulo_Aberto,
+  Qtd_Pushs_30D,
+  Perfil_Uso_Push,
+  Data_Ultima_Abertura_App,
+  Flag_Recebeu_Email_30D,
+  Flag_Abriu_Email_30D,
+  Flag_Recebeu_Push_30D,
+  Flag_Abriu_App_30D,
+  Flag_Abriu_Push_30D
+FROM
+  assinantes
+  INNER JOIN consumo_cluster USING (globo_id)
+  LEFT JOIN cancel USING (globo_id)
+  LEFT JOIN consumo_total USING (globo_id)
+QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id, id_asset) = 1

@@ -1,0 +1,21 @@
+config {
+  type: "incremental",  
+  schema: "jornadas_mkt",
+  name: "Trilho_Rec_Pers_Genero_Incremental",
+  tags: ['trilho', 'schedule_tag=trilho_Trilho_Rec_Pers_Genero_Incremental'],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+SELECT
+  globo_id,
+  program_title,
+  title_url_for_consumption,
+  rank_final,
+  genero,
+  program_id,
+  title_id,
+  CURRENT_DATE() AS dt_proc,
+  media_kit_resource__poster
+ FROM ${ref('trilho','Segment_Trilho Rec Pers por Genero T5')}

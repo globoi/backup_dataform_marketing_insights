@@ -1,0 +1,55 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=familiag_mkt_mktflow_auto_g1_cluster_d1', 'schedule_cron=0 16 * * *'],
+    name: 'mktflow_auto_g1_cluster_d1',
+    schema: 'familiag_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "familiag_mkt"
+        }
+    }
+}
+
+WITH
+  Cluster_G1 AS (
+  SELECT
+    DISTINCT userid AS globo_id,
+    DATETIME(TIMESTAMP_MILLIS(timestamp), 'America/Sao_Paulo') AS dt_acesso,
+    CASE
+      WHEN object LIKE '%ge.globo.com/' THEN 'home'
+      WHEN object LIKE '%amp%'
+    AND object LIKE '%google%' THEN SPLIT(object, '/')[SAFE_OFFSET(5)]
+      ELSE SPLIT(object, '/')[SAFE_OFFSET(3)]
+  END
+    AS editoria,
+    CASE
+      WHEN SPLIT(object, '/')[SAFE_OFFSET(4)] LIKE '%ghtml%' THEN NULL
+      WHEN object LIKE '%amp%'
+    AND object LIKE '%google%' THEN SPLIT(object, '/')[SAFE_OFFSET(6)]
+      ELSE SPLIT(object, '/')[SAFE_OFFSET(4)]
+  END
+    AS subeditoria
+  FROM
+    -- `valiant-circuit-129220.g1.pgt_*`
+    ${ref("g1", "pgt_*")}
+  WHERE
+    provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%g1.globo.com%'
+    AND _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) )
+SELECT
+  p.globo_id,
+  MAX(dt_acesso) AS dt_acesso,
+  p.editoria AS editoria,
+  p.subeditoria AS subeditoria
+FROM
+  Cluster_G1 AS p
+GROUP BY
+  p.globo_id,
+  p.editoria,
+  p.subeditoria

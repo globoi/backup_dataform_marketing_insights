@@ -1,0 +1,81 @@
+config {
+  type: "table",
+  name: "step_info_old",
+  schema: "usuarios",
+  tags: []
+}
+
+WITH base_completa_1 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    CASE WHEN AssetId IS NOT NULL THEN 1 ELSE 0 END as ct1
+  FROM ${ref("usuarios", "base_completa")}
+),
+
+base_legado_1 AS (
+  SELECT
+    *,
+    COALESCE((LAG(DT_FIM,1) OVER(PARTITION BY ASSINATURA_ID ORDER BY DT_INICIO)), DATE_SUB(DT_INICIO, INTERVAL 30 DAY)) AS Fim_assinatura_anterior
+  FROM ${ref("legado", "legado_sales")}
+),
+
+base_legado_2 AS (
+  SELECT 
+    *
+  FROM base_legado_1 
+  WHERE DATE_DIFF(DT_INICIO, Fim_assinatura_anterior, DAY) >= 30
+),
+
+base_legado_3 AS (
+  SELECT
+    CAST(ASSINATURA_ID AS STRING) AS AssetId,
+    COUNT(DISTINCT DT_INICIO) AS n_assinaturas
+  FROM base_legado_2
+  GROUP BY ASSINATURA_ID
+),
+
+legado_completa_1 AS (
+  SELECT
+    *,
+    COALESCE(n_assinaturas, ct1) as ct
+    FROM base_completa_1
+    LEFT JOIN base_legado_3
+    USING (AssetId)
+),
+
+assinatura AS (
+  SELECT 
+    globo_id,
+    SUM(ct) OVER(PARTITION BY globo_id) AS numero_assinaturas
+  FROM legado_completa_1
+  WHERE globo_id IS NOT NULL
+),
+
+base_ativa_pagante_com_trial AS (
+  SELECT
+    *,
+    SUM(CASE WHEN tipo_assinante LIKE 'dependente' THEN 1 ELSE 0 END) OVER(PARTITION BY id_asset) as numero_dependentes
+  FROM ${ref("usuarios", "base_ativa_pagante_com_trial")}
+),
+
+demografia AS (
+  SELECT 
+    globo_id,
+    address_state,
+    address_city,
+    age,
+    COALESCE(gender, gender_inf) as gender
+  FROM ${ref("globoid_enriched", "demografia")}
+)
+
+SELECT 
+  * EXCEPT (numero_assinaturas),
+  COALESCE(numero_assinaturas, 1) as numero_assinaturas
+FROM base_ativa_pagante_com_trial
+LEFT JOIN demografia
+USING (globo_id)
+LEFT JOIN assinatura
+USING (globo_id)
+WHERE LOWER(tipo_assinante) NOT LIKE '%trial%'
+

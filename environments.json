@@ -1,0 +1,18 @@
+{
+    "environments": [
+        {
+            "name": "production",
+            "configOverride": {
+                "defaultDatabase": "gglobo-mkt-ins-hdg-prd",
+                "vars" : {
+                    "foundationDatabase": "gglobo-foundation-psd-hdg-prd"
+                }
+            },
+            "gitRef": "master"
+        },
+        {
+            "name": "dev",
+            "gitRef": "master"
+        }
+    ]
+}

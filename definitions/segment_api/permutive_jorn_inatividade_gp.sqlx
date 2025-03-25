@@ -1,0 +1,14 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_jorn_inatividade_gp'],
+  name: 'permutive_jorn_inatividade_gp',
+  schema: 'segment_api',
+  description: 'base de inatividade GP',
+  columns: {
+  }
+}
+
+
+SELECT distinct globo_id AS user_id
+--FROM `gglobo-mkt-ins-hdg-prd.jornadas_mkt.mktflow_inatividade_v2`
+FROM ${ref("jornadas_mkt","mktflow_inatividade_v2")}

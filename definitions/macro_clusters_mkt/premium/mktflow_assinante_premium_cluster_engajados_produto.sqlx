@@ -1,0 +1,96 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_engajados_produto',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_engajados_produto',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      tags: "",
+      owner: "martech" ,
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: 'assinantes premium que abriram o app ou acessaram web ou assistiram mais de 40 horas nos ultimos dias',
+  columns: {
+  },
+}
+
+WITH
+--usuarios premium que abriram o aplicativo do globoplay nos últimos 30 dias.
+abriuapp AS (
+  SELECT DISTINCT globo_id
+  FROM ${ref('comunicacao','ultima_comunicacao_geral')} AS a
+  WHERE tipo_cadastro = 'Assinante'
+    AND mais_canais = true
+    AND appopen_flag_30D IS not null
+),
+
+--usuarios premium que acessaram globoplay na web nos últimos 30 dias.
+abriuweb as (
+  SELECT DISTINCT globo_id
+  FROM ${ref('comunicacao','ultima_comunicacao_geral')} AS a
+  WHERE tipo_cadastro = 'Assinante'
+    AND mais_canais = true
+    AND acesso_flag_30D is not NULL
+),
+
+--usuarios premium que consumiram mais de 40 horas acumuladas nos ultimos 30 dias
+
+consumiu as (
+    with consumiu_vod as (
+        SELECT DISTINCT userId as globo_id, sum(hours_watched) as hrs_consumidas
+        FROM ${ref('consumo_enriched','impression')} AS i
+        WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+        GROUP BY ALL
+        HAVING hrs_consumidas >= 40
+    ),
+
+    consumiu_aovivo as (
+        SELECT DISTINCT globoid as globo_id, sum(playtime_hours) as hrs_consumidas
+        FROM ${ref('simulcast','consumo_ibope')}  AS i
+        WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+        GROUP BY ALL
+        HAVING hrs_consumidas >= 40
+    ),
+
+   uniao as (
+        select distinct globo_id, hrs_consumidas from consumiu_vod
+
+        union distinct 
+
+        select distinct globo_id, hrs_consumidas from consumiu_aovivo
+  )
+
+  SELECT u.globo_id
+  FROM uniao as u
+  JOIN ${ref('comunicacao','ultima_comunicacao_geral')} as c 
+    ON u.globo_id = c.globo_id
+  WHERE tipo_cadastro = 'Assinante'
+    AND mais_canais = true
+    AND consumo_flag_30D is not NULL 
+),
+
+--uniao de todos os usuarios premium distintos que abriram o app, acessaram web ou tiveram consumo no globoplay nos ultimos 30 dias.
+uniao as (
+  SELECT DISTINCT globo_id FROM abriuapp
+
+  UNION DISTINCT
+
+  SELECT DISTINCT globo_id FROM abriuweb
+
+  UNION DISTINCT
+  
+  SELECT DISTINCT globo_id FROM consumiu
+ )
+
+
+SELECT DISTINCT 'named_user' as identifier_type, a.globo_id
+FROM uniao AS u
+JOIN ${ref('comunicacao','ultima_comunicacao_geral')} AS a
+	ON u.globo_id = a.globo_id
+

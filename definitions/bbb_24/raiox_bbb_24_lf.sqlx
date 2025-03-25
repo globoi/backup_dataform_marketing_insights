@@ -1,0 +1,888 @@
+config {
+  type: 'table',
+  schema: 'bbb_24',
+
+        bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech",
+      horario: "11h30min"
+
+    }
+  },
+  description: 'Tabela com os LFs que assistiram algum conteúdo relacionado ao BBB 24. A tabela é atualizada diariamente empilhando o consumo do usuário na semana.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    tipo_usuario: 'Classificação do usuário em Logado Free/Ex-Assinante.',
+    consumiu_bbb_20: 'Flag se o usuário consumiu o BBB 2020.',
+    assinou_cancelou_bbb_20: 'Flag se o usuário assinou entre 01/01/2020 e 30/04/2020, solicitou o cancelamento entre 01/04/2020 e 31/05/2020 e teve a assinatura cancelada no ano de 2020.',
+    consumiu_bbb_21: 'Flag se o usuário consumiu o BBB 2021.',
+    assinou_cancelou_bbb_21: 'Flag se o usuário assinou entre 01/01/2021 e 30/04/2021, solicitou o cancelamento entre 01/04/2021 e 31/05/2021 e teve a assinatura cancelada no ano de 2021.',
+    consumiu_bbb_22: 'Flag se o usuário consumiu o BBB 2022.',
+    assinou_cancelou_bbb_22: 'Flag se o usuário assinou entre 01/01/2022 e 30/04/2022, solicitou o cancelamento entre 01/04/2022 e 31/05/2022 e teve a assinatura cancelada no ano de 2022.',
+    consumiu_bbb_23: 'Flag se o usuário consumiu o BBB 2023.',
+    consumiu_bbb_23_simulcast: 'Flag se o usuário consumiu o BBB 2023 ao vivo via GA/SIMULCAST.',
+    assinou_cancelou_bbb_23: 'Flag se o usuário assinou entre 01/01/2023 e 30/04/2023, solicitou o cancelamento entre 01/04/2023 e 31/05/2023 e teve a assinatura cancelada no ano de 2023.',
+    semana: 'Semana em que o usuário assistiu o programa.',
+    frequencia: 'Quantidade de dias em que o usuário assistiu o programa na semana.',
+    horas_episode: 'Quantidade de horas em íntegra que o usuário assistiu na semana.',
+    qtd_midias_episode: 'Quantidade de mídias de íntegras dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+    freq_episode: 'Quantidade de dias que o usuário consumiu em íntegras na semana.',
+    horas_excerpt: 'Quantidade de horas em trechos que o usuário assistiu na semana.',
+    qtd_midias_excerpt: 'Quantidade de mídias de trechos dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+    freq_excerpt: 'Quantidade de dias que o usuário consumiu em trechos na semana.',
+    horas_extra: 'Quantidade de horas em extras que o usuário assistiu na semana.',
+    qtd_midias_extra: 'Quantidade de mídias de extras dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+    freq_extra: 'Quantidade de dias que o usuário consumiu em extras na semana.',
+    horas_teaser: 'Quantidade de horas em teaser que o usuário assistiu na semana.',
+    qtd_midias_teaser: 'Quantidade de mídias de teasers dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+    freq_teaser: 'Quantidade de dias que o usuário consumiu em teaser na semana.',
+    horas_trailer: 'Quantidade de horas em trailer que o usuário assistiu na semana.',
+    qtd_midias_trailer: 'Quantidade de mídias de trailer dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+    freq_trailer: 'Quantidade de dias que o usuário consumiu em trailer na semana.',
+    total_horas_simulcast_bbb: 'Total de horas em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+    frequencia_simulcast: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+    total_horas_bbb: 'Total de horas que o usuário consumiu os programas relacionados ao BBB. Exceto simulcast.',
+    cluster_bbb: 'Cluster em que consideramos o total de horas assistidas em SIMULCAST para classificar o usuário.',
+    share_bbb: 'Horas consumidas em BBB sob todo o consumo dos usuários inclusive o BBB',
+    cluster_share_bbb: 'Porcentagem de consumo do usuário sob o BBB.',
+    horas_mais_canais: 'Total de horas consumidas pelo usuário nos conteúdos de mais canais.',
+    qtd_midias_mais_canais: 'Total de mídias consumidas pelo usuário nos conteúdos de mais canais.',
+    freq_mais_canais: 'Total de dias consumidos pelo usuário nos conteúdos de mais canais.',
+    qtd_programas_mais_canais: 'Total de programas consumidos pelo usuário nos conteúdos de mais canais.',
+    horas_novela: 'Total de horas consumidas pelo usuário em novelas.',
+    qtd_midias_novela: 'Total de mídias consumidas pelo usuário em novelas.',
+    freq_novela: 'Total de dias consumidos pelo usuário em novelas.',
+    qtd_programas_novela: 'Total de programas consumidos pelo usuário em novelas.',
+    horas_series: 'Total de horas consumidas pelo usuário em séries.',
+    qtd_midias_series: 'Total de mídias consumidas pelo usuário em séries.',
+    freq_series: 'Total de dias consumidos pelo usuário em séries.',
+    qtd_programas_series: 'Total de programas consumidos pelo usuário em séries.',
+    horas_filmes: 'Total de horas consumidas pelo usuário em filmes.',
+    qtd_midias_filmes: 'Total de mídias consumidas pelo usuário em filmes.',
+    freq_filmes: 'Total de dias consumidos pelo usuário em filmes.',
+    qtd_programas_filmes: 'Total de programas consumidos pelo usuário em filmes.',
+    horas_ao_vivo_globo: 'Total de horas consumidas pelo usuário no ao vivo da globo (FONTE HORIZON). Foram desconsideradas as horas em bbb ao vivo na Tv Globo (SIMULCAST FONTE GA).',
+    freq_ao_vivo_globo: 'Total de dias consumidos pelo usuário no ao vivo da globo (FONTE HORIZON). Foram desconsideradas as horas em bbb ao vivo na Tv Globo (SIMULCAST FONTE GA).',
+    horas_outros_conteudos: 'Total de horas consumidas pelo usuário em outros tipos de conteúdos.',
+    qtd_midias_outros_conteudos: 'Total de mídias consumidas pelo usuário em outros tipos de conteúdos.',
+    freq_outros_conteudos: 'Total de dias consumidos pelo usuário em outros tipos de conteúdos.',
+    qtd_programas_outros_conteudos: 'Total de programas consumidos pelo usuário em outros tipos de conteúdos.',
+    assistiu_fora_da_casa: 'Flag se o usuário assistiu ou não ao programa Fora da Casa.',
+    assistiu_a_eliminacao: 'Flag se o usuário assistiu ou não ao programa A Eliminação.',
+    assistiu_bbb24_exclusivo_gshow: 'Flag se o usuário assistiu ou não ao programa BBB 24 Exclusivo Gshow.',
+    assistiu_bate_papo_bbb: 'Flag se o usuário assistiu ou não ao programa Bate Papo BBB.',
+    assistiu_click_bbb: 'Flag se o usuário assistiu ou não ao programa Click BBB.',
+    assistiu_bbb_ta_on: 'Flag se o usuário assistiu ou não ao programa BBB ta On.',
+    assistiu_maratona_big_day: 'Flag se o usuário assistiu ou não ao programa Maratona Big Day.',
+    assistiu_mesacast: 'Flag se o usuário assistiu ou não ao programa Mesacast.',
+    perfil_consumo: 'Subset mais assistido pelo usuário na semana desconsiderando o consumo em BBB.'
+  }
+
+}
+
+WITH conteudo AS (
+  SELECT
+    id AS mediaid,
+    kind,
+    service_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  where
+    program_id in (
+26595,
+12082,
+16280,
+16284,
+13492,
+26751
+    )
+),
+base as (
+  select
+    b.globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    mediaid,
+    program_id,
+    hours_watched,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    count(distinct date) over(
+      partition by b.globo_id,
+      date_trunc(date, WEEK(MONDAY))
+    ) as frequencia_total,
+    date,
+    kind,
+    service_id
+  from
+    ${ref("consumo_enriched", "all_impression")} as a
+    inner join conteudo using(mediaid)
+    inner join ${ref("bbb_24", "base_dados_lfs_bbb_24")} as b on b.globo_id = a.userid
+  where
+    date >= '2024-01-08'
+    and (
+      program_id in (
+26595,
+12082,
+16280,
+16284,
+13492,
+26751
+      )
+      and EXTRACT(
+        YEAR
+        FROM
+          date
+      ) = 2024
+    )
+),
+base1 as (
+  select
+    *
+  from
+    (
+      select
+        globo_id,
+        tipo_usuario,
+        consumiu_bbb_20,
+        assinou_cancelou_bbb_20,
+        consumiu_bbb_21,
+        assinou_cancelou_bbb_21,
+        consumiu_bbb_22,
+        assinou_cancelou_bbb_22,
+        consumiu_bbb_23,
+        consumiu_bbb_23_simulcast,
+        assinou_cancelou_bbb_23,
+        semana,
+        frequencia_total,
+        mediaid,
+        hours_watched,
+        date,
+        kind
+      from
+        base
+    ) pivot(
+      sum(hours_watched) horas,
+      count(distinct mediaid) qtd_midias,
+      count(distinct date) freq for kind in (
+        'episode',
+        'excerpt',
+        'extra',
+        'teaser',
+        'trailer'
+      )
+    )
+),
+base2 as(
+  select
+    globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    semana,
+    frequencia_total,
+    case
+      when horas_episode is null then 0
+      else horas_episode
+    end as horas_episode,
+    qtd_midias_episode,
+    freq_episode,
+    case
+      when horas_excerpt is null then 0
+      else horas_excerpt
+    end as horas_excerpt,
+    qtd_midias_excerpt,
+    freq_excerpt,case
+      when horas_extra is null then 0
+      else horas_extra
+    end as horas_extra,
+    qtd_midias_extra,
+    freq_extra,case
+      when horas_teaser is null then 0
+      else horas_teaser
+    end as horas_teaser,
+    qtd_midias_teaser,
+    freq_teaser,case
+      when horas_trailer is null then 0
+      else horas_trailer
+    end as horas_trailer,
+    qtd_midias_trailer,
+    freq_trailer
+  from
+    base1
+),
+base3 as (
+  select
+    distinct globo_id,
+    semana,
+    frequencia_simulcast,
+    total_horas_simulcast_bbb
+  from
+    ${ref("bbb_24", "consumo_simulcast_bbb")}
+),
+base4 as (
+  select
+    *
+  except(total_horas_simulcast_bbb),
+    case
+      when total_horas_simulcast_bbb is null then 0
+      else total_horas_simulcast_bbb
+    end as total_horas_simulcast_bbb
+  from
+    base2
+    left join base3 using(globo_id, semana)
+),
+base5 as (
+  select
+    *,
+    (
+      sum(
+        horas_episode + horas_excerpt + horas_extra + horas_teaser + horas_trailer
+      ) over (partition by globo_id, semana)
+    ) as total_horas_bbb
+  from
+    base4
+  group by
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+),
+base6 as (
+  select
+    *
+  from
+    base5
+),
+impression as (
+  select
+    userid as globo_id,
+    mediaid,
+    program_id,
+    date,
+    hours_watched,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    program_subset,
+    case
+      when service_id = 6807 then 'mais_canais'
+      when program_subset = 'novelas' then 'novela'
+      when program_subset = 'series' then 'series'
+      when program_subset in('filmes', 'movies') then 'filmes'
+      when program_id = 9095 then 'ao_vivo_globo'
+      else 'outros_conteudos'
+    end as grupo
+  from
+    ${ref("consumo_enriched", "all_impression")}
+    left join conteudo using(mediaid)
+  where
+    date between '2024-01-08'
+    and '2024-04-26'
+    and program_id not in (
+26595,
+12082,
+16280,
+16284,
+13492,
+26751
+    )
+),
+base_geral as (
+  select
+    distinct globo_id,
+    tipo_usuario
+  from
+    base5
+),
+ai as (
+  select
+    *
+  from
+    base_geral
+    left join impression using(globo_id)
+),
+ai2 as (
+  select
+    *
+  from
+    (
+      select
+        distinct globo_id,
+        tipo_usuario,
+        semana,
+        hours_watched,
+        program_id,
+        mediaid,
+        date,
+        grupo
+      from
+        ai
+    ) pivot(
+      sum(hours_watched) horas,
+      count(distinct mediaid) qtd_midias,
+      count(distinct date) freq,
+      count(distinct program_id) qtd_programas for grupo in (
+        'mais_canais',
+        'novela',
+        'series',
+        'filmes',
+        'ao_vivo_globo',
+        'outros_conteudos'
+      )
+    )
+),
+consulta as (
+  select
+    *
+  except
+    (
+      horas_mais_canais,
+      horas_novela,
+      horas_series,
+      horas_filmes,
+      horas_ao_vivo_globo,
+      horas_outros_conteudos
+    ),
+    case
+      when horas_mais_canais is null then 0
+      else horas_mais_canais
+    end as horas_mais_canais,case
+      when horas_novela is null then 0
+      else horas_novela
+    end as horas_novela,case
+      when horas_series is null then 0
+      else horas_series
+    end as horas_series,
+    case
+      when horas_filmes is null then 0
+      else horas_filmes
+    end as horas_filmes,
+    case
+      when horas_ao_vivo_globo is null then 0
+      else horas_ao_vivo_globo
+    end as horas_ao_vivo_globo,case
+      when horas_outros_conteudos is null then 0
+      else horas_outros_conteudos
+    end as horas_outros_conteudos
+  from
+    ai2
+),
+consulta2 as (
+  select
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  from
+    consulta
+),
+consulta3 as (
+  select
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,case
+      when freq_mais_canais >= 8 then 7
+      else freq_mais_canais
+    end as freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,case
+      when freq_novela >= 8 then 7
+      else freq_novela
+    end as freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,case
+      when freq_series >= 8 then 7
+      else freq_series
+    end as freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,case
+      when freq_filmes >= 8 then 7
+      else freq_filmes
+    end as freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,case
+      when freq_ao_vivo_globo >= 8 then 7
+      else freq_ao_vivo_globo
+    end as freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,case
+      when freq_outros_conteudos >= 8 then 7
+      else freq_outros_conteudos
+    end as freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  from
+    consulta2
+),
+basebbb as (
+  select
+    *
+  from
+    base6
+    left join consulta3 using(globo_id, tipo_usuario, semana)
+),
+/*Fora_da_Casa as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_fora_da_casa
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2023-01-16'
+    and program_id = 16281
+),*/
+A_Eliminacao as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_a_eliminacao
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2024-01-08'
+    and program_id = 13492
+),
+BBB24_Exclusivo_Gshow as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_bbb24_exclusivo_gshow
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2024-01-08'
+    and program_id = 26595
+),
+Bate_Papo_BBB as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_bate_papo_bbb
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2024-01-08'
+    and program_id = 16280
+),
+Click_BBB as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_click_bbb
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2024-01-08'
+    and program_id = 16284
+),
+/*Maratona_BBB as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_maratona_bbb
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2023-01-16'
+    and program_id = 8568
+),
+BBB_ta_on as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_bbb_ta_on
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2023-01-16'
+    and program_id = 24008
+),*/
+Maratona_Big_Day as (
+  select
+    distinct userId as globo_id,
+    True as assistiu_maratona_big_day
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date = '2024-01-05'
+    and mediaid = 8642899
+),
+mesacast as (
+  select
+    distinct userid as globo_id,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    True as assistiu_mesacast
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    date >= '2024-01-08'
+    and program_id = 26751
+),
+basebbb3 as (
+  select
+    distinct globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    semana,
+    frequencia_total as frequencia,
+    ifnull(horas_episode,0) as horas_episode,
+    ifnull(qtd_midias_episode,0) as qtd_midias_episode,
+    ifnull(freq_episode,0) as freq_episode,
+    ifnull(horas_excerpt,0) as horas_excerpt,
+    ifnull(qtd_midias_excerpt,0) as qtd_midias_excerpt,
+    ifnull(freq_excerpt,0) as freq_excerpt,
+    ifnull(horas_extra,0) as horas_extra,
+    ifnull(qtd_midias_extra,0) as qtd_midias_extra,
+    ifnull(freq_extra,0) as freq_extra,
+    ifnull(horas_teaser,0) as horas_teaser,
+    ifnull(qtd_midias_teaser,0) as qtd_midias_teaser,
+    ifnull(freq_teaser,0) as freq_teaser,
+    ifnull(horas_trailer,0) as horas_trailer,
+    ifnull(qtd_midias_trailer,0) as qtd_midias_trailer,
+    ifnull(freq_trailer,0) as freq_trailer,
+    total_horas_simulcast_bbb,
+    frequencia_simulcast,
+    total_horas_bbb,
+    ifnull(horas_mais_canais,0) as horas_mais_canais,
+    ifnull(qtd_midias_mais_canais,0) as qtd_midias_mais_canais,
+    ifnull(freq_mais_canais,0) as freq_mais_canais,
+    ifnull(qtd_programas_mais_canais,0) as qtd_programas_mais_canais,
+    ifnull(horas_novela,0) as horas_novela,
+    ifnull(qtd_midias_novela,0) as qtd_midias_novela,
+    ifnull(freq_novela,0) as freq_novela,
+    ifnull(qtd_programas_novela,0) as qtd_programas_novela,
+    ifnull(horas_series,0) as horas_series,
+    ifnull(qtd_midias_series,0)as qtd_midias_series,
+    ifnull(freq_series,0) as freq_series,
+    ifnull(qtd_programas_series,0) as qtd_programas_series,
+    ifnull(horas_filmes,0) as horas_filmes,
+    ifnull(qtd_midias_filmes,0) as qtd_midias_filmes,
+    ifnull(freq_filmes,0) as freq_filmes,
+    ifnull(qtd_programas_filmes,0) as qtd_programas_filmes,
+    ifnull(horas_ao_vivo_globo,0) as horas_ao_vivo_globo,
+    ifnull(freq_ao_vivo_globo,0) as freq_ao_vivo_globo,
+    ifnull(horas_outros_conteudos,0) as horas_outros_conteudos,
+    ifnull(qtd_midias_outros_conteudos,0) as qtd_midias_outros_conteudos,
+    ifnull(freq_outros_conteudos,0) as freq_outros_conteudos,
+    ifnull(qtd_programas_outros_conteudos,0) as qtd_programas_outros_conteudos,
+    case
+      when assistiu_a_eliminacao is null then false
+      else assistiu_a_eliminacao
+    end as assistiu_a_eliminacao,
+    case
+      when assistiu_bbb24_exclusivo_gshow is null then false
+      else assistiu_bbb24_exclusivo_gshow
+    end as assistiu_bbb24_exclusivo_gshow,
+    case
+      when assistiu_bate_papo_bbb is null then false
+      else assistiu_bate_papo_bbb
+    end as assistiu_bate_papo_bbb,
+    case
+      when assistiu_click_bbb is null then false
+      else assistiu_click_bbb
+    end as assistiu_click_bbb,
+    case
+      when assistiu_maratona_big_day is null then false
+      else assistiu_maratona_big_day
+    end as assistiu_maratona_big_day,
+        case
+      when assistiu_mesacast is null then false
+      else assistiu_mesacast
+    end as assistiu_mesacast
+  from
+    basebbb
+  --  left join Fora_da_Casa using(globo_id, semana)
+    left join A_Eliminacao using(globo_id, semana)
+    left join BBB24_Exclusivo_Gshow using(globo_id, semana)
+    left join Bate_Papo_BBB using(globo_id, semana)
+    left join Click_BBB using(globo_id, semana)
+    left join mesacast using(globo_id, semana)
+  --  left join Maratona_BBB using(globo_id, semana)
+  --  left join BBB_ta_on using(globo_id, semana)
+    left join Maratona_Big_Day using(globo_id)
+),
+final as (
+  select
+    *
+  except(horas_ao_vivo_globo),
+    case
+      when (horas_ao_vivo_globo - total_horas_simulcast_bbb) < 0 then 0
+      else (horas_ao_vivo_globo - total_horas_simulcast_bbb)
+    end as horas_ao_vivo_globo,
+    case
+      when (
+        (horas_filmes > horas_novela)
+        and (horas_filmes > horas_series)
+        and (horas_filmes > horas_mais_canais)
+        and (horas_filmes > horas_outros_conteudos)
+        and (horas_filmes > horas_ao_vivo_globo)
+      ) then 'Filmes'
+      when (
+        (horas_novela > horas_outros_conteudos)
+        and (horas_novela > horas_series)
+        and (horas_novela > horas_mais_canais)
+        and (horas_novela > horas_ao_vivo_globo)
+      ) then 'Novelas'
+      when (
+        (horas_series > horas_outros_conteudos)
+        and (horas_series > horas_mais_canais)
+        and (horas_series > horas_ao_vivo_globo)
+      ) then 'Series'
+      when (
+        (horas_mais_canais > horas_outros_conteudos)
+        and (horas_mais_canais > horas_ao_vivo_globo)
+      ) then 'Mais Canais'
+      when (horas_ao_vivo_globo > horas_outros_conteudos) then 'Ao Vivo Globo'
+      ELSE 'Outros Conteudos'
+    end as perfil_consumo
+  from
+    basebbb3
+  order by
+    globo_id,
+    semana asc
+),
+basebbb2 as (
+  select
+    *
+  except(frequencia_simulcast),
+    case
+      when frequencia_simulcast is null then 0
+      else frequencia_simulcast
+    end as frequencia_simulcast,
+    case
+      when total_horas_simulcast_bbb>=7 then '4. Heavy User'
+      when total_horas_simulcast_bbb BETWEEN 0.05
+      AND 1 then '1. Light User'
+      when total_horas_simulcast_bbb BETWEEN 1
+      AND 4 then '2. Mid-Light User'
+      when total_horas_simulcast_bbb BETWEEN 4
+      AND 6 then '3. Mid-Heavy User'
+      else '0. No Live'
+    end as cluster_bbb,
+    SAFE_DIVIDE(
+      total_horas_bbb,(
+        horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb
+      )
+    ) as share_bbb,
+    case
+      when SAFE_DIVIDE(
+        total_horas_bbb,(
+          horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb
+        )
+      ) <= 0.5 then '00%-50%'
+      when SAFE_DIVIDE(
+        total_horas_bbb,(
+          horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb
+        )
+      ) <= 0.8 then '51%-80%'
+      else '81%-100%'
+    end as cluster_share_bbb
+  from
+    final
+),
+lf as (
+  select
+    globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    semana,
+    frequencia,
+    ifnull(horas_episode,0) as horas_episode,
+    ifnull(qtd_midias_episode,0) as qtd_midias_episode,
+    ifnull(freq_episode,0) as freq_episode,
+    ifnull(horas_excerpt,0) as horas_excerpt,
+    ifnull(qtd_midias_excerpt,0) as qtd_midias_excerpt,
+    ifnull(freq_excerpt,0) as freq_excerpt,
+    ifnull(horas_extra,0) as horas_extra,
+    ifnull(qtd_midias_extra,0) as qtd_midias_extra,
+    ifnull(freq_extra,0) as freq_extra,
+    ifnull(horas_teaser,0) as horas_teaser,
+    ifnull(qtd_midias_teaser,0) as qtd_midias_teaser,
+    ifnull(freq_teaser,0) as freq_teaser,
+    ifnull(horas_trailer,0) as horas_trailer,
+    ifnull(qtd_midias_trailer,0) as qtd_midias_trailer,
+    ifnull(freq_trailer,0) as freq_trailer,
+    total_horas_simulcast_bbb,
+    frequencia_simulcast,
+    total_horas_bbb,
+    cluster_bbb,
+    share_bbb,
+    cluster_share_bbb,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos,
+    assistiu_a_eliminacao,
+    assistiu_bbb24_exclusivo_gshow,
+    assistiu_bate_papo_bbb,
+    assistiu_click_bbb,
+    assistiu_maratona_big_day,
+    assistiu_mesacast,
+    perfil_consumo
+  from
+    basebbb2 as f
+  order by
+    globo_id,
+    semana asc
+),
+base_perfil AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id,
+      semana
+      ORDER BY
+        globo_id,
+        semana
+    ) AS rm,
+  FROM
+    lf QUALIFY rm = 1
+),
+baself as (
+  SELECT
+    *
+  EXCEPT
+    (rm)
+  FROM
+    base_perfil
+),
+tabela as (
+  select
+    *
+  from
+    baself
+),
+tabela2 as (
+  SELECT
+    *,
+    row_number() OVER (
+      PARTITION BY globo_id,
+      cluster_bbb
+      ORDER BY
+        globo_id desc
+    ) dup
+  FROM
+    tabela
+),
+tabela_lf as (
+  SELECT
+    *,
+    rank() OVER (
+      PARTITION BY globo_id,
+      semana
+      ORDER BY
+        globo_id,
+        semana,
+        cluster_bbb asc
+    ) rm
+  FROM
+    tabela2
+  where
+    dup = 1 qualify rm = 1
+)
+select
+  *
+except(rm, dup)
+from
+  tabela_lf

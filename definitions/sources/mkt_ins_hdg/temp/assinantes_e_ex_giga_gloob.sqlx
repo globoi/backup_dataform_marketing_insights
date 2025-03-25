@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "temp",
+  name: "assinantes_e_ex_giga_gloob",
+  description: ""
+}

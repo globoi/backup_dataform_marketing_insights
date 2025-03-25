@@ -1,0 +1,39 @@
+config {
+  type: 'table',
+  tags: [
+        'macrocluster_old',
+        'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_automatico_futebol',
+        'schedule_cron=00 09 * * *' 
+  ],
+  name: 'mktflow_lf_cluster_automatico_futebol',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+WITH  base_futebol AS (
+    SELECT DISTINCT c.globoid, sum(ar.playtime_hours) as hrs_assistidas
+    FROM ${ref('simulcast', 'consumo_ibope')} as c,
+    UNNEST(ar_minutos_assistidos) as ar
+    JOIN  ${ref('comunicacao', 'ultima_comunicacao_geral')} as uc
+        ON c.globoid = uc.globo_id
+    WHERE c.data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+        AND (c.genero_programa LIKE '%FUTEBOL%' OR c.subgenero_programa LIKE '%FUTEBOL%')
+        AND uc.push_optout_status in ('Push Ativo') 
+        AND uc.tipo_cadastro = 'Logado Free'
+    GROUP BY ALL
+    HAVING hrs_assistidas >= 0.15
+)
+
+SELECT DISTINCT "named_user" as identifier_type, globoid as UUID
+FROM base_futebol

@@ -1,0 +1,128 @@
+config {
+  type: "incremental",
+  name: "first_play",
+  schema: "consumo",
+  tags: ['consumo_staging_1',
+        "schedule_tag=consumo_first_play",
+        "schedule_cron=0 6 * * *"
+        ]
+}
+
+pre_operations {
+  DECLARE max_dt DATE;
+  DECLARE diff DATE;
+  EXECUTE IMMEDIATE
+  "SELECT MAX(start_dt) FROM `gglobo-foundation-psd-hdg-prd.dataform_monitor.jobs_info` WHERE project_id ='gglobo-mkt-ins-hdg-prd' AND table_id = 'first_play' AND error_message IS NULL" INTO max_dt;
+  SET diff = DATE_SUB(max_dt, INTERVAL 1 DAY);
+}
+
+WITH 
+asset AS (
+  SELECT
+    sd.id AS assetid,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    cd.globo_id
+  FROM
+    ${ref("sales_gold", "subscription_details")} AS sd
+  INNER JOIN
+    ${ref("sales_gold", "customer_details")}  AS cd
+    ON cd.id = sd.customer_id
+  ),
+
+yesterday_play AS (
+  SELECT
+    imp.userid,
+    av2.assetid,
+    imp.program_id,
+    imp.program_title,
+    imp.program_subset,
+    imp.mediaid,
+    imp.hours_watched,
+    imp.`timestamp` AS first_play_timestamp,
+    imp.is_full_content,
+    imp.date,
+    av2.data_hora_compra,
+    CURRENT_DATE() AS dt_proc,
+    imp.`timestamp` >= av2.data_hora_compra AS play_pago
+  FROM
+    ${ref("consumo_enriched","all_impression")} imp
+    FULL JOIN asset av2
+    ON imp.userid = av2.globo_id
+  WHERE
+    program_id IS NOT NULL
+    AND userid IS NOT NULL
+    ${when(incremental(), 'AND imp.date >= diff')} 
+  QUALIFY
+    ROW_NUMBER() OVER(PARTITION BY imp.userid, imp.program_id, av2.assetid, imp.is_full_content, play_pago ORDER BY timestamp ASC) = 1
+)
+
+SELECT
+  yest.*
+FROM
+  yesterday_play yest
+   ${when(incremental(),`LEFT JOIN (SELECT userid, assetid, program_id, is_full_content, play_pago FROM ${self()}) total
+USING(userid, assetid, program_id, is_full_content, play_pago) 
+  WHERE total.userid IS NULL 
+  OR total.assetid IS NULL 
+  OR total.program_id IS NULL 
+  OR total.is_full_content IS NULL
+  OR total.play_pago IS NULL`)}
+
+
+-- SELECT 
+--     globo_id AS userid, 
+--     object_id AS assetid,
+--     SAFE_CAST(program_id AS INT64) AS program_id,
+--     programa AS program_title,
+--     subset AS program_subset,
+--     video_id AS mediaid,
+--     FLOAT64(NULL) AS hours_watched,
+--     timestamp_consumo AS first_play_timestamp,
+--     IF(tipo_video = 'full', TRUE, FALSE) AS is_full_content,
+--     date,
+--     activation_time AS data_hora_compra,
+--     CURRENT_DATE() AS dt_proc,
+--     DATETIME(timestamp_consumo) >= activation_time AS play_pago,
+
+
+--     timestamp_consumo,
+--     hour,
+--     minute,
+--     horario,
+--     globo_id,
+--     object_id,
+--     origin_id,
+--     origin_name,
+--     genero,
+--     idade,
+--     address_state,
+--     nome_produto,
+--     canal_tratado_ibms,
+--     tier,
+--     periodicidade,
+--     activation_time,
+--     event_at_timestamp,
+--     tipo_metrica,
+--     oferta_consumo,
+--     tipo_video,
+--     subset,
+--     video_id,
+--     service_id,
+--     programa,
+--     title,
+--     season,
+--     flag_licenciado,
+--     flag_licenciado_geral,
+--     flag_original,
+--     titulo_canal,
+--     data_estreia,
+--     dias_desde_pub,
+--     programa_ibms,
+--     title_aka,
+--     season_ibms,
+--     subset_ibms,
+--     subsubset_ibms,
+--     rnk
+-- FROM 
+--     ${ref("business_performance","d2c_first_views_gold_d2c_b2b_cws")}
+

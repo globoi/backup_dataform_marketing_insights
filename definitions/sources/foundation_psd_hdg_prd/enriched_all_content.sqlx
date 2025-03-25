@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.foundationDatabase,
+  schema: "conteudo_enriched",
+  name: "all_content",
+  description: ""
+}

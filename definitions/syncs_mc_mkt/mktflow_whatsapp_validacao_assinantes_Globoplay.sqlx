@@ -1,0 +1,36 @@
+config {
+    type: "table",
+    name: "mktflow_whatsapp_validacao_assinantes_globoplay",
+    schema: 'syncs_mc_mkt',
+    tags: ['schedule_tag=sync_mc_mkt_mktflow_whatsapp_validacao_assinantes_globoplay',
+        "schedule_cron=30 11 * * *"
+    ],
+    bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+select distinct
+    a.globo_id, 
+    i.data_hora_compra,
+    i.produto as periodicidade,
+    b.tipo_assinante,
+    case when i.produto_contratado like '%Globoplay%' then true else false end as globoplay,
+    i.mais_canais,
+    case when i.produto_contratado like '% e %' then true else false end as combo,
+    a.cartola,
+    a.telecine,
+    a.premiere,
+    a.combate ,
+    a.disney,
+    a.flatv,
+    i.gplay_basico,
+    i.gplay_padrao,
+    i.gplay_padrao_ads
+from ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} a, 
+    unnest(info) as i
+left join ${ref('datacloud', 'base_todos_os_globo_ids_v2')}  b
+  on a.globo_id = b.globo_id

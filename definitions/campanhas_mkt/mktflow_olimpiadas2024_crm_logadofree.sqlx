@@ -1,0 +1,51 @@
+config {
+    type: "table",
+    name: "mktflow_olimpiadas2024_crm_logadofree",
+    schema: 'campanhas_mkt',
+    tags: ['schedule_tag=campanhas_mkt_mktflow_olimpiadas2024_crm_logadofree',
+        "schedule_cron=0 12 * * *"
+    ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "12h00min",
+      urban: "list"
+    }
+  },
+  description: '',
+  columns: {
+  },
+}
+
+WITH 
+acesso_ge AS (
+SELECT globoId
+FROM
+(SELECT globoId, MAX(data) ultimo_acesso
+FROM ${ref('foundation_ge', 'foundation_ge_sessions_v3')} AS S, S.hits AS h
+WHERE data >= CURRENT_DATE() - 31 
+AND provider = "cadun" 
+AND pagepath LIKE "%/olimpiadas/%"
+GROUP BY 1
+)
+)
+,
+
+consumo_olimpiadas AS 
+(
+SELECT 
+  bo.globo_id
+FROM ${ref('olimpiadas_2024', 'raiox_olimpiadas_2024')} AS bo
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} AS ba
+ON bo.globo_id = ba.globo_id
+WHERE ba.tipo_cadastro = 'Logado Free'
+)
+
+SELECT DISTINCT  'named_user' AS identifier_type
+, co.globo_id AS UUID
+FROM acesso_ge AS ag
+FULL OUTER JOIN consumo_olimpiadas AS co
+ON ag.globoId = co.globo_id
+

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.foundationDatabase,
+  schema: "mkt_clean",
+  name: "dados_cadastros_assinantes_V2",
+  description: ""
+}

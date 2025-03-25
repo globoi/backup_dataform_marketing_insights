@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  schema: "bbb_22",
+  name: "Max_Semana_BBB_22_historico",
+  description: ""
+}
+

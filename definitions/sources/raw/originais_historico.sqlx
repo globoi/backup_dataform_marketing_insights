@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.defaultDatabase,
+  schema: "retrospectiva_2022",
+  name: "originais_historico",
+  description: ""
+}

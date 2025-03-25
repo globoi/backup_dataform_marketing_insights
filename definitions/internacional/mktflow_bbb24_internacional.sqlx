@@ -1,0 +1,88 @@
+config {
+    type: "table",
+    schema: 'internacional',
+    tags: [
+        "schedule_tag=internacional_mktflow_bbb24_internacional", 'schedule_cron=0 10 * * *'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "internacional",
+            owner: "martech",
+            horario: "10h00min"
+
+        }
+    }
+}
+
+WITH
+  consumo_bbb24_internacional AS (
+  SELECT
+    a.userId
+  FROM
+    ${ref('consumo_enriched', 'all_impression')}as a
+  INNER JOIN
+    ${ref('internacional', 'base_ativa_internacional')}as b
+  ON
+    a.userId = b.globo_id
+  WHERE
+    a.date >= '2024-01-05'
+    AND a.program_id IN (12082,
+      16284,
+      26751,
+      13492,
+      16280)
+    AND a.date >= CURRENT_DATE-7
+  UNION DISTINCT
+  SELECT
+    c.userId
+  FROM
+    ${ref('consumo_enriched', 'all_impression')} AS c
+  INNER JOIN
+    ${ref('internacional', 'base_lf_internacional')}as d
+  ON
+    c.userId = d.globo_id
+  WHERE
+    c.date >= '2024-01-05'
+    AND c.program_id IN (12082,
+      16284,
+      26751,
+      13492,
+      16280)
+    AND c.date >= CURRENT_DATE-7
+  UNION DISTINCT
+  SELECT
+    h.globo_id
+  FROM
+    ${ref('simulcast', 'consumo_ibope')} AS g
+  INNER JOIN
+    ${ref('internacional', 'base_ativa_internacional')} AS h
+  ON
+    g.globoid = h.globo_id
+  WHERE
+    g.data_consumo >= "2024-01-08"
+    AND (LOWER(programa) LIKE '%big brother%'
+      OR LOWER(programa) LIKE '%bbb%')
+    AND (program_id = '9095'
+      OR LOWER(canal) LIKE '%multishow%')
+    AND g.data_consumo >= CURRENT_DATE-7
+  UNION DISTINCT
+  SELECT
+    j.globo_id
+  FROM
+    ${ref('simulcast', 'consumo_ibope')} AS i
+  INNER JOIN
+    ${ref('internacional', 'base_lf_internacional')} AS j
+  ON
+    i.globoid = j.globo_id
+  WHERE
+    i.data_consumo >= "2024-01-08"
+    AND (LOWER(programa) LIKE '%big brother%'
+      OR LOWER(programa) LIKE '%bbb%')
+    AND (program_id = '9095'
+      OR LOWER(canal) LIKE '%multishow%')
+    AND i.data_consumo >= CURRENT_DATE-7 )
+SELECT
+  distinct userId as globo_id
+FROM
+  consumo_bbb24_internacional

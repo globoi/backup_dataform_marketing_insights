@@ -1,0 +1,62 @@
+config {
+ 
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_touchpoint_15d','schedule_cron=00 11 * * *'],
+  name: 'mktflow_base_touchpoint_15d',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+  
+  bigquery: {
+    labels: {
+      mktcloud: "true",
+      schedule: "diario",
+      urban: 'list'
+    }
+  }
+}
+
+WITH
+  base_ativa AS (
+  SELECT
+    DISTINCT ss.globo_id
+  FROM
+   ${ref("sales_gold", "subscription_state")} as ss
+    --`gglobo-vendas-hdg-prd.sales_gold.subscription_state` ss
+  LEFT JOIN
+  ${ref("sales_gold", "subscription_details")} as sd
+    --`gglobo-vendas-hdg-prd.sales_gold.subscription_details` sd
+  ON
+    ss.object_id = sd.id
+  LEFT JOIN
+  ${ref("sales_gold", "product_details")} as pd
+    --`gglobo-vendas-hdg-prd.sales_gold.product_details` pd
+  ON
+    sd.product_id = pd.id
+  WHERE
+    DATE(ss.state_date) = CURRENT_DATE() - 1
+    AND LOWER(pd.name) LIKE '%cartola%'
+    AND ss.state = 'active'),
+ 
+  tp_pro AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+  ${ref("cartola_analytics", "report_Tracking")} 
+    --`gglobo-prodservdig-hdg-prd.cartola_analytics.report_Tracking`
+  WHERE
+    DATA >= CURRENT_DATE() - 15
+    AND REGEXP_CONTAINS(LOWER(eventCategory), "pro"))
+   
+SELECT
+  DISTINCT 'named_user' AS identifier_type,
+  globo_id AS UUID
+FROM
+  tp_pro
+WHERE
+  globo_id NOT IN(
+  SELECT
+    DISTINCT globo_id
+  FROM
+    base_ativa)

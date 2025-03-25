@@ -1,0 +1,84 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_engajados_produto'],
+  name: 'mktflow_lf_cluster_engajados_produto',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+-----------------------------------VERSÃO 2---------------------------------------------------
+--MACRO CLUSTER LF ENGAJADO PRODUTO
+
+--lf mais de 10 horas
+
+WITH
+--usuarios lf que abriram o aplicativo do globoplay nos últimos 30 dias.
+abriuapp AS (
+  SELECT
+  globo_id
+  FROM
+   ${ref("comunicacao", "ultima_comunicacao_geral")} AS a
+  WHERE
+    tipo_cadastro = 'Logado Free'
+    AND appopen_flag_30D IS not null),
+
+--usuarios lf que acessaram globoplay na web nos últimos 30 dias.
+abriuweb as (
+  SELECT
+  globo_id
+  FROM
+   ${ref("comunicacao", "ultima_comunicacao_geral")} AS a
+  WHERE
+    tipo_cadastro = 'Logado Free'
+    AND acesso_flag_30D is not NULL),
+
+--usuarios lf que tiveram consumo de conteúdo no Globoplay nos últimos 30 dias. 
+consumiu as (
+  SELECT
+  globo_id
+  FROM
+   ${ref("comunicacao", "ultima_comunicacao_geral")} AS a
+  WHERE
+    tipo_cadastro = 'Logado Free' 
+    AND consumo_flag_30D is not NULL),
+
+--uniao de todos os usuarios lf distintos que abriram o app, acessaram web ou tiveram consumo no globoplay nos ultimos 30 dias.
+uniao as (
+  SELECT distinct globo_id
+  from abriuapp
+  UNION DISTINCT
+  SELECT distinct globo_id
+  from abriuweb
+  UNION DISTINCT
+  SELECT distinct globo_id
+  from consumiu
+  ),
+
+--filtro dos usuarios lf distintos que consumiram mais de 10 horas acumuladas nos ultimos 30 dias, e que abriram o app, ou acessaram web ou ou tiveram consumo no globoplay nos ultimos 30 dias
+engajamento as (
+  SELECT
+  DISTINCT b.globo_id,
+  SUM(hours_watched) as hrs
+FROM
+ ${ref("consumo_enriched", "all_impression")} AS a
+INNER JOIN
+  uniao AS b
+ON
+  a.userId = b.globo_id
+WHERE
+  date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+GROUP BY 1
+HAVING
+  hrs >= 10)
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id
+FROM engajamento
+
+

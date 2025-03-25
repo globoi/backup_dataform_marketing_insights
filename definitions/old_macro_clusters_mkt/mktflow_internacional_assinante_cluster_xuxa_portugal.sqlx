@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_internacional_assinante_cluster_xuxa_portugal'],
+  name: 'mktflow_internacional_assinante_cluster_xuxa_portugal',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+select distinct 'named_user' as identifier_type, x.globo_id
+from ${ref("xuxaverso", "base_xuxaverso")} x
+left join ${ref("internacional", "base_ativa_internacional")} ba
+on x.globo_id = ba.globo_id
+where tipo_cadastro = 'Assinante Internacional'
+and country = 'Portugal'

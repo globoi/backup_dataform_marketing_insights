@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "usuarios",
+  name: "assinatura_erick",
+  description: ""
+}

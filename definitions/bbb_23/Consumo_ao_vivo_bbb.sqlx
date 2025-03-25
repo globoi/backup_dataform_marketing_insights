@@ -1,0 +1,71 @@
+config {
+  type: 'table',
+  name: 'Consumo_ao_vivo_bbb',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com os usuários que assistiram algum conteúdo relacionado ao BBB 23 via simulcast (FONTE GA).',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    canal: 'Canal em que o usuário assistiu o programa.',
+    programa: 'Programa relacionado ao BBB que o usuário assistiu.',
+    semana: 'Semana em que o assinante assistiu o programa.',
+    frequencia_ao_vivo: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+    total_horas_ao_vivo_bbb: 'Total de horas em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).'
+  }
+
+}
+
+with base as (
+  SELECT
+    globoid,
+    canal,
+    programa,
+    case
+      when playtime_hours is null then 0
+      else playtime_hours
+    end as playtime_hours,
+    date_trunc(data_consumo, WEEK(MONDAY)) as semana,
+    count(distinct data_consumo) over(
+      partition by globoid,
+      date_trunc(data_consumo, WEEK(MONDAY))
+    ) as frequencia_ao_vivo,
+  FROM
+    ${ref("simulcast", "consumo_ibope")}
+  WHERE
+    data_consumo >= "2023-01-16"
+    and (
+      lower(programa) like '%big brother%'
+      or lower(programa) like '%bbb%'
+    )
+    and (
+      program_id = '9095'
+      or lower(canal) like '%multishow%'
+    )
+)
+select
+  distinct globoid as globo_id,
+  canal,
+  programa,
+  semana,
+  case
+    when frequencia_ao_vivo >= 8 then 7
+    else frequencia_ao_vivo
+  end as frequencia_ao_vivo,
+  sum(playtime_hours) OVER (PARTITION BY globoid, semana) as total_horas_ao_vivo_bbb
+from
+  base as b
+  inner join ${ref("comunicacao","ultima_comunicacao_geral")} as c on c.globo_id = b.globoid
+  --where frequencia_ao_vivo=8
+  --  globoid = '9db3a1d8-336e-4ed2-be9d-e038be5bd5b9'
+order by
+  semana asc

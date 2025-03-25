@@ -1,0 +1,50 @@
+/*config {
+    type: "table",
+    name: "mktflow_adimplentes_telecine_combo_v2",
+    schema: "jornadas_mkt",
+    tags: ["jornadas_mkt",'schedule_tag=jornadas_mkt_mktflow_adimplentes_telecine_combo_v2'],
+    bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "jornadas",
+      owner: "martech" ,
+       mktcloud: "true"
+    }
+  },
+}*/
+
+    SELECT 
+    t0.*,
+    info.id_asset AS id_asset,
+    info.data_hora_compra AS data_hora_compra,
+    info.dt_assinatura_comeco AS dt_assinatura_comeco,
+    info.activation_at AS activation_at,
+    info.unsubscribe_at AS unsubscribe_at,
+    info.scheduled_unsubscribe_at AS scheduled_unsubscribe_at,
+    info.end_cycle_at AS end_cycle_at,
+    info.canal_compra AS canal_compra,
+    info.flag_claro_wholesale AS flag_claro_wholesale,
+    info.Produto_Contratado AS Produto_Contratado,
+    info.produto AS produto,
+    info.origem AS origem,
+    info.assinatura_gplay AS assinatura_gplay,
+    info.subscription_type AS subscription_type,
+    info.subscription_status AS subscription_status,
+    info.status AS status,
+    info.origin_id AS origin_id,
+    info.origin_name AS origin_name,
+    info.tempo_de_base AS tempo_de_base,
+    info.tempo_de_base_agrupado AS tempo_de_base_agrupado,
+    info.mais_canais AS mais_canais,
+    info.gplay_basico AS gplay_basico,
+    info.gplay_padrao AS gplay_padrao,
+    info.gplay_padrao_ads AS gplay_padrao_ads,
+    info.combo AS combo
+FROM 
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS t0 
+  CROSS JOIN UNNEST(t0.info) AS info
+      WHERE
+       lower(INFO.Produto_Contratado) like '%telecine%'
+   AND assinatura_gplay = 'nacional'
+   AND globo_id is not null
+   ORDER BY DATA_HORA_COMPRA DESC

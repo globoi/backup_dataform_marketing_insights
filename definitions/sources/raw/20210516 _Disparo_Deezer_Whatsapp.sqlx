@@ -1,0 +1,9 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.defaultDatabase,
+  schema: "raw",
+  name: "20210516 - Disparo Deezer Whatsapp",
+  description: ""
+}
+
+

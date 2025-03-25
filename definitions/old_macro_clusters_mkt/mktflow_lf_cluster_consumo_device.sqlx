@@ -1,0 +1,37 @@
+config {
+    type: "table",
+    name: "mktflow_lf_cluster_consumo_device",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_lf_cluster_consumo_device']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT 
+    imp.userid as globo_id, 
+    SUM(
+        CASE
+            WHEN imp.deviceGroup = 'tablet' or imp.deviceGroup = 'mobile' then 1
+            ELSE 0
+        END
+    ) AS Mobile, 
+    SUM(
+        CASE
+            WHEN imp.deviceGroup = 'desktop' then 1
+            ELSE 0
+        END
+    ) AS Desktop,
+    SUM(
+        CASE
+            WHEN imp.deviceGroup = 'tv' then 1
+            ELSE 0
+        END
+    ) AS TV,
+    count(*) as Total_Plays  
+FROM ${ref("consumo_enriched", "all_impression")} as imp
+INNER JOIN ${ref("usuarios", "Free users")} as fu on imp.userid = fu.globo_id
+GROUP BY imp.userid

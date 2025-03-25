@@ -1,0 +1,51 @@
+config {
+    type: "table",
+    name: "consumo_top5",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com o top5 de conteudo do usuário',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    grupo: 'Grupo de elegilidade do qual o usuário percente'
+  },
+}
+
+with 
+top_consumo as (
+  SELECT
+    c.globo_id,
+    program_id,
+    program_title,
+    b.media_kit_resource__poster,
+    c.grupo,
+    ROUND(SUM(hours_watched),0) AS hrs,
+    ROW_NUMBER() OVER(PARTITION BY c.globo_id ORDER BY SUM(hours_watched) DESC) AS top
+  FROM  ${ref('retrospectiva_2024','consumo_retro_2024')} a
+  JOIN  ${ref('retrospectiva_2024','elegibilidade_2024')} c
+    ON a.globo_id = c.globo_id
+  JOIN ${ref('conteudo_enriched', 'program')} b
+    ON a.program_id = CAST(b.id AS INT)
+  WHERE b.media_kit_resource__poster IS NOT NULL
+  AND a.program_title NOT IN('USA Ao Vivo','Globoplay')
+  GROUP BY ALL
+  QUALIFY top <= 5
+    )
+
+SELECT * 
+FROM top_consumo
+PIVOT(
+  max(program_title) program_title_top,
+  max(program_id) program_id_top,
+  max(media_kit_resource__poster) program_poster_url_top,
+  max(hrs) horas_top
+  FOR top IN (1,2,3,4,5)
+)

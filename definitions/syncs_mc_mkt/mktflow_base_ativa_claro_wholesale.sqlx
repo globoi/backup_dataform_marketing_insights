@@ -1,0 +1,22 @@
+config {
+    type: "table",
+    name: "mktflow_base_ativa_claro_wholesale",
+    schema: "syncs_mc_mkt",
+    tags: [
+        "schedule_tag=syncs_mc_mkt_mktflow_base_ativa_claro_wholesale"
+    ],
+    bigquery: {
+        labels: {mktcloud: "true",
+            schedule: "diario",
+            tags: "syncs_mc_mkt",
+            owner: "mins",
+            origem: "sales_gold-salesforce"
+        }
+    }
+}
+
+SELECT
+  DISTINCT globo_id
+FROM
+  ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} as b,unnest(b.info) as i
+  where i.canal_compra='CLARO_BASE'

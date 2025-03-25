@@ -1,0 +1,120 @@
+config {
+    type: "table",
+    name: "base_pesquisas_consolidadas",
+    schema: 'pesquisas',
+    tags: ['schedule_tag=pesquisas_base_pesquisas_consolidadas',
+        "schedule_cron=0 10 * * *"
+    ]
+}
+
+WITH
+  pesq_3_dias AS (
+  SELECT
+    user_id AS globo_id,
+    DATE(MAX(date_created)) AS max_date_created,
+    DATE(MAX(date_modified)) AS max_date_modified,
+    '3 dias' AS tipo_pesquisa
+  FROM
+    ${ref('pesquisas', 'pesquisa_assinante_3')}
+  WHERE
+    user_id IS NOT NULL
+  GROUP BY
+    1 ),
+  pesq_30_dias AS (
+  SELECT
+    user_id AS globo_id,
+    DATE(MAX(date_created)) AS max_date_created,
+    DATE(MAX(date_modified)) AS max_date_modified,
+    '30 dias' AS tipo_pesquisa
+  FROM
+    ${ref('pesquisas', 'pesquisa_assinante_30')}
+  WHERE
+    user_id IS NOT NULL
+  GROUP BY
+    1 ),
+  pesq_cancel AS (
+  SELECT
+    user_id AS globo_id,
+    DATE(MAX(date_created)) AS max_date_created,
+    DATE(MAX(date_modified)) AS max_date_modified,
+    'cancelados' AS tipo_pesquisa
+  FROM
+    ${ref('pesquisas', 'pesquisa_cancelados')}
+  WHERE
+    user_id IS NOT NULL
+  GROUP BY
+    1 )
+SELECT
+  *
+FROM
+  pesq_3_dias
+UNION ALL
+SELECT
+  *
+FROM
+  pesq_30_dias
+UNION ALL
+SELECT
+  *
+FROM
+  pesq_cancel
+UNION ALL
+SELECT
+  DISTINCT UUID AS globo_id,
+  CAST('2024-05-22' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'moc_ott' AS tipo_pesquisa
+FROM
+  ${ref('campanhas_mkt', 'mktflow_base_moc_ott')}
+WHERE
+  UUID IS NOT NULL
+UNION ALL
+SELECT
+  DISTINCT UUID AS globo_id,
+  CAST('2024-05-22' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'mcc_seac' AS tipo_pesquisa
+FROM
+  ${ref('campanhas_mkt', 'mktflow_base_mcc_seac')}
+WHERE
+  UUID IS NOT NULL
+UNION ALL
+SELECT
+  DISTINCT UUID AS globo_id,
+  CAST('2024-05-27' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'max_diff_seac' AS tipo_pesquisa
+FROM
+  ${ref('campanhas_mkt', 'mktflow_base_max_diff_seac')}
+WHERE
+  UUID IS NOT NULL
+UNION ALL
+SELECT
+  DISTINCT UUID AS globo_id,
+  CAST('2024-05-27' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'max_diff_ott' AS tipo_pesquisa
+FROM
+  ${ref('campanhas_mkt', 'mktflow_base_max_diff_ott')}
+WHERE
+  UUID IS NOT NULL
+UNION ALL
+SELECT
+  DISTINCT globo_id AS globo_id,
+  CAST('2024-07-11' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'canais_fast' AS tipo_pesquisa
+FROM
+  ${ref('pesquisas', 'baase_pesquisa_canalfast')}
+WHERE
+  globo_id IS NOT NULL
+UNION ALL
+SELECT
+  DISTINCT globo_id,
+  CAST('2024-09-10' AS date) AS max_date_created,
+  CAST(NULL AS date) AS max_date_modified,
+  'gift_card' AS tipo_pesquisa
+FROM
+  ${ref('pesquisas', 'base_pesquisa_gift_card')}
+WHERE
+  globo_id IS NOT NULL

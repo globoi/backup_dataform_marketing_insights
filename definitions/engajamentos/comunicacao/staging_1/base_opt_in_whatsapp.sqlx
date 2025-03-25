@@ -1,0 +1,33 @@
+config {
+  type: 'table',
+  name: 'base_opt_in_whatsapp',
+  schema: 'comunicacao',
+  tags: ['comunicacao_staging_1','schedule_tag=comunicacao_base_opt_in_whatsapp'],
+  description: '',
+  columns: {
+  }
+}
+
+WITH step_1 AS (
+  SELECT
+    globo_id,
+    endereco,
+    telefone,
+    dt_aniversario,
+    optout_mcloud,
+    optout_cp,
+    optout_wpp,
+    optin_wpp,
+  CASE
+    WHEN optin_wpp IS NOT NULL and optout_wpp IS NULL THEN TRUE
+    WHEN optin_wpp >= optout_wpp THEN TRUE
+    ELSE FALSE
+  END AS Status_Opt_In
+
+  FROM
+  ${ref("mkt_clean", "dados_cadastros_assinantes_V2")}
+)
+
+SELECT * FROM step_1
+WHERE
+  Status_Opt_In

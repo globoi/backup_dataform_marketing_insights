@@ -1,0 +1,36 @@
+config {
+  type: 'table',
+  name: 'Entrada_Cluster_Assinante',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com os assinantes do Raiox_BBB_23_Assinantes e a semana em que entraram no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    min_semana: 'Semana em que o assinante entrou no Raiox_BBB_23_Assinantes.'
+  }
+
+}
+
+WITH Entrada_Cluster AS (
+  SELECT
+    DISTINCT globo_id,
+    MIN(semana) AS min_semana
+  FROM
+    ${ref("bbb_23", "Raiox_BBB_23_Assinantes")}
+  GROUP BY
+    1
+)
+SELECT
+  *
+FROM
+  Entrada_Cluster

@@ -1,0 +1,35 @@
+config {
+
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_performance_aquisicao', 'schedule_cron=10 16 * * *'],
+    name: 'mktflow_base_automatica_performance_aquisicao',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+WITH
+ 
+temporada_atual AS (
+  SELECT *
+  FROM
+    ${ref("report_staging", "report_rodada")} --`gglobo-cartola-hdg-prd.report_staging.report_rodada`
+    WHERE temporada = EXTRACT(year FROM current_date())),
+
+rodada_atual AS (
+  SELECT * 
+  FROM temporada_atual
+  WHERE rodada_id = (SELECT MAX(rodada_id) FROM temporada_atual)
+  AND pro_na_rodada_bln != 1
+)
+
+SELECT globo_id, pontos_num, rodada_id, temporada
+FROM rodada_atual 
+WHERE pontos_num >= (SELECT avg(pontos_num) FROM rodada_atual)

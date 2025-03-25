@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+  tags: ['usuarios_staging_3',
+        "schedule_tag=usuarios_assinantes_e_logados_free"
+  ],
+  schema: 'usuarios',
+  name: 'assinantes_e_logados_free',
+  description: '',
+  columns: {}
+}
+
+with usuarios as (
+  select
+    distinct globo_id,
+    'Assinante' as tipo_usuario
+  from
+    ${ref('usuarios', 'base_ativa_pagante_com_trial_new')}
+  union
+    distinct
+  select
+    distinct globo_id,
+    'Logado Free' as tipo_usuario
+  from
+    ${ref('usuarios', 'free_users_all')}
+)
+select
+  *
+from
+  usuarios

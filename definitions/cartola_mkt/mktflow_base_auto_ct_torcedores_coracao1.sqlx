@@ -1,0 +1,22 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_auto_ct_torcedores_coracao1', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_auto_ct_torcedores_coracao1',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  *
+FROM
+  -- `gglobo-mkt-ins-hdg-prd.macro_clusters_mkt.rotina_times_do_coracao_urban_grupo1`
+  ${ref("macro_clusters_mkt", "rotina_times_do_coracao_urban_grupo1")}

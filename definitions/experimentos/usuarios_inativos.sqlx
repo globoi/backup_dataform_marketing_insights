@@ -1,0 +1,15 @@
+config {
+  type: "incremental",  
+  schema: "experimentos",
+  name: "usuarios_inativos_incremental",
+  tags: [
+        "schedule_tag=experimentos_usuarios_inativos_incremental"
+  ],
+  bigquery: {
+    partitionBy: "dt_proc"
+  }
+}
+
+select distinct globo_id, CURRENT_DATE() as dt_proc
+from ${ref('usuarios','perfil_assinantes_ativo_reduzido')}
+where inativo = true

@@ -1,0 +1,120 @@
+config {
+
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_jornada_inativos', 'schedule_cron=0 10 * * 3'],
+    name: 'mktflow_base_automatica_jornada_inativos',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  rodadas AS (
+  SELECT
+    slate_id,
+    contest_id,
+    name,
+    contest_create_date,
+    slate_lock_date,
+    sport,
+    max_entries_per_user,
+    entry_fee_local,
+    MIN(rodada_id) AS rodada_id
+  FROM (
+    SELECT
+      c.slate_id,
+      c.contest_id,
+      EXTRACT( DATE
+      FROM
+        c.create_date ) AS contest_create_date,
+      EXTRACT( DATE
+      FROM
+        s.lock_date ) AS slate_lock_date,
+      s.sport,
+      c.name,
+      c.max_entries_per_user,
+      c.entry_fee_local,
+      CASE
+        WHEN s.sport = 'bras' THEN CAST(rj.rodada_id AS STRING)
+      ELSE
+      (SPLIT(c.name, ':')) [SAFE_ORDINAL(1)]
+    END
+      AS rodada_id,
+    FROM
+      `gglobo-cartola-hdg-prd.dfs.contest` c
+    LEFT JOIN
+      `gglobo-cartola-hdg-prd.dfs.slate` s
+    ON
+      c.slate_id = s.slate_id
+    LEFT JOIN
+      `gglobo-cartola-hdg-prd.report.rodada_janela` rj
+    ON
+      s.lock_date >= inicio_rodada_dt
+      AND s.lock_date <= fim_rodada_dt
+      AND temporada >= 2025
+    WHERE
+      c.create_date IS NOT NULL
+      AND c.name <> 'do not enter'
+      AND c.name NOT LIKE '%test%'
+      AND c.contest_id NOT IN (248054389,
+        248054388,
+        247982352)
+      AND c.total_entries >= c.min_entries ) r
+  GROUP BY
+    slate_id,
+    contest_id,
+    name,
+    contest_create_date,
+    slate_lock_date,
+    sport,
+    max_entries_per_user,
+    entry_fee_local ),
+  rodada_atual AS (
+  SELECT
+    CAST(MAX(rodada_id) AS STRING)
+  FROM
+    `gglobo-cartola-hdg-prd.report.rodada_janela`
+  WHERE
+    temporada = 2023 ),
+  slate_atual AS (
+  SELECT
+    DISTINCT slate_id
+  FROM
+    rodadas
+  WHERE
+    rodada_id IN(
+    SELECT
+      *
+    FROM
+      rodada_atual ) ),
+  jogaram_rodada_X AS (
+  SELECT
+    DISTINCT cartola_id
+  FROM
+    `gglobo-cartola-hdg-prd.dfs.entries`
+  WHERE
+    cartola_id IS NOT NULL
+    AND slate_id IN (
+    SELECT
+      *
+    FROM
+      slate_atual ) )
+SELECT
+  DISTINCT cartola_id
+FROM
+  `gglobo-cartola-hdg-prd.dfs.entries`
+WHERE
+  cartola_id IS NOT NULL
+  AND cartola_id NOT IN (
+  SELECT
+    cartola_id
+  FROM
+    jogaram_rodada_X )

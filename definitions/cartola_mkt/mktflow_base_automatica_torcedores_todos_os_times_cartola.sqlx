@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+  tags: ['jornada_consumo', 'schedule_tag=cartola_mkt_mktflow_base_automatica_torcedores_todos_os_times_cartola','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_torcedores_todos_os_times_cartola',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt"
+    }
+  }
+}
+
+-- Base de torcedores de todos os times
+-- Fonte dos dados: tabela do time de inteligência de esporte
+
+-- Nova fonte de times do coração, snapshot diário
+-- estrutura-esportes.Cartola.TimeCoracao_Cart18_20_GE
+
+SELECT
+  globoid AS globo_id,
+  time_aferido
+FROM
+  ${ref("Cartola", "TimeCoracao_Cart18_20_GE")}
+ORDER BY 2 ASC

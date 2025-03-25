@@ -1,0 +1,132 @@
+config {
+    type: "table",
+    name: "elegibilidade_2024",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com a divisão dos globo_ids elegiveis para a retro',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    grupo: 'Grupo de elegilidade do qual o usuário percente'
+  },
+}
+WITH
+
+ativos AS (
+  SELECT DISTINCT(globo_id), 'Ativo' AS status_assinatura
+  FROM ${ref('usuarios','base_ativa_pagante_com_trial_new')}
+),
+ 
+assinantes_sem_julia AS (
+  SELECT DISTINCT(globo_id), assinatura_gplay, COALESCE(status_assinatura, 'Cancelado') AS status_assinatura, ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY assinatura_gplay DESC) AS ass
+  FROM ${ref('usuarios','base_ativa_incremental_new')}
+  LEFT JOIN ativos USING(globo_id)
+  WHERE EXTRACT(YEAR FROM dt_proc) >= 2024 QUALIFY ass = 1
+  AND assinatura_gplay = 'nacional'
+  ORDER BY 4 DESC
+),
+--Etapa para adicionar a julia na base de assinantes
+assinantes AS (
+  SELECT sj.*
+  FROM assinantes_sem_julia AS sj
+  UNION ALL 
+  SELECT cj.globo_id, 
+  'nacional' AS assinatura_gplay, 
+  'Ativo' AS status_assinatura,
+  1 AS ass
+  FROM ${ref('usuarios','base_ativa_pagante_com_trial_new')} AS cj
+  WHERE globo_id = 'e45b3006-9259-4d7d-a29c-6f43adf57ab4'
+),
+
+base_impression as (
+  SELECT distinct
+    userId AS globo_id,
+    status_assinatura,
+    assinatura_gplay,
+    mediaid,
+    date,
+    timestamp,
+    hours_watched,
+    program_title,
+    program_subset,
+    program_id,
+    is_live
+  FROM ${ref('consumo_enriched','impression')} as i
+  INNER JOIN assinantes as a
+    on a.globo_id = i.userId
+  WHERE EXTRACT( YEAR FROM date ) >= 2024
+),
+
+base_impression_grouped AS (
+  SELECT
+    globo_id,
+    ROUND(SUM(hours_watched), 0) AS horas_total,
+    COUNT(DISTINCT date) AS qtd_dias_assistidos
+  FROM
+    base_impression
+  GROUP BY all
+),
+
+horas_assistidas AS (
+  SELECT DISTINCT * EXCEPT(status_assinatura),
+    ROUND((horas_total / qtd_dias_assistidos), 2) AS media_hrs,
+    CASE
+      WHEN horas_total >= 30 AND status_assinatura = 'Cancelado' THEN 'Cancelado - com consumo'
+      WHEN horas_total >= 30 AND status_assinatura = 'Ativo'     THEN 'Ativo - com consumo'
+      WHEN horas_total < 30  AND status_assinatura = 'Cancelado' THEN 'Cancelado - sem consumo'
+      WHEN horas_total < 30  AND status_assinatura = 'Ativo'     THEN 'Ativo - sem consumo'
+      ELSE 'sem_grupo'
+    END AS grupo
+  FROM base_impression_grouped
+  INNER JOIN assinantes USING (globo_id)
+),
+
+conteudos_diferentes as (
+  WITH consumo as (
+    SELECT distinct globo_id, count(distinct program_id) as qtd_conteudos_assistidos, assinantes.status_assinatura
+    FROM base_impression
+    INNER JOIN assinantes USING (globo_id)
+    group by all
+  )
+  
+  select *, 
+    CASE
+      WHEN qtd_conteudos_assistidos >= 8 AND status_assinatura = 'Cancelado' THEN 'Cancelado - com consumo'
+      WHEN qtd_conteudos_assistidos >= 8 AND status_assinatura = 'Ativo'     THEN 'Ativo - com consumo'
+      WHEN qtd_conteudos_assistidos < 8  AND status_assinatura = 'Cancelado' THEN 'Cancelado - sem consumo'
+      WHEN qtd_conteudos_assistidos < 8  AND status_assinatura = 'Ativo'     THEN 'Ativo - sem consumo'
+      ELSE 'sem_grupo'
+    END AS grupo 
+  from consumo 
+)
+,
+
+base_final AS ( 
+SELECT 
+  h.globo_id,
+  h.grupo AS grupo_horas_assistidas,
+  c.grupo AS grupo_qtd_conteudos,
+CASE 
+WHEN h.grupo = c.grupo THEN h.grupo
+WHEN h.grupo LIKE'%sem consumo%'THEN h.grupo
+WHEN c.grupo LIKE'%sem consumo%'THEN c.grupo
+ELSE'sem grupo'
+END AS grupo_final
+FROM 
+  horas_assistidas AS h
+JOIN 
+  conteudos_diferentes AS c
+ON 
+  h.globo_id = c.globo_id
+)
+
+SELECT base_final.globo_id, base_final.grupo_final AS grupo
+FROM base_final

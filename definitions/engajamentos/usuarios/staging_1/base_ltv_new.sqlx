@@ -1,0 +1,285 @@
+config {
+  type: "table",
+  name: "base_ltv_new",
+  schema: "usuarios",
+    description: 'Base com usuários geraram lucro.',
+    columns: {
+  AssetId:'Código do item da Cesta (Produto que o cliente adquiriu).',
+  globo_id:'Código de identificação do usuário.',
+  AssetName:'Nome do produto na cesta.',
+  frequencia_cobranca:'Identifica a periodicidade da cobrança do produto adquirido. Ex: Anual, bianual ou mensal.', 
+  caracteristica_produto:'Identifica se o produto foi comprado por meio de combo ou não.',
+  tipo_de_aquisicao:'Identifica o tipo de movimentação do produto relacionado a compra. (Ex: Cross, Upgrade, Downgrade, etc.).',
+  tipo_de_pedido:'Informa o tipo de pedido realizado pelo cliente.(Ex: Produto, Oferta ou Combo).',
+  status_calculado:'status da assinatura.',
+  visivel_cesta:'Composto com o id do item da cesta do cliente. Mostra somente na linha referente ao que ele efetivamente paga ou contrata.',
+  preco:'Informa o preço do Ativo.',
+  data_compra:'Data da compra do produto.',
+  data_fim_ref:'Identifica a data final de um cliente dentro da base (data de cancelamento, suspensão ou data atual, caso o intem ainda esteja ativo.).',
+  origem_id:'Código que identifica a origem do pedido.',
+  descricao_origem_id:'Descrição da data origem do pedido.',
+  lt:'Identifica o periodo em que o usuário esteve dentro da base, descontando o periódo.',
+  lt_sem_desconto:'Identifica o periodo em que o usuário esteve dentro da base sem desconto.',
+  lt_mes_cheio:'Identifica o periodo em que o usuário esteve dentro da base dentro de 30 dias.',
+  lt_meses:'Identifica o periodo em que o usuário teve dentro da base em contagem de meses.',
+  ciclos_pagos:'Identifica a quantidadae de faturas pagas.',
+  receita_total:'Identifica o quanto de receita o usuário gerou com uma assinatura.',
+  grupo:'Define qual grupo o usuário pertence por meio de seus gastos.',
+  tier_fidelidade:'Define qual tier o usuário está de acordo com o grupo especificado.'
+
+}}
+
+WITH 
+step_1 AS
+(SELECT 
+  DISTINCT
+    sd.id AS AssetId,
+    customer_id,
+    ss.globo_id, 
+    sd.product_name AS AssetName,
+    sd.billing_frequency AS frequencia_cobranca,
+    asset.EVA_Caracteristica_Produto_c AS caracteristica_produto,
+    sd.subscription_type AS tipo_de_aquisicao,
+    asset.EVA_Tipo_de_pedido_c AS tipo_de_pedido,
+    sd.subscription_status AS status_calculado,
+    sd.customer_id AS visivel_cesta,
+    sd.price AS preco,
+    DATE(sd.subscription_at) AS data_compra,
+    COALESCE(DATE(sd.unsubscribe_at), CURRENT_DATE()) AS data_fim_ref,
+    sd.origin_id AS origem_id,
+    sd.origin_name AS descricao_origem_id,
+    
+FROM  
+  ${ref('sales_gold', 'subscription_details')} AS sd
+INNER JOIN 
+  -- ${ref('sales_gold', 'subscription_state')} AS ss 
+  ${ref('sales_gold', 'last_subscription_state')} AS ss 
+  ON ss.object_id = sd.id
+LEFT JOIN ${ref('salesforce', 'asset')} AS asset 
+  ON asset.id = sd.id
+),
+listas AS (
+  SELECT
+  object_id,
+  subscription_status,
+  ARRAY_AGG(IF(event='subscription_on_hold',event_at,NULL) IGNORE NULLS ORDER BY event_at ASC) AS lista_suspensoes,
+  ARRAY_AGG(IF(event='reactivation',event_at,NULL) IGNORE NULLS ORDER BY event_at ASC) AS lista_reativacoes,
+
+  FROM
+    ${ref('sales_gold', 'customer_events')} AS e
+  LEFT JOIN     
+    ${ref('sales_gold', 'subscription_details')} AS sd ON e.object_id = sd.id 
+  LEFT JOIN 
+    ${ref('sales_gold', 'partner_details')}  AS pt ON e.object_id = pt.partner_token
+  LEFT JOIN 
+    ${ref('sales_gold', 'product_details')} AS pd ON sd.product_id = pd.id OR pt.product_id = pd.id 
+  WHERE
+    DATE(e.event_at) = CURRENT_DATE -1
+  GROUP BY object_id,subscription_status
+),
+step_2 AS (
+  SELECT 
+    *,
+    CASE
+      WHEN ARRAY_LENGTH(lista_reativacoes) < ARRAY_LENGTH(lista_suspensoes) THEN ARRAY(
+        SELECT
+          DATE_DIFF(
+            lista_reativacoes [SAFE_OFFSET(y)],
+            lista_suspensoes [SAFE_OFFSET(y)],
+            DAY
+          )
+        FROM
+          UNNEST(lista_reativacoes) AS x WITH OFFSET AS y
+        ORDER BY
+          y
+      )
+      ELSE ARRAY(
+        SELECT
+          DATE_DIFF(
+            lista_reativacoes [SAFE_OFFSET(y)],
+            lista_suspensoes [SAFE_OFFSET(y)],
+            DAY
+          )
+        FROM
+          UNNEST(lista_suspensoes) AS x WITH OFFSET AS y
+        ORDER BY
+          y
+      )
+    END AS duracao_suspensoes 
+  FROM step_1
+  LEFT JOIN listas ON step_1.AssetId = listas.object_id
+),
+
+step_3 AS (
+  SELECT
+    *,
+    (
+      SELECT
+        MAX(x)
+      FROM
+        UNNEST(duracao_suspensoes) AS x
+    ) AS max_dias_suspenso,
+    (
+      SELECT
+        SUM(x)
+      FROM
+        UNNEST(duracao_suspensoes) AS x
+    ) AS dias_suspenso,
+    CURRENT_DATE() AS dt_processamento
+  FROM
+    step_2
+),
+step_4 AS (
+  SELECT
+    *,
+    DATE_DIFF(data_fim_ref, data_compra, DAY) AS lt_sem_desconto,
+    DATE_DIFF(data_fim_ref, data_compra, DAY) - COALESCE(dias_suspenso, 0) AS lt,
+    DATE_DIFF(data_fim_ref, data_compra, MONTH) lt_meses
+  FROM
+    step_3
+),
+step_5 AS (
+  SELECT
+    *,
+    FLOOR(DIV(lt, 30)) AS lt_mes_cheio,
+    CEIL(
+      SAFE_DIVIDE(
+        lt,
+        (
+          CASE
+            WHEN LOWER(frequencia_cobranca) = 'mensal' THEN 30
+            WHEN LOWER(frequencia_cobranca) = 'anual' THEN 365
+            WHEN LOWER(frequencia_cobranca) = 'bianual' THEN 730
+            ELSE 30
+          END
+        )
+      )
+    ) AS ciclos_pagos
+  FROM
+    step_4
+),
+step_6 AS (
+  SELECT
+    origem_id,
+    globo_id,
+    AssetId,
+    AssetName,
+    --status,
+    status_calculado,
+    --enhanced_status,
+    data_compra,
+    --dt_cancelamento_final_ciclo,
+    --data_da_suspensao,
+    lista_suspensoes,
+    lista_reativacoes,
+    --ultima_suspensao,
+    --ultima_reativacao,
+    visivel_cesta,
+    descricao_origem_id,
+    --tipo_cancelamento,
+    caracteristica_produto,
+    --ProductCode,
+    tipo_de_pedido,
+    --canal_compra,
+    --forma_pagamento,
+    tipo_de_aquisicao,
+    frequencia_cobranca,
+    --ProductName,
+    --gender,
+    --age,
+    --address_city,
+    --address_state,
+    --comunica_globo,
+    preco,
+    --teste_ultima_susp,
+    --teste_primeira_susp,
+    --qtd_susp,
+    --dist_primeira_susp_compra,
+    duracao_suspensoes,
+    dias_suspenso,
+    max_dias_suspenso,
+    data_fim_ref,
+    dt_processamento,
+    lt_sem_desconto,
+    lt,
+    lt_mes_cheio,
+    lt_meses,
+    ciclos_pagos,
+    ROUND(ciclos_pagos * preco, 2) AS receita_total
+  FROM
+    step_5
+  WHERE
+    1 = 1
+),
+
+base AS (
+  SELECT
+    AssetId,
+    globo_id,
+    AssetName,
+    frequencia_cobranca,
+    caracteristica_produto,
+    tipo_de_aquisicao,
+    tipo_de_pedido,
+    status_calculado,
+    visivel_cesta,
+    preco,
+    data_compra,
+    data_fim_ref,
+    origem_id,
+    descricao_origem_id,
+    lt,
+    lt_sem_desconto,
+    lt_mes_cheio,
+    lt_meses,
+    ciclos_pagos,
+    receita_total,
+    NTILE(100) OVER (
+      ORDER BY
+        receita_total DESC
+    ) grupo
+  FROM
+    step_6
+
+  WHERE 1=1
+    AND receita_total >= 0
+    AND NOT (
+      AssetName = 'Globoplay'
+      AND frequencia_cobranca = 'Anual'
+      AND preco > 500
+    )
+    AND NOT (
+      AssetName = 'Globoplay'
+      AND frequencia_cobranca = 'Mensal'
+      AND preco > 25
+    )
+    AND NOT (
+      AssetName != 'Globoplay'
+      AND frequencia_cobranca = 'Mensal'
+      AND preco > 100
+    )
+    AND NOT (
+      frequencia_cobranca IS NULL
+      AND preco > 500
+    )
+),
+tier AS (
+  SELECT
+    *,
+    CASE
+      WHEN grupo <= 3 THEN 7
+      WHEN grupo <= 11 THEN 6
+      WHEN grupo <= 25 THEN 5
+      WHEN grupo <= 41 THEN 4
+      WHEN grupo <= 59 THEN 3
+      WHEN grupo <= 79 THEN 2
+      ELSE 1
+    END AS tier_fidelidade,
+    RANGE_BUCKET(receita_total, [120.,350,450,650,1000,1400]) + 1 bucket
+  FROM
+    base
+)
+SELECT
+  *
+FROM
+  tier

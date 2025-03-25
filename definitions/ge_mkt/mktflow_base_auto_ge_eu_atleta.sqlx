@@ -1,0 +1,31 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_auto_ge_eu_atleta', 'schedule_cron=55 7 * * 7'],
+    name: 'mktflow_base_auto_ge_eu_atleta',
+    schema: 'ge_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT userid AS globo_id,
+  FORMAT_DATE('%D %R %p', MAX(DATETIME(TIMESTAMP_MILLIS(timestamp), 'America/Sao_Paulo'))) AS dt_acesso
+FROM
+  -- `valiant-circuit-129220.globo_esporte.pgt_*`
+  ${ref("globo_esporte", "pgt_*")}
+WHERE
+  provider = 'cadun'
+  AND userid IS NOT NULL
+  AND object LIKE '%ge.globo.com/eu-atleta/%'
+  AND _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))
+  AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+GROUP BY
+  userid

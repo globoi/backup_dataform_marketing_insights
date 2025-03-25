@@ -1,0 +1,23 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_jornada_olimpiadas_ge', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_jornada_olimpiadas_ge',
+    schema: 'ge_mkt',
+    description: 'Base da jornada de Ge, puxando usuarios que acessara a editoria de olimpiadas nos ultimos 60d e estão a 3 dias sem acessar ',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt"
+        }
+    }
+}
+SELECT globoId, IF(DATE_DIFF((CURRENT_DATE() -1), ultimo_acesso , day) > 3, true,false) Flag_nao_retono
+FROM
+(SELECT globoId, MAX(data) ultimo_acesso
+FROM ${ref('foundation_ge', 'foundation_ge_sessions_v3')} as S, S.hits as h
+where data >= CURRENT_DATE() - 61 AND provider = "cadun" AND pagepath LIKE "%/olimpiadas/%"
+GROUP BY ALL
+)

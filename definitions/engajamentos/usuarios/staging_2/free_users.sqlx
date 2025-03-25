@@ -1,0 +1,62 @@
+config {
+    type: "table",
+    schema: "usuarios",
+    name: "Free users",
+    tags: ["usuarios_staging_2",
+        "schedule_tag=usuarios_free_users"
+    ],
+    description: ' ',
+    columns: {}
+}
+
+--   -- pega todos os usuários da users (entender o que vem pra ca, se é todo globo_id ou apenas que provisionaram algum serviço gplay, acredito que a segunda opção)
+-- SELECT
+--   u.*
+-- FROM
+--   ${ref("sales_enriched", "user")} AS u
+--   -- retira todos os usuários que estão na base_ativa que engaj gera
+-- LEFT JOIN
+--   ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} AS b
+-- ON
+--   b.globo_id = u.globo_id
+-- WHERE
+--   b.globo_id IS NULL
+--   -- retira usuários que estão com flag de internacional na users (entender o que gera a flag)
+--   AND (u.GP_internacional_ind NOT LIKE 'globo-play-%'
+--     OR u.GP_internacional_ind IS NULL)
+--   -- retira usuários que estão marcados como ativos na users ou que são considerados do sistema legado (entender o que gera a flag de ativo principalmente)
+--   AND NOT (u.status = 'Ativo'
+--     AND u.SISTEMA = 'Legado')
+--   -- retira dependentes
+--   AND NOT EXISTS (
+--   SELECT
+--     1
+--   FROM
+--     ${ref("sales_enriched", "relacionamento")} AS relacionamento
+--   WHERE
+--     relacionamento.Asset_status = 'Ativo'
+--     AND relacionamento.EVA_Status_Relacionamento__c = 'Ativo'
+--     AND relacionamento.globo_id_dependente = u.globo_id)
+--   -- retira usuários que contém globoplay internacional na lista de produtos (entender o )
+--   AND 'globoplay internacional' NOT IN (
+--   SELECT
+--     *
+--   FROM
+--     UNNEST(u.produto_list))
+
+
+SELECT
+  fu.globo_id,
+  fu.dt_criacao_gid,
+  fu.born_in,
+  fu.gender,
+  fu.age,
+  fu.dt_free_inicio,
+  fu.dt_free_fim,
+  fu.SISTEMA,
+  fu.country_code,
+  fu.GP_internacional_ind,
+  globo_ua.user_group
+FROM
+  ${ref("usuarios", "free_users_all")} AS fu
+LEFT JOIN ${ref("globoid_enriched", "globoid_user_all")} AS globo_ua ON (fu.globo_id = globo_ua.globoId)

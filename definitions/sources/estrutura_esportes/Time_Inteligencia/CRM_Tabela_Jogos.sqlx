@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "estrutura-esportes",
+  schema: "Time_Inteligencia",
+  name: "CRM_Tabela_Jogos",
+  description: ""
+}

@@ -1,0 +1,111 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_performance_engaja', 'schedule_cron=0 7 * * *'],
+    name: 'mktflow_base_automatica_performance_engaja',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+WITH
+  meses AS (
+  SELECT
+    rodada_id,
+    EXTRACT(month
+    FROM
+      fechamento_mercado_dt) mes
+  FROM
+    -- `gglobo-cartola-hdg-prd.report.rodada_janela`
+    ${ref("report", "rodada_janela")}
+  WHERE
+    temporada = 2025),
+  dados AS (
+  SELECT
+    mes,
+    rodada_id,
+    globo_id,
+    pontos_num,
+    patrimonio_num
+  FROM
+    -- `gglobo-cartola-hdg-prd.report_staging.report_rodada`
+    ${ref("report_staging", "report_rodada")}
+  LEFT JOIN
+    meses
+  USING
+    (rodada_id)
+  WHERE
+    temporada = 2025
+    AND globo_id IN (
+    SELECT
+      globo_id
+    FROM
+        -- `gglobo-cartola-hdg-prd.report_staging.report_temporada`
+        ${ref("report_staging", "report_temporada")}
+    WHERE
+      Temporada = 2025
+      AND pro_em IS NOT NULL) ),
+  pontos AS (
+  SELECT
+    mes,
+    globo_id,
+    ROUND(SUM(pontos_num),2) AS sum_pts_globo_id_mes,
+    MAX(pontos_num) max_pts_globo_id_mes,
+    MIN(pontos_num) min_pts_globo_id_mes,
+    ROUND(AVG(pontos_num),2) avg_pts_geral_mes
+  FROM
+    dados
+  GROUP BY
+    1,
+    2),
+  patrimonio AS (
+  WITH
+    ultimas_rodadas AS (
+    SELECT
+      globo_id,
+      rodada_id,
+      mes,
+      patrimonio_num,
+      ROW_NUMBER() OVER (PARTITION BY globo_id, mes ORDER BY rodada_id DESC) AS numero_linha
+    FROM
+      dados )
+  SELECT
+    mes,
+    globo_id,
+    patrimonio_num
+  FROM
+    ultimas_rodadas
+  WHERE
+    numero_linha = 1),
+  Ultimos_Pontos AS (
+  SELECT
+    globo_id,
+    pontos_num,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY rodada_id DESC) AS Rank_Pontos
+  FROM
+    dados)
+SELECT
+  *,
+  Ultimos_Pontos.pontos_num AS Ultima_Pontuacao
+FROM
+  pontos
+LEFT JOIN
+  patrimonio
+USING
+  (mes,
+    globo_id)
+LEFT JOIN
+  Ultimos_Pontos
+USING
+  (globo_id)
+WHERE
+  Rank_Pontos = 1
+ORDER BY
+  mes ASC

@@ -1,0 +1,12 @@
+config {
+  type: 'table',
+  tags: ['sales_gold',
+         "schedule_tag=temp_dependence_2",
+         "schedule_cron=0 10 * * *"],
+  name: 'dependence_2',
+  schema: 'temp',
+  description: 'Tabela para testar o reset do scheduler',
+}
+
+select 
+  2 AS id, 'to test schedule reset' AS col

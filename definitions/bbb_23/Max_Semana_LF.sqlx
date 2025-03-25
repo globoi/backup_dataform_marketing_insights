@@ -1,0 +1,29 @@
+config {
+  type: 'table',
+  name: 'Max_Semana_LF',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tag1: "bbb_23",
+      dag2: "mkt_bbb_23_simulcast",
+      dag1: "mkt_bbb_23",
+      tag2: "bbb_23_simulcast"
+
+    }
+  },
+  description: 'Tabela com os LFs do Raiox_BBB_23_LF e a últimna semana em que aparecem no cluster.',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    max_semana: 'Última semana em que o usuário apareceu no Raiox_BBB_23_LF.'
+  }
+
+}
+
+with max_semana as (
+select distinct globo_id, max(semana) as max_semana from ${ref("bbb_23", "Raiox_BBB_23_LF")}
+where globo_id is not null
+group by 1
+)
+select * from max_semana

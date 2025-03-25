@@ -1,0 +1,1563 @@
+config {
+    type: "table",
+    name: "bt_campanhas_canais",
+    schema: 'comunicacao',
+    tags: ['schedule_tag=comunicacao_bt_campanhas_canais',
+        "schedule_cron=00 11 * * *"
+    ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "11h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  },
+  
+}
+
+with email_gp as (--  bases por produtos de email
+    SELECT 
+        'Email' AS canal,
+        'globoplay' AS produto,
+        date(send_date,'America/Sao_Paulo') AS data,
+        cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', send_date, 'America/Sao_Paulo'))) as string) AS hora_envio,
+        date(open_date,'America/Sao_Paulo') AS data_abertura,
+        cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', open_date, 'America/Sao_Paulo'))) as string) AS hora_abertura,
+        CASE
+            WHEN UPPER(EmailName) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(EmailName) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(EmailName) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(EmailName) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(EmailName) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(EmailName) LIKE '%_BV%' THEN 'Engajamento'
+            ELSE      'Outro'
+        END      AS tipo_comunicacao,
+            CASE
+            WHEN UPPER(EmailName) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(EmailName) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(EmailName) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(EmailName) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(EmailName) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(EmailName) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+            ELSE      'Outro'
+        END      AS tipo_campanha,
+        JourneyName_original as jornada,
+        EmailName as campanha,
+        '' as botao,
+        produto_vendido as produto_vendido,
+        COUNT(DISTINCT globo_id) as qtd_enviados,
+        null as qtd_views,
+        COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+        null as qtd_expirados,
+        null as qtd_fechados,
+        COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+        COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+        COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+        COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+        count( distinct vm.globoid) as qtd_vendas,
+        sum(vm.receita_brl) as valor_total_vendido
+    FROM ${ref('mkt_enriched',"email_send")}
+        --`gglobo-foundation-psd-hdg-prd.mkt_enriched.email_send` 
+
+    LEFT JOIN (
+        SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+            FROM
+            (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+            from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+            on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+            on  vm.id_produto = d.code_unique
+
+            where 1=1 
+            and campaign is not null
+    ) vm 
+    on vm.globoid = globo_id and vm.sfmc_activity_id = JobID
+
+    WHERE
+        date >= "2023-01-01"
+        and date(send_date,'America/Sao_Paulo') >= "2023-01-01"
+        
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
+),
+
+email_gshow as (
+  SELECT 
+      'Email' AS canal,
+      'gshow' AS produto,
+      date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(cast(EXTRACT(HOUR FROM open_date) as string) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+      
+  FROM ${ref('mktcloud_gshow_enriched',"email_send")}
+	--`gglobo-foundation-psd-hdg-prd.mktcloud_gshow_enriched.email_send`
+  LEFT JOIN (
+        SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+            FROM
+            (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+            from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+            on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+            on  vm.id_produto = d.code_unique
+
+            where 1=1 
+            and campaign is not null
+    ) vm 
+    on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+  group by 1,2,3,4,5,6,7,8,9,10,11,12
+),
+
+email_ge as (
+  SELECT 
+      'Email' AS canal,
+      'ge' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(cast(EXTRACT(HOUR FROM open_date) as string) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_ge_enriched',"email_send")} 
+  --`gglobo-foundation-psd-hdg-prd.mktcloud_ge_enriched.email_send`
+  LEFT JOIN (
+                        SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                            FROM
+                            (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                            from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                            on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                            on  vm.id_produto = d.code_unique
+
+                            where 1=1 
+                            and campaign is not null
+                    ) vm 
+                    on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+  group by 1,2,3,4,5,6,7,8,9,10,11,12
+),
+
+email_globoorg as(
+  
+  SELECT 
+      'Email' AS canal,
+      'globo.com' AS produto,
+      date(send_date,'America/Sao_Paulo') AS data,
+      cast(EXTRACT(HOUR FROM send_date) as string) AS hora_abertura,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_globoorg_enriched',"email_send")} 
+  --`gglobo-foundation-psd-hdg-prd.mktcloud_globoorg_enriched.email_send`
+  LEFT JOIN (
+            SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                FROM
+                (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                on  vm.id_produto = d.code_unique
+
+                where 1=1 
+                and campaign is not null
+        ) vm 
+        on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date,'America/Sao_Paulo') >= "2023-01-01"
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
+
+),
+
+email_globoplay_internacional as (
+  select
+      'Email' AS canal,
+      'globoplay_internacional' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_internacional_enriched',"email_send")} 
+	  --`gglobo-foundation-psd-hdg-prd.mktcloud_internacional_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
+),
+
+email_premiere as (
+ 
+  SELECT 
+      'Email' AS canal,
+      'premiere' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_premiere_enriched',"email_send")} 
+	--`gglobo-foundation-psd-hdg-prd.mktcloud_premiere_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
+),
+
+email_receitas as (
+  
+  SELECT 
+      'Email' AS canal,
+      'receitas' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM	${ref('mktcloud_receitas_enriched',"email_send")} 
+	--`gglobo-foundation-psd-hdg-prd.mktcloud_receitas_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
+
+),
+
+email_g1 as (
+ 
+  SELECT 
+      'Email' AS canal,
+      'g1' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_familiag_enriched',"email_send")} 
+	--`gglobo-foundation-psd-hdg-prd.mktcloud_familiag_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+      group by 1,2,3,4,5,6,7,8,9,10,11,12
+
+
+),
+
+email_combate as (
+
+  SELECT 
+      'Email' AS canal,
+      'combate' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM ${ref('mktcloud_combate_enriched',"email_send")} 
+    --`gglobo-foundation-psd-hdg-prd.mktcloud_combate_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+      group by 1,2,3,4,5,6,7,8,9,10,11,12
+
+),
+
+email_cartola as (
+
+  SELECT 
+     'Email' AS canal,
+      'cartola' AS produto,
+            date(send_date) AS data,
+      cast(cast(EXTRACT(HOUR FROM send_date) as string) as string) AS hora_envio,
+      date(open_date) AS data_abertura,
+      cast(EXTRACT(HOUR FROM open_date) as string) AS hora_abertura,
+      CASE
+          WHEN UPPER(Email_Name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+          WHEN UPPER(Email_Name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+          WHEN UPPER(Email_Name) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+      END      AS tipo_comunicacao,
+        CASE
+          WHEN UPPER(Email_Name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%JORN\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\_%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%J\\-%' THEN 'Jornada'
+          WHEN UPPER(Email_Name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+          WHEN UPPER(Email_Name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+      END AS tipo_campanha,
+      journey_name_original as jornada,
+      Email_Name as campanha,
+      '' as botao,
+      produto_vendido as produto_vendido,
+      COUNT(DISTINCT globo_id) as qtd_enviados,
+      null as qtd_views,
+      COUNT(DISTINCT IF(was_opened, globo_id, null)) as qtd_abertos,
+      null as qtd_expirados,
+      null as qtd_fechados,
+      COUNT(DISTINCT IF(was_bounced, globo_id, null)) as qtd_rejeitados,
+      COUNT(DISTINCT IF(was_delivered, globo_id, null)) as qtd_recebidos,
+      COUNT(DISTINCT IF(was_clicked, globo_id, null)) as qtd_clickados,
+      COUNT(DISTINCT IF(was_unsubscribed, globo_id, null)) as qtd_descadastrados,
+      count( distinct vm.globoid) as qtd_vendas,
+      sum(vm.receita_brl) as valor_total_vendido
+  FROM	${ref('mktcloud_cartola_enriched',"email_send")} 
+    --`gglobo-foundation-psd-hdg-prd.mktcloud_cartola_enriched.email_send`
+  LEFT JOIN (
+                      SELECT vm.globoid, vm.sfmc_activity_id, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                          FROM
+                          (select globoid, sfmc_activity_id, campaign, receita_brl, id_produto
+                          from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                          on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                          LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                          on  vm.id_produto = d.code_unique
+
+                          where 1=1 
+                          and campaign is not null
+                  ) vm 
+                  on vm.globoid = globo_id and vm.sfmc_activity_id = Job_ID
+  WHERE
+    date >= "2023-01-01" and
+    date(send_date) >= "2023-01-01"
+      group by 1,2,3,4,5,6,7,8,9,10,11,12
+
+),
+-- base email
+base_email as (
+  select *
+    from email_combate
+  union all
+  select *
+    from email_g1
+  union all
+  select *
+    from email_gshow
+  union all
+  select *
+    from email_ge
+  union all
+  select *
+    from email_globoorg
+  union all
+  select *
+    from email_gp
+  union all
+  select *
+    from email_globoplay_internacional
+  union all
+  select *
+    from email_premiere
+  union all
+  select *
+    from email_receitas
+  union all
+  select *
+    from email_cartola
+),
+
+--  bases por produtos de sms
+sms_globoplay as (
+  select 
+  'SMS' as canal
+  ,'globoplay' as produto
+  ,date(action_date_time) as data
+  ,cast(cast(EXTRACT(HOUR FROM action_date_time) as string) as string) AS hora_envio
+  ,date(null) as data_abertura
+  ,'' as hora_abertura
+  ,      CASE
+            WHEN UPPER(name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(name) LIKE '%_BV%' THEN 'Engajamento'
+          ELSE      'Outro'
+        END      AS tipo_comunicacao
+  ,        CASE
+            WHEN UPPER(name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(name) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(name) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(name) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+          ELSE      'Outro'
+        END AS tipo_campanha
+  ,name as campanha
+  ,'' as botao
+  ,count(DISTINCT IF(sent,mobile_hash,null)) as qtd_enviados
+  ,null as qtd_views
+  ,null as qtd_abertos
+  ,null as qtd_expirados
+  ,null as qtd_fechados
+  ,null as qtd_rejeitados
+  ,count(DISTINCT IF(delivered,mobile_hash,null)) as qtd_recebidos
+  ,null as qtd_clickados
+  ,null as qtd_descadastrados
+
+  from --${ref('sms',"sms_message_tracking")} 
+  `gglobo-mkt-ins-hdg-prd.sms.sms_message_tracking`
+  where 1=1
+  and date(action_date_time) >= "2023-01-01"
+  and outbound = true
+
+  group by 1,2,3,4,5,6,7,8,9,10
+),
+
+sms_combate as (
+  select 
+	  'SMS' as canal
+	  ,'combate' as produto
+	  ,date(action_date_time) as data
+	  ,cast(cast(EXTRACT(HOUR FROM action_date_time) as string) as string) AS hora_envio
+	  ,date(null) as data_abertura
+	  ,'' as hora_abertura
+	  ,      CASE
+				WHEN UPPER(name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+				WHEN UPPER(name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%_BV%' THEN 'Engajamento'
+			  ELSE      'Outro'
+			END      AS tipo_comunicacao
+	  ,        CASE
+				WHEN UPPER(name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%JORN\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\-%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+				WHEN UPPER(name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+			  ELSE      'Outro'
+			END AS tipo_campanha
+	  ,name as campanha
+	  ,'' as botao
+	  ,count(DISTINCT IF(sent,mobile_hash,null)) as qtd_enviados
+	  ,null as qtd_views
+	  ,null as qtd_abertos
+	  ,null as qtd_expirados
+	  ,null as qtd_fechados
+	  ,null as qtd_rejeitados
+	  ,count(DISTINCT IF(delivered,mobile_hash,null)) as qtd_recebidos
+	  ,null as qtd_clickados
+	  ,null as qtd_descadastrados
+  from ${ref('combate_mkt',"sms_message_tracking")} 
+  --`gglobo-mkt-ins-hdg-prd.combate_mkt.sms_message_tracking` 
+  where 1=1
+  and date(action_date_time) >= "2023-01-01"
+  and outbound = true
+
+  group by 1,2,3,4,5,6,7,8,9,10
+),
+
+sms_premiere as (
+  select 
+	  'SMS' as canal
+	  ,'premiere' as produto
+	  ,date(action_date_time) as data
+	  ,cast(cast(EXTRACT(HOUR FROM action_date_time) as string) as string) AS hora_envio
+	  ,date(null) as data_abertura
+	  ,'' as hora_abertura
+	  ,      CASE
+				WHEN UPPER(name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+				WHEN UPPER(name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%_BV%' THEN 'Engajamento'
+			  ELSE      'Outro'
+			END      AS tipo_comunicacao
+	  ,        CASE
+				WHEN UPPER(name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%JORN\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\-%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+				WHEN UPPER(name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+			  ELSE      'Outro'
+			END AS tipo_campanha
+	  ,name as campanha
+	  ,'' as botao
+	  ,count(DISTINCT IF(sent,mobile_hash,null)) as qtd_enviados
+	  ,null as qtd_views
+	  ,null as qtd_abertos
+	  ,null as qtd_expirados
+	  ,null as qtd_fechados
+	  ,null as qtd_rejeitados
+	  ,count(DISTINCT IF(delivered,mobile_hash,null)) as qtd_recebidos
+	  ,null as qtd_clickados
+	  ,null as qtd_descadastrados
+
+  from --${ref('premiere_mkt',"sms_message_tracking")} 
+  `gglobo-mkt-ins-hdg-prd.premiere_mkt.sms_message_tracking` 
+  where 1=1
+  and date(action_date_time) >= "2023-01-01"
+  and outbound = true
+
+  group by 1,2,3,4,5,6,7,8,9,10
+),
+
+sms_cartolas as (
+  select 
+	  'SMS' as canal
+	  ,CASE
+			  WHEN UPPER(name) LIKE 'CT\\_%' THEN 'cartola'
+			  WHEN UPPER(name) LIKE 'CTE\\_%' THEN 'cartola_express'
+			ELSE      'cartola'
+		  END      AS produto
+	  ,date(action_date_time) as data
+	  ,cast(cast(EXTRACT(HOUR FROM action_date_time) as string) as string) AS hora_envio
+	  ,date(null) as data_abertura
+	  ,'' as hora_abertura
+	  ,      CASE
+				WHEN UPPER(name) LIKE '%\\_A\\_%' THEN 'Aquisição'
+				WHEN UPPER(name) LIKE '%\\_E\\_%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+				WHEN UPPER(name) LIKE '%_BV%' THEN 'Engajamento'
+			  ELSE      'Outro'
+			END      AS tipo_comunicacao
+	  ,        CASE
+				WHEN UPPER(name) LIKE '%JORNADA\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%JORN\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\_%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%J\\-%' THEN 'Jornada'
+				WHEN UPPER(name) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+				WHEN UPPER(name) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+			  ELSE      'Outro'
+			END AS tipo_campanha
+	  ,name as campanha
+	  ,'' as botao
+	  ,count(DISTINCT IF(sent,mobile_hash,null)) as qtd_enviados
+	  ,null as qtd_views
+	  ,null as qtd_abertos
+	  ,null as qtd_expirados
+	  ,null as qtd_fechados
+	  ,null as qtd_rejeitados
+	  ,count(DISTINCT IF(delivered,mobile_hash,null)) as qtd_recebidos
+	  ,null as qtd_clickados
+	  ,null as qtd_descadastrados
+
+  from --${ref('cartola_mkt',"sms_message_tracking")} 
+  `gglobo-mkt-ins-hdg-prd.cartola_mkt.sms_message_tracking` 
+  where 1=1
+  and date(action_date_time) >= "2023-01-01"
+  and outbound = true
+
+  group by 1,2,3,4,5,6,7,8,9,10
+),
+-- base sms
+
+base_sms as (
+  select *
+    from sms_globoplay
+  union all
+  select *
+    from sms_premiere
+  union all
+  select *
+    from sms_combate
+  union all
+  select *
+    from sms_cartolas
+),
+
+-- base push
+base_push as (
+--push geral - urban
+    SELECT
+        'Push' AS canal,
+        a.product AS produto,
+        DATE(a.occurred,'America/Sao_Paulo') AS DATA,
+        cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', a.occurred, 'America/Sao_Paulo'))) as string) AS hora_envio,
+        date(null) AS data_abertura,
+        '' AS hora_abertura,
+            CASE
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%_BV%' THEN 'Engajamento'
+            ELSE      'Outro'
+        END      AS tipo_comunicacao,
+
+        IF(a.product = 'globoplay',
+            CASE
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GP\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GPINT\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GPCN\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+            ELSE      'Campanha'
+            END
+        ,
+            CASE
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORNADA\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORN\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\-%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+            ELSE      'Outro'
+            END
+        ) AS tipo_campanha,
+        if(REGEXP_CONTAINS(COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(1)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(1)] ), r'_') = true,COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(1)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(1)] ),null) as jornada,
+        IF(COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is null,coalesce(a.payload__notification__android__title,a.payload__notification__ios__title),COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) AS campanha,
+        '' as botao,
+        'Urban' as plataforma,
+        '' as produto_vendido,
+        sum(total_unique_users + total_unique_users_silent)  as qtd_enviados,
+        null as qtd_views,
+        null as qtd_abertos,
+        null as qtd_expirados,
+        NULL AS qtd_fechados,
+        null as qtd_rejeitados,
+        sum(total_unique_users) as qtd_recebidos,
+        NULL AS qtd_clickados,
+        sum(total_unique_users_silent) as qtd_descadastrados,
+        null as qtd_vendas,
+        null as valor_total_vendido,
+        sum(total_unique_devices) as qtd_devices_recebidos
+    FROM
+        ${ref('enriched',"urban_push_campaign")} a
+        --`gglobo-bigdata-urban-hdg-prd.enriched.urban_push_campaign` a
+    WHERE
+        a.max_date >= "2023-01-01"
+        AND DATE(a.occurred,'America/Sao_Paulo') >= "2023-01-01"
+        AND --filtra onde o nome da campanha pra GP não é null (considerando o titulo) e filtra para produtos diferentes de GP, que o nome da campanha não seja nulo
+        (
+            (a.product = 'globoplay' and if(COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is null,coalesce(a.payload__notification__android__title,a.payload__notification__ios__title),COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)]))  is not null)
+        or
+            (a.product <> 'globoplay' and COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is not null)
+        )
+        AND a.push_id is not null
+        
+    GROUP BY  1,  2,  3,  4,  5,  6,7,8,9,10,11,12,13
+
+    union all
+
+    -- URBAN push - aberturas
+    SELECT
+        'Push' AS canal,
+        a.product AS produto,
+        DATE(a.occurred,'America/Sao_Paulo') AS DATA,
+        cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', a.occurred, 'America/Sao_Paulo'))) as string) AS hora_envio,
+        date(o.occurred,'America/Sao_Paulo') AS data_abertura,
+        cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', o.occurred, 'America/Sao_Paulo'))) as string) AS hora_abertura,   
+        CASE
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%_BV%' THEN 'Engajamento'
+            ELSE      'Outro'
+        END      AS tipo_comunicacao,
+        IF(a.product = 'globoplay',
+            CASE
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GP\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GPINT\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE 'GPCN\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+            ELSE      'Campanha'
+            END
+        ,
+            CASE
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORNADA\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%JORN\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\_%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%J\\-%' THEN 'Jornada'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+                WHEN UPPER(COALESCE(JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+            ELSE      'Outro'
+            END
+        ) AS tipo_campanha,
+        '' as jornada, 
+        IF(COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is null,coalesce(a.payload__notification__android__title,a.payload__notification__ios__title),COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] )) AS campanha,
+        '' as botao,
+        'Urban' as plataforma,
+        produto_vendido as produto_vendido,
+        
+        null as qtd_enviados,
+        null as qtd_views,
+        count(distinct o.globo_id) as qtd_abertos,
+        null as qtd_expirados,
+        NULL AS qtd_fechados,
+        null as qtd_rejeitados,
+        null as qtd_recebidos,
+        NULL AS qtd_clickados,
+        null as qtd_descadastrados,
+        count( distinct vm.globoid) as qtd_vendas,
+        sum(vm.receita_brl) as valor_total_vendido,
+        null as qtd_devices_recebidos
+      FROM --${ref('enriched',"urban_push_campaign")} a
+          `gglobo-bigdata-urban-hdg-prd.enriched.urban_push_campaign` a
+          INNER JOIN	--${ref('clean',"urban_app_open_event")} o
+          `gglobo-bigdata-urban-hdg-prd.clean.urban_app_open_event` o
+              on o.globo_id is not null and a.push_id = o.push_id
+          LEFT JOIN (
+                    SELECT vm.globoid, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                        FROM
+                        (select globoid, campaign, receita_brl, id_produto
+                        from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                        LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) c
+                        on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                        LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-dev.sales_gold.product_details`) d
+                        on  vm.id_produto = d.code_unique
+
+                        where 1=1 
+                        and campaign is not null
+                ) vm 
+                on vm.globoid = o.globo_id and vm.campaign = COALESCE(REGEXP_EXTRACT(a.payload__notification__actions__open__content, r'[?&]c=([^&]*)'),REGEXP_EXTRACT(a.payload__notification__actions__open__content, r'[?&]utm_campaign=([^&]*)'))
+      
+      WHERE
+          a.max_date >= "2023-01-01"
+          AND DATE(a.occurred,'America/Sao_Paulo') >= "2023-01-01"
+          AND o.table_suffix_date >= "2023-01-01"
+          AND --filtra onde o nome da campanha pra GP não é null (considerando o titulo) e filtra para produtos diferentes de GP, que o nome da campanha não seja nulo
+          (
+              (a.product = 'globoplay' and if(COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is null,coalesce(a.payload__notification__android__title,a.payload__notification__ios__title),COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)]))  is not null)
+          or
+              (a.product <> 'globoplay' and COALESCE( JSON_EXTRACT_STRING_ARRAY(payload, '$.campaigns.categories') [SAFE_OFFSET(0)], JSON_EXTRACT_STRING_ARRAY(payload, '$.push.campaigns.categories') [SAFE_OFFSET(0)] ) is not null)
+          )
+          AND a.push_id is not null
+        
+    GROUP BY  1,  2,  3,  4,  5,  6,7,8,9,10,11,12,13
+
+    union all  -- dados de mobile_push GP -> vindos do SF
+
+    SELECT
+    'Push' as canal,
+    'globoplay' as produto,
+    date(date_time_send,'America/Sao_Paulo') as data,
+    cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', date_time_send, 'America/Sao_Paulo'))) as string) AS hora_envio,
+    date(open_date,'America/Sao_Paulo') AS data_abertura,
+    cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', open_date, 'America/Sao_Paulo'))) as string) AS hora_abertura,
+    CASE
+      WHEN message_name LIKE '%\\_A\\_%' THEN 'Aquisição'
+      WHEN message_name LIKE '%\\_E\\_%' THEN 'Engajamento'
+      ELSE      'Outro'
+    END      AS tipo_comunicacao,
+    CASE
+      WHEN message_name LIKE '%Jornada\\_%' THEN 'Jornada'
+      WHEN message_name LIKE '%Campanha\\_%' THEN 'Campanha'
+      ELSE      'Outro'
+    END      AS tipo_campanha,
+    '' as jornada,
+    message_name as campanha,
+    '' as botao,
+    'Salesforce' as plataforma,
+    '' as produto_vendido,
+    COUNT(DISTINCT  contact_key) AS qtd_enviados,
+    null as qtd_views,
+    COUNT(DISTINCT  IF    (open_date is not null, contact_key, NULL)) AS qtd_abertos,
+    null as qtd_expirados,
+    null as qtd_fechados,
+    null as qtd_rejeitados,
+    null as qtd_recebidos,
+    null as qtd_clickados,
+    null as qtd_descadastrados,
+    null as qtd_vendas,
+    null as valor_total_vendido,
+    null as qtd_devices_recebidos
+
+    FROM --${ref('mkt_clean',"mobile_push")}
+      `gglobo-foundation-psd-hdg-prd.mkt_clean.mobile_push`
+    WHERE
+      table_suffix_date >= "2023-01-01"
+      and date(date_time_send,'America/Sao_Paulo') >= "2023-01-01"
+      and app_name = 'globoplay-production'
+    group by  1,2,3,4,5,6,7,8,9,10,11,12,13
+),
+
+-- base_inapp
+base_inapp as (
+  SELECT
+      'InApp' AS canal,
+      'cartola' AS produto,
+      date(a.inapp_occurred,'America/Sao_Paulo') as data,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S',a.inapp_occurred, 'America/Sao_Paulo'))) as string) AS hora_envio,
+      date(IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null),'America/Sao_Paulo') AS data_abertura,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null), 'America/Sao_Paulo'))) as string) AS hora_abertura,
+      --tabelas jessica
+      CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%_BV%' THEN 'Engajamento'
+          ELSE      'Outro'
+        END      AS tipo_comunicacao,
+          CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+          ELSE      'Outro'
+        END AS tipo_campanha,
+      campaigns[SAFE_OFFSET(0)] AS campanha,
+      a.button_informations.button_description as botao,
+      null AS qtd_enviados,
+      COUNT(DISTINCT globo_id) AS qtd_views,
+      COUNT(DISTINCT      IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), globo_id, NULL)) AS qtd_abertos,
+      COUNT(DISTINCT      IF        (type = 'TIMED_OUT', globo_id, NULL)) AS qtd_expirados,
+      COUNT(DISTINCT          IF            (type = 'USER_DISMISSED', globo_id, NULL)) AS qtd_fechados,
+      null as qtd_rejeitados,
+      null as qtd_recebidos,
+      null as qtd_clickados,
+      null as qtd_descadastrados
+    FROM ${ref('clean',"urban_inapp_cartola")} a
+      --`gglobo-bigdata-urban-hdg-prd.clean.urban_inapp_cartola` a
+    WHERE
+      a.date >= "2023-01-01"
+      AND date(a.occurred,'America/Sao_Paulo') >= "2023-01-01"
+      AND globo_id IS NOT NULL
+      AND urban_type = 'IN_APP_MESSAGE_RESOLUTION'
+      AND campaigns[SAFE_OFFSET(0)] <> ''
+      AND campaigns[SAFE_OFFSET(0)] LIKE '%\\_%'
+  GROUP BY  1,  2,  3,  4,  5,  6, 7,8,9,10
+
+ union all
+
+  SELECT
+      'InApp' AS canal,
+      'globoplay' AS produto,
+      date(a.inapp_occurred,'America/Sao_Paulo') as data,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S',a.inapp_occurred, 'America/Sao_Paulo'))) as string) AS hora_envio,
+      date(IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null),'America/Sao_Paulo') AS data_abertura,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null), 'America/Sao_Paulo'))) as string) AS hora_abertura,
+      --tabelas jessica
+      CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%_BV%' THEN 'Engajamento'
+          ELSE      'Outro'
+        END      AS tipo_comunicacao,
+          CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+          ELSE      'Outro'
+        END AS tipo_campanha,
+      campaigns[SAFE_OFFSET(0)] AS campanha,
+      a.button_informations.button_description as botao,
+      null AS qtd_enviados,
+      COUNT(DISTINCT globo_id) AS qtd_views,
+      COUNT(DISTINCT      IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), globo_id, NULL)) AS qtd_abertos,
+      COUNT(DISTINCT      IF        (type = 'TIMED_OUT', globo_id, NULL)) AS qtd_expirados,
+      COUNT(DISTINCT          IF            (type = 'USER_DISMISSED', globo_id, NULL)) AS qtd_fechados,
+      null as qtd_rejeitados,
+      null as qtd_recebidos,
+      null as qtd_clickados,
+      null as qtd_descadastrados
+    FROM ${ref('clean',"urban_inapp_globoplay")} a
+    WHERE
+      a.date >= "2023-01-01"
+      AND date(a.occurred,'America/Sao_Paulo') >= "2023-01-01"
+      AND globo_id IS NOT NULL
+      AND urban_type = 'IN_APP_MESSAGE_RESOLUTION'
+      AND campaigns[SAFE_OFFSET(0)] <> ''
+      AND campaigns[SAFE_OFFSET(0)] LIKE '%\\_%'
+  GROUP BY  1,  2,  3,  4,  5,  6, 7,8,9,10
+
+ union all
+
+  SELECT
+      'InApp' AS canal,
+      'cartola_exp' AS produto,
+      date(a.inapp_occurred,'America/Sao_Paulo') as data,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S',a.inapp_occurred, 'America/Sao_Paulo'))) as string) AS hora_envio,
+      date(IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null),'America/Sao_Paulo') AS data_abertura,
+      cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), a.occurred, null), 'America/Sao_Paulo'))) as string) AS hora_abertura,
+      --tabelas jessica
+      CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_A\\_%' THEN 'Aquisição'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%\\_E\\_%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%_BV%' THEN 'Engajamento'
+          ELSE      'Outro'
+        END      AS tipo_comunicacao,
+          CASE
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORNADA\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%JORN\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\_%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%J\\-%' THEN 'Jornada'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+            WHEN UPPER(campaigns[SAFE_OFFSET(0)]) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+          ELSE      'Outro'
+        END AS tipo_campanha,
+      campaigns[SAFE_OFFSET(0)] AS campanha,
+      a.button_informations.button_description as botao,
+      null AS qtd_enviados,
+      COUNT(DISTINCT globo_id) AS qtd_views,
+      COUNT(DISTINCT      IF        (type IN ('BUTTON_CLICK','MESSAGE_CLICK'), globo_id, NULL)) AS qtd_abertos,
+      COUNT(DISTINCT      IF        (type = 'TIMED_OUT', globo_id, NULL)) AS qtd_expirados,
+      COUNT(DISTINCT          IF            (type = 'USER_DISMISSED', globo_id, NULL)) AS qtd_fechados,
+      null as qtd_rejeitados,
+      null as qtd_recebidos,
+      null as qtd_clickados,
+      null as qtd_descadastrados
+    FROM ${ref('clean',"urban_inapp_cartola_exp")} a 
+    WHERE
+      a.date >= "2023-01-01"
+      AND date(a.occurred,'America/Sao_Paulo') >= "2023-01-01"
+      AND globo_id IS NOT NULL
+      AND urban_type = 'IN_APP_MESSAGE_RESOLUTION'
+      AND campaigns[SAFE_OFFSET(0)] <> ''
+      AND campaigns[SAFE_OFFSET(0)] LIKE '%\\_%'
+  GROUP BY  1,  2,  3,  4,  5,  6, 7,8,9,10
+
+),
+
+base_proprietarios as (
+  SELECT 
+    
+    case
+      when e.componente.ds_type_add = 'intervention' AND e.componente.nm_label LIKE ('si_%') then 'Smart Intervention'
+      when e.componente.ds_type_add = 'intervention_snackbar' then 'Snack Bar'
+      when e.componente.nm_type = 'destaque_trilho' then 'Entre Trilhos'
+      when e.componente.nm_type = 'destaque_premium' then 'Destaque Premium'
+    end AS canal,
+    'globoplay' AS produto,
+    date(ts_consumo_sessao,'America/Sao_Paulo') AS data,
+    cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', ts_consumo_sessao, 'America/Sao_Paulo'))) as string) AS hora_envio,
+    date(ts_consumo_sessao,'America/Sao_Paulo') AS data_abertura,
+    cast(EXTRACT(HOUR FROM TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%E6S', ts_consumo_sessao, 'America/Sao_Paulo'))) as string) AS hora_abertura,
+    CASE
+        WHEN UPPER(nm_evento) LIKE '%\\_A\\_%' THEN 'Aquisição'
+        WHEN UPPER(nm_evento) LIKE '%\\_E\\_%' THEN 'Engajamento'
+        WHEN UPPER(nm_evento) LIKE '%BOAS_VINDAS%' THEN 'Engajamento'
+        WHEN UPPER(nm_evento) LIKE '%BOAS VINDAS%' THEN 'Engajamento'
+        WHEN UPPER(nm_evento) LIKE '%BOASVINDAS%' THEN 'Engajamento'
+        WHEN UPPER(nm_evento) LIKE '%_BV%' THEN 'Engajamento'
+        ELSE      'Outro'
+    END      AS tipo_comunicacao,
+    CASE
+        WHEN UPPER(nm_evento) LIKE '%JORNADA\\_%' THEN 'Jornada'
+        WHEN UPPER(nm_evento) LIKE '%JORN\\_%' THEN 'Jornada'
+        WHEN UPPER(nm_evento) LIKE '%J\\_%' THEN 'Jornada'
+        WHEN UPPER(nm_evento) LIKE '%J\\-%' THEN 'Jornada'
+        WHEN UPPER(nm_evento) LIKE '%CAMPANHA\\_%' THEN 'Campanha'
+        WHEN UPPER(nm_evento) LIKE '%NEWSLETTER%' THEN 'Newsletter'
+        ELSE      'Outro'
+    END      AS tipo_campanha,
+    CASE
+        WHEN UPPER(nm_evento) LIKE '%JORNADA\\_%' THEN nm_evento
+        WHEN UPPER(nm_evento) LIKE '%JORN\\_%' THEN nm_evento
+        WHEN UPPER(nm_evento) LIKE '%J\\_%' THEN nm_evento
+        WHEN UPPER(nm_evento) LIKE '%J\\-%' THEN nm_evento
+        ELSE      ''
+    END      AS jornada,
+    componente.nm_label as campanha,
+    '' as botao,
+    produto_vendido as produto_vendido,
+    null AS qtd_enviados,
+    COUNT(IF        (nm_evento = 'component_viewed', id_sessao,null)) AS qtd_views,
+    null AS qtd_abertos,
+    null AS qtd_expirados,
+    null AS qtd_fechados,
+    null as qtd_rejeitados,
+    null as qtd_recebidos,
+    COUNT(IF        (nm_evento = 'component_clicked', id_sessao,null)) as qtd_clickados,
+    null as qtd_descadastrados,
+    count( distinct vm.globoid) as qtd_vendas,
+    sum(vm.receita_brl) as valor_total_vendido
+
+    FROM --${ref('prep_ga4_globoplay',"tb_navegacao")} a
+        `gglobo-audiencia-hdg-prd.prep_ga4_globoplay.tb_navegacao` a
+    CROSS JOIN UNNEST(a.evento) AS e
+
+    LEFT JOIN (
+                        SELECT vm.globoid, vm.campaign, vm.receita_brl, id_produto, COALESCE(c.name, d.name) AS produto_vendido,
+                            FROM
+                            (select globoid, campaign, receita_brl, id_produto
+                            from `gglobo-gplay-aquisicao-hdg-prd.Reports.VendasMidia_v2_2`) vm
+
+                            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-prd.sales_gold.product_details`) c
+                            on  upper(split(vm.id_produto,'-Br')[OFFSET(0)]) = c.code
+
+                            LEFT JOIN  (select code_unique,code, name from `gglobo-vendas-hdg-prd.sales_gold.product_details`) d
+                            on  vm.id_produto = d.code_unique
+
+                            where 1=1 
+                            and campaign is not null
+                    ) vm 
+                    on vm.globoid = usuario.globoid.id and vm.campaign = origem_trafego.nm_name
+
+    WHERE 
+    a.dt_consumo >= '2023-12-03'
+    AND (e.nm_evento = 'component_viewed' OR e.nm_evento = 'component_clicked')
+    AND ((e.componente.ds_type_add = 'intervention' AND e.componente.nm_label LIKE ('si_%')) or e.componente.ds_type_add = 'intervention_snackbar' or e.componente.nm_type = 'destaque_trilho' or e.componente.nm_type = 'destaque_premium')
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12
+)
+
+--   base com todos os canais
+
+select 
+    canal
+  , produto
+  ,	data
+  , hora_envio
+  , data_abertura
+  , hora_abertura
+  ,	tipo_comunicacao
+  ,	tipo_campanha
+  , jornada
+  ,	campanha
+  , botao
+  , 'Salesforce' as plataforma
+  , produto_vendido
+  ,	qtd_enviados
+  , qtd_views
+  ,	qtd_abertos
+  ,	qtd_expirados
+  ,	qtd_fechados
+  ,	qtd_rejeitados
+  ,	qtd_recebidos
+  ,	qtd_clickados
+  ,	qtd_descadastrados
+  , qtd_vendas
+  , valor_total_vendido
+  , null as qtd_devices_recebidos
+from base_email 
+--
+union all
+--
+select 
+  canal
+  , produto
+  ,	data
+  , hora_envio
+  , data_abertura
+  , hora_abertura
+  ,	tipo_comunicacao
+  ,	tipo_campanha
+  , CASE
+          WHEN UPPER(campanha) LIKE '%JORNADA\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%JORN\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%J\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%J\\-%' THEN campanha
+        ELSE      ''
+      END      AS jornada
+  ,	campanha
+  , botao
+  , 'Salesforce' as plataforma
+  , '' as produto_vendido
+  ,	qtd_enviados
+  , qtd_views
+  ,	qtd_abertos
+  ,	qtd_expirados
+  ,	qtd_fechados
+  ,	qtd_rejeitados
+  ,	qtd_recebidos
+  ,	qtd_clickados
+  ,	qtd_descadastrados
+  , null as qtd_vendas
+  , null as valor_total_vendido
+  , null as qtd_devices_recebidos
+from base_sms 
+--
+union all
+--
+select 	
+    canal
+  , 
+  CASE
+    WHEN base_push.produto = 'globoplay' and base_push.campanha like 'GPINT_%' THEN 'globoplay_internacional'
+    ELSE base_push.produto
+  END AS produto
+  ,	data
+  , hora_envio
+  , data_abertura
+  , hora_abertura
+  ,	tipo_comunicacao
+  ,	tipo_campanha
+  , CASE
+          WHEN jornada is not null then jornada
+          WHEN UPPER(campanha) LIKE '%JORNADA\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%JORN\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%J\\_%' THEN campanha
+          WHEN UPPER(campanha) LIKE '%J\\-%' THEN campanha
+            ELSE      ''
+    END      AS jornada
+  ,	campanha
+  , botao
+  , plataforma
+  , produto_vendido
+  ,	qtd_enviados
+  , qtd_views
+  ,	qtd_abertos
+  ,	qtd_expirados
+  ,	qtd_fechados
+  ,	qtd_rejeitados
+  ,	qtd_recebidos
+  ,	qtd_clickados
+  ,	qtd_descadastrados
+  , qtd_vendas
+  , valor_total_vendido
+  , qtd_devices_recebidos
+from base_push 
+--
+union all
+--
+select 
+   canal
+  , 
+  CASE
+    WHEN base_inapp.produto = 'globoplay' and base_inapp.campanha like 'GPINT_%' THEN 'globoplay_internacional'
+    ELSE base_inapp.produto
+  END AS produto
+  ,	data
+  , hora_envio
+  , data_abertura
+  , hora_abertura
+  ,	tipo_comunicacao
+  ,	tipo_campanha
+  , CASE
+        WHEN UPPER(campanha) LIKE '%JORNADA\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%JORN\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%J\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%J\\-%' THEN campanha
+        ELSE      ''
+    END      AS jornada
+  ,	campanha
+  , botao
+  , 'Urban' as plataforma
+  , '' as produto_vendido
+  ,	qtd_enviados
+  , qtd_views
+  ,	qtd_abertos
+  ,	qtd_expirados
+  ,	qtd_fechados
+  ,	qtd_rejeitados
+  ,	qtd_recebidos
+  ,	qtd_clickados
+  ,	qtd_descadastrados
+  , null as qtd_vendas
+  , null as valor_total_vendido
+  , null as qtd_devices_recebidos
+from base_inapp
+
+union all
+--
+select 
+    canal
+  , produto
+  ,	data
+  , hora_envio
+  , data_abertura
+  , hora_abertura
+  ,	tipo_comunicacao
+  ,	tipo_campanha
+  , CASE
+        WHEN UPPER(campanha) LIKE '%JORNADA\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%JORN\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%J\\_%' THEN campanha
+        WHEN UPPER(campanha) LIKE '%J\\-%' THEN campanha
+        ELSE      ''
+    END      AS jornada
+  ,	campanha
+  , botao
+  , 'Backstage' as plataforma
+  , produto_vendido
+  ,	qtd_enviados
+  , qtd_views
+  ,	qtd_abertos
+  ,	qtd_expirados
+  ,	qtd_fechados
+  ,	qtd_rejeitados
+  ,	qtd_recebidos
+  ,	qtd_clickados
+  ,	qtd_descadastrados
+  , qtd_vendas
+  , valor_total_vendido
+  , null as qtd_devices_recebidos
+from base_proprietarios

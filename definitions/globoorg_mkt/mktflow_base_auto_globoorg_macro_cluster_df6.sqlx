@@ -1,0 +1,201 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=globoorg_mkt_mktflow_base_auto_globoorg_macro_cluster_df6', 'schedule_cron=35 8 * * 6'],
+    name: 'mktflow_base_auto_globoorg_macro_cluster_df6',
+    schema: 'globoorg_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "globoorg_mkt"
+        }
+    }
+}
+
+WITH
+  Cluster_Noticias AS (
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.g1.pgt_*`
+    ${ref("g1", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%g1.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.valor.pgt_*`
+    ${ref("valor", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%valor.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.radio_globo.pgt_*`
+    ${ref("radio_globo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%radioglobo.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.cbn.pgt_*`
+    ${ref("cbn", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%cbn.globoradio.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.g1.pgt_*`
+    ${ref("g1", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%g1.globo.com/globonews/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.epoca.pgt_*`
+    ${ref("epoca", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%oglobo.globo.com/epoca/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.epoca_negocios.pgt_*`
+    ${ref("epoca_negocios", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%epocanegocios.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.extra.pgt_*`
+    ${ref("extra", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%extra.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.valor.pgt_*`
+    ${ref("valor", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%valor.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.valor_investe.pgt_*`
+    ${ref("valor_investe", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%valorinveste.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.o_globo.pgt_*`
+    ${ref("o_globo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%oglobo.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2 )
+SELECT
+  'NOTICIAS' AS CLUSTER,
+  userid AS globo_id
+FROM
+  Cluster_Noticias n
+LIMIT
+  6000000

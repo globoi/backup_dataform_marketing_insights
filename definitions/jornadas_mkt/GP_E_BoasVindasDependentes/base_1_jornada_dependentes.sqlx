@@ -1,0 +1,141 @@
+config {
+  type: 'table',
+  name: 'base_1_jornada_dependentes',
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_BoasVindasDependentes",'schedule_tag=jornadas_mkt_base_1_jornada_dependentes'],
+  description: ''
+}
+
+
+WITH dependentes_sf AS (
+  SELECT 
+    * EXCEPT (mais_canais, data_criacao_dependente),
+    LOWER(Produto_Contratado) LIKE '%disney%' AS possui_disney,
+    LOWER(Produto_Contratado) LIKE '%telecine%' AS possui_telecine,
+    LOWER(Produto_Contratado) LIKE '%premiere%' AS possui_premiere,
+    LOWER(Produto_Contratado) LIKE '%combate%' AS possui_combate,
+    TIMESTAMP(DATETIME(data_criacao_dependente, "America/Sao_Paulo")) AS data_criacao_dependente,
+    COALESCE(mais_canais, FALSE) AS possui_mais_canais,
+  FROM
+    ${ref("jornadas_mkt", "dependentes_sf")} 
+  WHERE data_criacao_dependente >='2022-03-15'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id_dependente) = 1
+)
+
+
+,consumo_impression_step_1 AS (
+  SELECT
+    globo_id AS globo_id_dependente,
+    TIMESTAMP(DATETIME(timestamp, "America/Sao_Paulo")) AS `timestamp`
+  FROM
+    ${ref("consumo_enriched", "impression")}  where date >='2023-12-01'
+)
+
+,consumo_impression_step_2 AS (
+  SELECT 
+    globo_id_dependente,
+    MAX(`timestamp`) 
+    OVER(
+        PARTITION BY  globo_id_dependente
+    ) AS ultimo_consumo,
+  FROM
+   consumo_impression_step_1 
+)
+
+,consumo_impression_step_3 AS (
+  SELECT 
+    globo_id_dependente,
+    ultimo_consumo,
+    IF(DATE_DIFF(CURRENT_DATE(),DATE(ultimo_consumo), DAY)<=7, 1,0) AS consumiu_7_dias
+  FROM
+   consumo_impression_step_2
+)
+
+,consumo_impression_step_4 AS (
+  SELECT 
+    globo_id_dependente,
+    SUM(consumiu_7_dias) AS consumiu_7_dias,
+  FROM
+   consumo_impression_step_3 
+   GROUP BY globo_id_dependente
+)
+
+,consumo_impression_step_5 AS (
+  SELECT 
+   * EXCEPT(consumiu_7_dias),
+   IF(consumiu_7_dias > 0, TRUE, FALSE) AS consumiu_7_dias
+  FROM
+   consumo_impression_step_4
+  
+)
+,consumo_impression_step_final AS (
+  SELECT DISTINCT 
+    *
+  FROM
+   consumo_impression_step_5
+)
+
+,consumo2_impression_step_1 AS (
+  SELECT
+    globo_id AS globo_id_dependente,
+    TIMESTAMP(DATETIME(timestamp, "America/Sao_Paulo")) AS `timestamp`,
+    program_id
+  FROM
+     ${ref("consumo_enriched", "impression")} where date >='2023-12-01'
+
+)
+
+,consumo2_impression_step_2 AS (
+  SELECT 
+    globo_id_dependente,
+    `timestamp`,
+    program_id,
+    MAX(`timestamp`) 
+    OVER(
+        PARTITION BY  globo_id_dependente
+    ) AS ultimo_consumo,
+  FROM
+   consumo2_impression_step_1 
+   WHERE DATE_DIFF(CURRENT_DATE(),DATE(`timestamp`), DAY) <= 7
+)
+
+,consumo2_impression_step_3 AS (
+  SELECT 
+    globo_id_dependente,
+    ultimo_consumo,
+    `timestamp`,
+    program_id,
+    DATE_DIFF(CURRENT_DATE(),DATE(ultimo_consumo), DAY) AS dias_ultimo_consumo,
+  FROM
+   consumo2_impression_step_2 
+)
+
+,consumo2_impression_step_final AS (
+  SELECT 
+    * EXCEPT (timestamp, program_id),
+    COUNT(DISTINCT program_id)
+    OVER (
+      PARTITION BY globo_id_dependente
+    ) AS qtd_programas_consumidos
+  FROM
+   consumo2_impression_step_3 
+)
+
+,base_join AS (
+  SELECT 
+    *
+  FROM
+    dependentes_sf
+  LEFT JOIN consumo_impression_step_final 
+  USING (globo_id_dependente)
+  LEFT JOIN consumo2_impression_step_final
+  USING (globo_id_dependente)
+)
+
+SELECT 
+  *
+FROM
+    base_join
+QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id_dependente) = 1
+
+

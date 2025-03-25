@@ -1,0 +1,199 @@
+config {
+    type: "table",
+    schema: 'gshow_mkt',
+    tags: ["gshow_mkt",
+        "schedule_tag=gshow_mkt_jornada_cross_bbb_24_gshow",
+        'schedule_cron=40 9 * * *'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "gshow_mkt",
+            owner: "martech",
+            horario: "09h40min"
+        }
+    },
+    description: 'Tabela com os dados de e-mail dos usuários que foram impactados pela jornada cross do bbb 24.',
+    columns: {
+        email_send_id: 'Código do e-mail enviado',
+        subscriber_id: 'O número de identificação do assinante afetado. Esse número representa o ID exclusivo para cada registro de assinante.',
+        globo_id: 'Código que identifica o usuário.',
+        job_id: 'Número de identificação do job para o e-mail enviado.',
+        activity_or_email_name: 'Nome da atividade ou e-mail',
+        email_or_activity_name: 'Nome do email ou atividade',
+        email_id: 'Número de identificação do e-mail para o job.',
+        email_name: 'O nome do e-mail enviado pelo job.',
+        email_subject: 'O assunto do e-mail enviado.',
+        journey_id: 'O identificador exclusivo da jornada. Existem um ou mais VersionIDs associados a um JourneyID.',
+        journey_name_original: 'Nome original da jornada',
+        activity_id: 'O identificador exclusivo da atividade.',
+        activity_name: 'O nome da atividade.',
+        send_date: 'Data da atividade',
+        open_date: 'Data de abertura do email',
+        click_date: 'Data e hora do clique',
+    }
+}
+
+WITH
+  sends AS (
+  SELECT
+    job_id,
+    list_id,
+    batch_id,
+    subscriber_id,
+    event_date AS send_date,
+    subscriber_key AS GLOBO_ID,
+    triggerer_send_definition_object_id
+  FROM
+    ${ref('mktcloud_gshow_clean', 'sent')}
+  WHERE
+    table_suffix_date >='2024-01-23'),
+  opens AS (
+  SELECT
+    job_id,
+    list_id,
+    batch_id,
+    subscriber_id,
+    MIN(event_date) AS open_date,
+    COUNT(1) AS open_count
+  FROM
+    ${ref('mktcloud_gshow_clean', 'open')}
+  WHERE
+    table_suffix_date >='2024-01-23'
+  GROUP BY
+    job_id,
+    list_id,
+    batch_id,
+    subscriber_id ),
+  clicks AS (
+  SELECT
+    job_id,
+    list_id,
+    batch_id,
+    subscriber_id,
+    MIN(event_date) AS click_date,
+    COUNT(1) AS click_count,
+    ARRAY_AGG(DISTINCT URL) AS clicked_urls,
+    ARRAY_AGG(DISTINCT domain) AS clicked_domains
+  FROM
+    ${ref('mktcloud_gshow_clean', 'click')}
+  WHERE
+    table_suffix_date >='2024-01-23'
+  GROUP BY
+    job_id,
+    list_id,
+    batch_id,
+    subscriber_id ),
+  journey AS (
+  SELECT
+    DISTINCT version_id,
+    journey_id,
+    journey_name AS JourneyName_original,
+    version_number
+  FROM
+    ${ref('mktcloud_gshow_clean', 'journey')}
+  WHERE
+    table_suffix_date >='2024-01-23'
+    AND LOWER(journey_name) LIKE '%cross%' ),
+  journey_activity AS (
+  SELECT
+    DISTINCT journey_activity_object_id,
+    version_id,
+    activity_id,
+    activity_name,
+    journey_id,
+    JourneyName_original,
+    version_number
+  FROM
+    ${ref('mktcloud_gshow_clean', 'journey_activity')}
+  LEFT JOIN
+    journey
+  USING
+    (version_id)
+  WHERE
+    table_suffix_date >='2024-01-23'
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  jobs AS (
+  SELECT
+    DISTINCT job_id,
+    email_id,
+    email_name,
+    email_subject,
+  FROM
+    ${ref('mktcloud_gshow_clean', 'job')}
+  WHERE
+    table_suffix_date >='2024-01-23'
+    AND LOWER(email_name) LIKE '%cross%'),
+  df1 AS (
+  SELECT
+    *
+  FROM
+    sends
+  LEFT JOIN
+    jobs
+  USING
+    (job_id)
+  WHERE
+    email_id IS NOT NULL ),
+  df2 AS (
+  SELECT
+    *
+  FROM
+    df1
+  LEFT JOIN
+    opens
+  USING
+    ( job_id,
+      list_id,
+      batch_id,
+      subscriber_id)
+  LEFT JOIN
+    clicks
+  USING
+    ( job_id,
+      list_id,
+      batch_id,
+      subscriber_id)
+  LEFT JOIN
+    journey_activity
+  ON
+    (email_name = activity_name)
+    --  LEFT JOIN journey USING (version_id)
+    ),
+  df3 AS (
+  SELECT
+    *,
+    open_date IS NOT NULL AS was_opened,
+    click_date IS NOT NULL AS was_clicked,
+    GLOBO_ID IS NOT NULL AS user_match,
+    CONCAT(subscriber_id, "-", job_id, "-", list_id, "-", batch_id) AS email_send_id,
+    COALESCE(activity_name, email_name) AS ActivityOrEmailName,
+    COALESCE(email_name, activity_name) AS EmailOrActivityName
+  FROM
+    df2 ),
+  df4 AS (
+  SELECT
+    DISTINCT email_send_id,
+    subscriber_id,
+    GLOBO_ID AS globo_id,
+    CAST(job_id AS STRING) AS job_id,
+    ActivityOrEmailName AS activity_or_email_name,
+    EmailOrActivityName AS email_or_activity_name,
+    email_id,
+    email_name,
+    email_subject,
+    journey_id,
+    JourneyName_original AS journey_name_original,
+    activity_id,
+    activity_name,
+    send_date,
+    open_date,
+    click_date
+  FROM
+    df3 )
+SELECT
+  DISTINCT *
+FROM
+  df4
+WHERE
+  LOWER(activity_or_email_name) LIKE '%cross%'

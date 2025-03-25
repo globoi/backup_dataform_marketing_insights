@@ -1,0 +1,27 @@
+config {
+    type: 'table',
+    tags: ["jornadas_mkt",
+        "schedule_tag=jornadas_mkt_mktflow_bbb25_lf_votantes"
+    ],
+    name: 'mktflow_bbb25_lf_votantes',
+    schema: 'jornadas_mkt',
+    description: '',
+    columns: {}
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+SELECT
+  DISTINCT a.globo_id
+FROM
+  ${ref("bbb_25", "interacao_gshow")} as a --`gglobo-mkt-ins-hdg-prd.bbb_25.interacao_gshow` AS a
+INNER JOIN
+   ${ref('comunicacao', 'ultima_comunicacao_geral')} as b-- `gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral` AS b
+ON
+  a.globo_id = b.globo_id
+WHERE
+  semana_votacao >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+  AND qtd_votos_BBB24 >= 1
+  AND b.tipo_cadastro = "Logado Free"

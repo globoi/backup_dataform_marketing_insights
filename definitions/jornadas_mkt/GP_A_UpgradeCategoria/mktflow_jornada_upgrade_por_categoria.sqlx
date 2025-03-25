@@ -1,0 +1,58 @@
+config {
+    type: 'table',
+    name: 'mktflow_jornada_upgrade_por_categoria',
+    schema: 'jornadas_mkt',
+    tags: ['GP_A_UpgradeCategoria', 'schedule_tag=jornadas_mkt_mktflow_jornada_upgrade_por_categoria',
+    'schedule_cron=45 18 * * *'],
+    description: '',
+    bigquery: {
+        labels: {
+            mktcloud: "true"
+        }
+    }
+}
+
+WITH
+  jornada_upgrade_categoria AS (
+  SELECT
+    DISTINCT globo_id,
+    canal,
+    CASE
+      WHEN LOWER(canal) IN ('multishow', 'gnt', 'viva', 'mais na tela', 'universal', 'syfy', 'studio universal', 'megapix', 'canal brasil', 'bis') THEN 'variedades'
+      WHEN LOWER(canal)='globonews' THEN 'noticias'
+      WHEN LOWER(canal) IN ('sportv', 'canal off', 'premiere', 'sportv 2', 'off') THEN 'esporte'
+      ELSE canal
+  END
+    AS categoria
+  FROM
+    ${ref('jornadas_mkt', 'jornada_upgrade_categoria')}
+  WHERE
+    ( LOWER(canal) LIKE "%multishow%"
+      OR LOWER(canal) LIKE "%gnt%"
+      OR LOWER(canal) LIKE "%viva%"
+      OR LOWER(canal) LIKE "%mais na tela%"
+      OR LOWER(canal) LIKE "%universal%"
+      OR LOWER(canal) LIKE "%syfy%"
+      OR LOWER(canal) LIKE "%studio universal%"
+      OR LOWER(canal) LIKE "%megapix%"
+      OR LOWER(canal) LIKE "%canal brasil%"
+      OR LOWER(canal) LIKE "%bis%"
+      OR LOWER(canal) LIKE "%globonews%"
+      OR LOWER(canal) LIKE "%sportv%"
+      OR LOWER(canal) LIKE "%off%"
+      OR LOWER(canal) LIKE "%premiere%" ) )
+SELECT
+  DISTINCT upgrade.categoria,
+  base_ativa.globo_id,
+  CURRENT_DATE() AS dt_proc
+FROM
+  jornada_upgrade_categoria AS upgrade
+INNER JOIN
+  (select * from ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} as b, unnest(b.info) as i where i.mais_canais is false    ) AS base_ativa
+ON
+  (base_ativa.globo_id = upgrade.globo_id ),
+  UNNEST(info) AS info
+WHERE
+  LOWER(tipo_assinante) NOT LIKE "%trial%"
+  AND LOWER(info.assinatura_gplay) = "nacional"
+  AND NOT base_ativa.mais_canais

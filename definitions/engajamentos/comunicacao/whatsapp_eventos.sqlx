@@ -1,0 +1,80 @@
+config {
+  type: "incremental",
+  schema: "comunicacao",
+  name: "whatsapp_eventos",
+  tags: ["schedule_tag=mkt_clean_open",
+        "schedule_cron=30 10 * * *",
+        "schedule_retry=3"],
+  dependencies: [],
+  bigquery: {
+    labels: {
+      tier: "clean",
+      source: "salesforce",
+      schedule: "diario",
+      tags: "mktcloud_clean",
+      dag: "foundation_mktcloud_clean"
+    }
+  },
+  description: '',
+  columns:{
+    DataHora	: '',
+    Bot	: '',
+    Channel	: '',
+    GloboID	: '',
+    Event	: '',
+    Flow	: '',
+    Campanha	: '',
+    Input	: '',
+    Payload	: '',
+    Avaliacao	: '',
+    Status_telefone	: '',
+    Status_assinatura	: '',
+    Status_email	: '',
+    Cidade	: '',
+    Estado	: '',
+    Data_assinatura	: '',
+    Tier_assinatura	: '',
+    Tipo_assinante	: '',
+    Data_Inclusao	: '',
+    event_id	: '',
+    table_suffix_date : ''
+ }
+}
+
+pre_operations {
+  declare last_table_suffix default(
+    ${when(incremental(),
+      `SELECT MAX(table_suffix_date) FROM ${self()} 
+          WHERE table_suffix_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY)
+       `,
+      `SELECT DATE('2024-07-20')`)}
+  );
+}
+
+SELECT
+    PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S',DataHora) AS DataHora,
+    IF(Bot = '', STRING(NULL), Bot) AS Bot,
+    IF(Channel = '', STRING(NULL), Channel) AS Channel,
+    IF(`GloboID` = '', STRING(NULL), `GloboID`)	AS GloboID,
+    IF(Event = '', STRING(NULL), Event) AS Event,
+    IF(Flow = '', STRING(NULL), Flow) AS	Flow,
+    IF(Campanha = '', STRING(NULL), Campanha) AS	Campanha,
+    IF(Input = '', STRING(NULL), Input) AS Input,
+    SAFE.PARSE_JSON(REPLACE(Payload, "'", '"')) AS Payload,
+    IF(Avaliacao = '', STRING(NULL), Avaliacao) AS Avaliacao,
+    SAFE_CAST(Status_telefone AS BOOL) AS Status_telefone,
+    SAFE_CAST(Status_assinatura AS BOOL) AS Status_assinatura,
+    IF(Status_email = '', STRING(NULL), Status_email) AS	Status_email,
+    IF(Cidade = '', STRING(NULL), Cidade) AS Cidade,
+    IF(Estado = '', STRING(NULL), Estado) AS Estado,
+    SAFE_CAST(SUBSTR(Data_assinatura, 1, 10) AS DATE) AS Data_assinatura,
+    IF(Tier_assinatura = '', STRING(NULL), Tier_assinatura) AS Tier_assinatura,
+    IF(Tipo_assinante = '', STRING(NULL), Tipo_assinante) AS Tipo_assinante,
+    SAFE.PARSE_DATETIME('%Y-%m-%d %H:%M:%E*S',Data_Inclusao) AS 	Data_Inclusao,
+    IF(event_id = '', STRING(NULL), event_id) AS event_id,
+    PARSE_DATE("%Y%m%d", REGEXP_EXTRACT(_FILE_NAME, r"([0-9]+)")) AS table_suffix_date
+FROM ${ref("raw", "whatsapp_eventos_raw")}
+WHERE 
+    PARSE_DATE("%Y%m%d", REGEXP_EXTRACT(_FILE_NAME, r"([0-9]+)")) > last_table_suffix
+    AND DataHora <> ''
+

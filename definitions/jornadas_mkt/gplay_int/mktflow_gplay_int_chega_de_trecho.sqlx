@@ -1,0 +1,74 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_chega_de_trecho',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 'schedule_tag=jornadas_mkt_mktflow_gplay_int_chega_de_trecho']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+`partial` AS (
+    SELECT
+        *
+    FROM
+        ${ref("consumo_enriched", "partial_content_impression")} pa
+        RIGHT JOIN ${ref("usuarios", "free_users_all")} fu
+        ON fu.globo_id = pa.userid
+    WHERE
+        DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) < date
+        AND program_id NOT IN (8426, 4692, 8321, 5523,9191)
+        AND mediaid NOT IN (8297383, 8260526, 6277327, 6277247, 6277330, 6277218, 6277238, 6277225, 6277332)
+
+),
+
+partial_top AS (
+    SELECT
+        userid AS globo_id,
+        program_id,
+        COUNT(mediaid) AS total_trechos
+    FROM
+        `partial`
+    GROUP BY
+        userid,
+        program_id
+    QUALIFY
+        ROW_NUMBER() OVER(PARTITION BY userid ORDER BY total_trechos DESC) = 1
+),
+
+partial_GP AS (
+    SELECT
+        userid,
+        GP_internacional_ind,
+        country_code,
+        COUNT(mediaid) AS total_trechos
+    FROM
+        `partial`
+    GROUP BY
+        userid,
+        GP_internacional_ind,
+        country_code
+    HAVING
+        total_trechos > 5        
+)
+
+SELECT
+    globo_id,
+    title,
+    media_kit_resource__poster,
+    GP_internacional_ind,
+    country_code
+FROM
+    partial_GP gp
+    INNER JOIN partial_top top 
+    ON gp.userid = top.globo_id
+    INNER JOIN ${ref("conteudo_enriched","program")} pro
+    ON top.program_id = pro.id
+WHERE
+    GP_internacional_ind like '%globo-play-%' 
+
+
+

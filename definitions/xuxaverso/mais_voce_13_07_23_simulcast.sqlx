@@ -1,0 +1,12 @@
+config {
+  type: "table",
+  schema: "xuxaverso"
+}
+
+SELECT
+  distinct globoid as globo_id
+FROM
+  ${ref('simulcast', 'consumo_ibope')}
+WHERE
+  data_consumo = "2023-07-13"
+  and programa = 'MAIS VOCE'

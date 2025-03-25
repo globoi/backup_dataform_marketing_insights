@@ -1,0 +1,65 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_seriespoliciais'],
+  name: 'mktflow_assinante_tier1_cluster_seriespoliciais',
+  schema: 'macro_clusters_mkt',
+  bigquery: {
+    labels: {
+      schedule: "semanal",
+      tags: "",
+      owner: "martech" ,
+      horario: "09h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+  description: '',
+  columns: {
+  }
+}
+
+--macro cluster tier 1 series policiais
+--assinantes tier 1 que consumiram series policiais vod ou series policiais/investigativas na tv ao vivo nos ultimos 180 dias.
+
+with todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.program.subset, c.program.metadata_scheme, c.program.format
+FROM  ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_series_policiais as (
+SELECT *
+FROM todos_os_generos
+where name in ('Investigação','Policial')
+and subset in ('series','serie')
+),
+
+consumo_em_genero_series_policiais as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_series_policiais b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_series_policiais as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")}  
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND genero_programa in ('SERIES')
+AND subgenero_programa in ('INVESTIGACAO')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo series policiais' as base
+FROM consumo_em_genero_series_policiais
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo series policiais' as base
+FROM consumo_em_programas_ao_vivo_series_policiais)
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false

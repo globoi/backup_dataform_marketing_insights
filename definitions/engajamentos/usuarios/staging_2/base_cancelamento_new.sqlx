@@ -1,0 +1,375 @@
+config {
+    type: 'table',
+    name: 'base_cancelamento_new',
+    schema: 'usuarios',
+    tags: [
+        "schedule_tag=usuarios_base_cancelamento_new",
+        "schedule_cron=0 10 * * *"
+    ],
+    description: '',
+    columns: {}
+}
+
+WITH
+  base AS (
+    --D2C
+  SELECT
+    DATE(e.event_at) AS date_event,
+    e.globo_id,
+    e.event,
+    CASE
+      WHEN e.object_id IS NULL THEN pt.partner_token
+      ELSE e.object_id
+  END
+    AS AssetId,
+    pd.name,
+    sd.subscription_status,
+    sd.caracteristica_produto,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    sd.purchase_channel AS canal_compra,
+    subscription_payment_method,
+    payment_method AS forma_pagamento,
+    DATE(TIMESTAMP(effective_conversion_at,'America/Sao_Paulo')) AS data_conversao_efetiva,
+    IFNULL(trial_period,0) AS periodo_trial_form,
+    IFNULL(is_trial,FALSE) AS is_trial,
+    pd.is_international AS assinatura_internacional,
+    CASE
+      WHEN sd.unsubscribe_at IS NULL AND e.event='request_unsubscription' THEN TIMESTAMP(e.event_at)
+      WHEN sd.unsubscribe_at IS NULL THEN TIMESTAMP(sd.end_cycle_at)
+      ELSE TIMESTAMP(sd.unsubscribe_at)
+  END
+    AS data_hora_cancelamento,
+    CASE
+      WHEN sd.end_cycle_at IS NULL AND e.event='unsubscription' THEN TIMESTAMP(e.event_at)
+      ELSE TIMESTAMP(sd.end_cycle_at,'America/Sao_Paulo')
+  END
+    AS dt_hr_cancelamento_final_ciclo,
+    TIMESTAMP(sd.scheduled_unsubscribe_at,'America/Sao_Paulo') AS scheduled_unsubscribe_at,
+    sd.unsubscribe_schedule AS ato_de_cancelamento,
+    sd.unsubscribe_channel AS canal_cancelamento,
+    CASE
+      WHEN sd.unsubscribe_reason ='Desistência da troca null' THEN 'Desistência da troca'
+      WHEN sd.unsubscribe_reason IN ('Fim de produto',
+      'Fim do produto') THEN 'Fim do Produto'
+      WHEN sd.unsubscribe_reason ='N�o gostei do produto' THEN 'Não gostei do produto'
+      WHEN sd.unsubscribe_reason='N�o uso porque n�o tem conte�do que me interessa' THEN 'Não uso porque não tem conteúdo que me interessa'
+      WHEN sd.unsubscribe_reason='N�o uso porque n�o tenho tempo' THEN 'Não uso porque não tenho tempo'
+      WHEN sd.unsubscribe_reason='N��o definido' THEN 'Não definido'
+      WHEN sd.unsubscribe_reason='O valor est� muito alto para mim' THEN 'O valor está muito alto para mim'
+      WHEN sd.unsubscribe_reason IN ('OUTRO',
+      'Outro') THEN 'Outros'
+      WHEN sd.unsubscribe_reason ='Solicitação do cliente' THEN 'Solicitação do Cliente'
+      WHEN sd.unsubscribe_reason IN ('Supeita Fraude',
+      'Suspeita Fraude') THEN 'Suspeita de Fraude'
+      WHEN sd.unsubscribe_reason ='Tive problemas t�cnicos' THEN 'Tive problemas técnicos'
+      WHEN sd.unsubscribe_reason='Vale presente Expirado' THEN 'Vale Presente Expirado'
+      ELSE sd.unsubscribe_reason
+  END
+    AS motivo_cancelamento,
+    CASE
+      WHEN LOWER(sd.unsubscribe_reason) LIKE '%downgrade%' THEN TRUE
+      ELSE FALSE
+  END
+    AS is_downgrade,
+    CASE
+      WHEN LOWER(sd.unsubscribe_reason) LIKE '%cross down%' THEN TRUE
+      ELSE FALSE
+  END
+    AS is_cross_down,
+    CASE
+      WHEN sd.unsubscribe_type IN ('Voluntario', 'Voluntário', 'VOLUNTARIO', 'Volunt√°rio', 'Vonluntário', 'VoluntÃ¡rio') THEN 'Voluntário'
+      ELSE sd.unsubscribe_type
+  END
+    AS tipo_cancelamento,
+    sd.unsubscription_event_action,
+    sd.unsubscribe_description,
+    pd.code AS ProductCode,
+    code_unique,
+    sd.billing_frequency AS plano,
+    ROW_NUMBER() OVER(PARTITION BY e.globo_id ORDER BY TIMESTAMP(sd.subscription_at) DESC) AS `last`,
+    CASE
+      WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais
+  FROM  ${ref('sales_gold', 'customer_events')} e
+  JOIN  ${ref('sales_gold', 'subscription_details')} sd
+  ON
+    e.object_id = sd.id
+  LEFT JOIN ${ref('sales_gold', 'partner_details')} pt
+  ON
+    e.object_id = pt.partner_token
+  LEFT JOIN ${ref('sales_gold', 'product_details')} pd
+  ON
+    sd.product_id = pd.id
+    OR pt.product_id = pd.id
+  WHERE
+    e.event IN ('unsubscription',
+      'request_unsubscription')
+    AND (sd.subscription_type IS NULL
+      OR LOWER(sd.unsubscribe_reason) NOT LIKE '%upgrade%')
+    AND LOWER(sd.unsubscribe_reason) NOT LIKE '%cross up%'
+    AND (LOWER(sd.subscription_status) NOT LIKE '%crossgrade%'
+      AND LOWER(sd.unsubscribe_reason) NOT LIKE '%upgrade%')
+  UNION DISTINCT
+    --Claro Wholesale
+  SELECT
+    DATE(e.event_at) AS date_event,
+    e.globo_id,
+    e.event,
+    e.object_id AS AssetId,
+    pd.name,
+    sd.subscription_status,
+    sd.caracteristica_produto,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    sd.purchase_channel AS canal_compra,
+    subscription_payment_method,
+    payment_method AS forma_pagamento,
+    DATE(TIMESTAMP(effective_conversion_at,'America/Sao_Paulo')) AS data_conversao_efetiva,
+    IFNULL(trial_period,0) AS periodo_trial_form,
+    IFNULL(is_trial,FALSE) AS is_trial,
+    pd.is_international AS assinatura_internacional,
+    CASE
+      WHEN sd.unsubscribe_at IS NULL AND e.event='request_unsubscription' THEN TIMESTAMP(e.event_at)
+      WHEN sd.unsubscribe_at IS NULL THEN TIMESTAMP(sd.end_cycle_at)
+      ELSE TIMESTAMP(sd.unsubscribe_at)
+  END
+    AS data_hora_cancelamento,
+    CASE
+      WHEN sd.end_cycle_at IS NULL AND e.event='unsubscription' THEN TIMESTAMP(e.event_at)
+      ELSE TIMESTAMP(sd.end_cycle_at,'America/Sao_Paulo')
+  END
+    AS dt_hr_cancelamento_final_ciclo,
+    TIMESTAMP(sd.scheduled_unsubscribe_at,'America/Sao_Paulo') AS scheduled_unsubscribe_at,
+    sd.unsubscribe_schedule AS ato_de_cancelamento,
+    sd.unsubscribe_channel AS canal_cancelamento,
+    CASE
+      WHEN sd.unsubscribe_reason ='Desistência da troca null' THEN 'Desistência da troca'
+      WHEN sd.unsubscribe_reason IN ('Fim de produto',
+      'Fim do produto') THEN 'Fim do Produto'
+      WHEN sd.unsubscribe_reason ='N�o gostei do produto' THEN 'Não gostei do produto'
+      WHEN sd.unsubscribe_reason='N�o uso porque n�o tem conte�do que me interessa' THEN 'Não uso porque não tem conteúdo que me interessa'
+      WHEN sd.unsubscribe_reason='N�o uso porque n�o tenho tempo' THEN 'Não uso porque não tenho tempo'
+      WHEN sd.unsubscribe_reason='N��o definido' THEN 'Não definido'
+      WHEN sd.unsubscribe_reason='O valor est� muito alto para mim' THEN 'O valor está muito alto para mim'
+      WHEN sd.unsubscribe_reason IN ('OUTRO',
+      'Outro') THEN 'Outros'
+      WHEN sd.unsubscribe_reason ='Solicitação do cliente' THEN 'Solicitação do Cliente'
+      WHEN sd.unsubscribe_reason IN ('Supeita Fraude',
+      'Suspeita Fraude') THEN 'Suspeita de Fraude'
+      WHEN sd.unsubscribe_reason ='Tive problemas t�cnicos' THEN 'Tive problemas técnicos'
+      WHEN sd.unsubscribe_reason='Vale presente Expirado' THEN 'Vale Presente Expirado'
+      ELSE sd.unsubscribe_reason
+  END
+    AS motivo_cancelamento,
+    CASE
+      WHEN LOWER(sd.unsubscribe_reason) LIKE '%downgrade%' THEN TRUE
+      ELSE FALSE
+  END
+    AS is_downgrade,
+    CASE
+      WHEN LOWER(sd.unsubscribe_reason) LIKE '%cross down%' THEN TRUE
+      ELSE FALSE
+  END
+    AS is_cross_down,
+    CASE
+      WHEN sd.unsubscribe_type IN ('Voluntario', 'Voluntário', 'VOLUNTARIO', 'Volunt√°rio', 'Vonluntário', 'VoluntÃ¡rio') THEN 'Voluntário'
+      ELSE sd.unsubscribe_type
+  END
+    AS tipo_cancelamento,
+    sd.unsubscription_event_action,
+    sd.unsubscribe_description,
+    pd.code AS ProductCode,
+    code_unique,
+    sd.billing_frequency AS plano,
+    ROW_NUMBER() OVER(PARTITION BY e.globo_id ORDER BY TIMESTAMP(sd.subscription_at) DESC) AS `last`,
+    CASE
+      WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais
+  FROM 
+    ${ref('sales_gold', 'customer_events')} e
+  LEFT JOIN
+    ${ref('sales_gold', 'subscription_details')} sd
+  ON
+    e.object_id = sd.id
+  LEFT JOIN ${ref('sales_gold', 'partner_details')} pt
+  ON
+    e.object_id = pt.partner_token
+  LEFT JOIN ${ref('sales_gold', 'product_details')} pd
+  ON
+    sd.product_id = pd.id
+    OR pt.product_id = pd.id
+  WHERE
+    e.event IN ('unsubscription',
+      'request_unsubscription')
+    AND (sd.subscription_type IS NULL
+      OR LOWER(sd.unsubscribe_reason) NOT LIKE '%upgrade%')
+    AND LOWER(pd.channel) LIKE '%wholesale%'
+    AND LOWER(sd.unsubscribe_reason) NOT LIKE '%cross up%'
+    AND (LOWER(sd.subscription_status) NOT LIKE '%crossgrade%'
+      AND LOWER(sd.unsubscribe_reason) NOT LIKE '%upgrade%') ),
+  dependentes AS (
+  SELECT
+    COUNT(DISTINCT(dependent_globoid)) AS n_dependentes,
+    parent_globo_id AS globo_id
+  FROM ${ref('sales_gold', 'subscription_dependent_details')}
+  WHERE
+    status='Active'
+  GROUP BY
+    2 ),
+  base2 AS (
+  SELECT
+    DISTINCT * EXCEPT(date_event,
+      event),
+    MAX(`last`) OVER(PARTITION BY globo_id) AS numero_assinaturas,
+    periodo_trial_form > 0 AS teve_trial,
+    CASE
+      WHEN periodo_trial_form > 0 THEN data_hora_compra
+  END
+    AS dt_trial_inicio,
+    CASE
+      WHEN periodo_trial_form > 0 AND periodo_trial_form BETWEEN 0 AND 41 THEN DATE_ADD(data_hora_compra, INTERVAL CAST(periodo_trial_form AS INT64) DAY)
+  END
+    AS dt_trial_fim,
+    ROW_NUMBER() OVER (PARTITION BY globo_id, AssetId ORDER BY data_hora_compra DESC) AS ult_ass
+  FROM
+    base
+  WHERE
+    tipo_cancelamento='Voluntário'),
+  ultimo_consumo_step_1 AS (
+  SELECT
+    DISTINCT globo_id,
+    AssetId,
+    dt_hr_cancelamento_final_ciclo,
+    data_hora_compra
+  FROM
+    base2 ),
+  ultimo_consumo_step_2 AS (
+  SELECT
+    globo_id,
+    asset.AssetId,
+    ultimo_consumo,
+    data_ultimo_consumo,
+    ultimo_consumo_subset,
+    FORMAT_DATE("%a", data_ultimo_consumo) AS dia_semana_ultimo_consumo,
+    EXTRACT(HOUR
+    FROM
+      DATETIME(data_ultimo_consumo, 'America/Sao_Paulo')) AS `hour`
+  FROM ${ref('consumo', 'ultimo_consumo')} ult
+  INNER JOIN
+    ultimo_consumo_step_1 asset
+  USING
+    (globo_id)
+  WHERE
+    data_ultimo_consumo BETWEEN data_hora_compra
+    AND dt_hr_cancelamento_final_ciclo ),
+  ultimo_consumo_step_3 AS (
+  SELECT
+    *,
+    CASE
+      WHEN `hour` BETWEEN 6 AND 11 THEN "Manhã"
+      WHEN `hour` BETWEEN 12
+    AND 17 THEN "Tarde"
+      WHEN `hour` BETWEEN 18 AND 23 THEN "Noite"
+      WHEN `hour` BETWEEN 0
+    AND 5 THEN "Madrugada"
+  END
+    AS periodo_ultimo_consumo
+  FROM
+    ultimo_consumo_step_2 ),
+  ultimo_30_step_1 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    data_hora_cancelamento,
+    data_hora_compra,
+    CASE
+      WHEN DATE_SUB(data_hora_cancelamento, INTERVAL 30 DAY) >= data_hora_compra THEN DATE_SUB(data_hora_cancelamento, INTERVAL 30 DAY)
+      ELSE data_hora_compra
+  END
+    AS `last`
+  FROM
+    base2 ),
+  ultimo_30_step_3 AS (
+  SELECT
+    globo_id,
+    asset.AssetId AS AssetId,
+    assinante_only,
+    hours_watched,
+    program_id
+  FROM ${ref('consumo', 'ultimo_consumo')} ult
+  INNER JOIN
+    ultimo_30_step_1 asset
+  USING
+    (globo_id)
+  WHERE
+    data_ultimo_consumo BETWEEN `last`AND data_hora_cancelamento ),
+  ultimo_30_step_4 AS (
+  SELECT
+    *
+  FROM
+    ultimo_30_step_3
+  PIVOT
+    ( SUM(hours_watched) h,
+      COUNT(DISTINCT program_id) pg FOR assinante_only IN (TRUE,
+        FALSE)) ),
+  ultimo_30_step_5 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    COALESCE(h_true, 0) + COALESCE(h_false, 0) AS u30_total_de_horas,
+    COALESCE(pg_true, 0) + COALESCE(pg_false) AS u30_programas_distintos,
+    COALESCE(h_true,0) AS u30_total_horas_conteudos_pagos,
+    COALESCE(pg_true,0) AS u30_programas_pagos
+  FROM
+    ultimo_30_step_4 ),
+  demografia AS (
+  SELECT
+    COALESCE(gender, gender_inf) AS gender,
+    globo_id,
+    age,
+    address_state,
+    address_city
+  FROM ${ref('globoid_enriched', 'demografia')})
+SELECT
+  DISTINCT * EXCEPT (code_unique,
+    n_dependentes,
+    `hour`,
+    plano,
+    ult_ass,
+    `last`),
+  CASE
+    WHEN code_unique LIKE '%Pro-0130%' OR code_unique LIKE '%Anual%' THEN 'anual'
+    ELSE plano
+END
+  AS Plano,
+  `last`= 1 AS ultima_assinatura,
+  COALESCE(n_dependentes, 0) AS n_dependentes
+FROM
+  base2
+LEFT JOIN
+  ultimo_consumo_step_3
+USING
+  (globo_id,
+    AssetId)
+LEFT JOIN
+  ultimo_30_step_5
+USING
+  (globo_id,
+    AssetId)
+LEFT JOIN ${ref('consumo', 'derived__primeiro_play')}
+USING
+  (globo_id,
+    AssetId)
+LEFT JOIN
+  dependentes
+USING
+  (globo_id)
+LEFT JOIN
+  demografia
+USING
+  (globo_id)
+WHERE
+  ult_ass=1

@@ -1,0 +1,34 @@
+config {
+  type: "incremental",
+  name: "geral_metas",
+  schema: "metas_conteudos",
+  tags: ['metas_conteudos_staging_1',
+        "schedule_tag=metas_conteudos_geral_metas"
+  ],
+  bigquery: {
+    partitionBy: "date"
+  }
+}
+
+
+pre_operations {
+  declare date_inc default(
+    ${when(incremental(),
+    `SELECT MAX(date) FROM ${self()} where date >= '2022-12-31' `,
+    `SELECT DATE('2022-12-31')`)}
+  )
+}
+
+SELECT
+  DISTINCT userid AS globo_id,
+  mediaid,
+  program_id,
+  program_title,
+  title,
+  DATE(timestamp, "America/Sao_Paulo") AS timestamp,
+  hours_watched,
+  date
+FROM
+  ${ref("consumo_enriched", "impression")} as i
+WHERE
+  date > date_inc

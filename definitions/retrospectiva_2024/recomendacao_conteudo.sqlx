@@ -1,0 +1,125 @@
+config {
+    type: "table",
+    name: "recomendacao_conteudo",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com a recomendação de conteudo para o usuário',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    program_title_rec1: 'titulo da recomendação 1 ',
+    program_poster_url_rec1: 'poster da recomendação 1 ',
+    url_add_minha_lista_rec1: 'url de adicionar na lista da recomendação 1',
+    program_title_rec2: 'titulo da recomendação 2',
+    program_poster_url_rec2: 'poster da recomendação 2',
+    url_add_minha_lista_rec2: 'url de adicionar na lista da recomendação 2',
+    program_title_rec3: 'titulo da recomendação 3',
+    program_poster_url_rec3: 'poster da recomendação 3',
+    url_add_minha_lista_rec3: 'url de adicionar na lista da recomendação 3'
+  }
+}
+
+with
+recomendacao AS (
+    SELECT
+      DISTINCT globo_id,
+      program_title_recc1,
+      program_poster_url_recc1,
+      url_add_minha_lista_recc1,
+      program_title_recc2,
+      program_poster_url_recc2,
+      url_add_minha_lista_recc2,
+      program_title_recc3,
+      program_poster_url_recc3,
+      url_add_minha_lista_recc3
+    FROM
+        ${ref('retrospectiva_2024','Lst_Rec_Pers_Genero_T5_Pivoted_Retro2024')} AS l
+    LEFT JOIN (
+        SELECT
+          *
+        EXCEPT(media_kit_resource__poster),
+          program_title AS program_title_recc1,
+          media_kit_resource__poster AS program_poster_url_recc1,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_recc1
+        FROM
+         ${ref('retrospectiva_2024','Lst_Rec_Pers_Genero_T5_Pivoted_Aux_Retro2024')}
+    ) AS p ON p.title_id = l.rank_1
+    LEFT JOIN (
+        SELECT
+          *
+        EXCEPT(media_kit_resource__poster),
+          program_title AS program_title_recc2,
+          media_kit_resource__poster AS program_poster_url_recc2,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_recc2
+        FROM
+         ${ref('retrospectiva_2024','Lst_Rec_Pers_Genero_T5_Pivoted_Aux_Retro2024')}
+    ) AS a ON a.title_id = l.rank_2
+    LEFT JOIN (
+        SELECT
+          *
+        EXCEPT(media_kit_resource__poster),
+          program_title AS program_title_recc3,
+          media_kit_resource__poster AS program_poster_url_recc3,
+          CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista_recc3
+        FROM
+         ${ref('retrospectiva_2024','Lst_Rec_Pers_Genero_T5_Pivoted_Aux_Retro2024')}
+    ) AS t ON t.title_id = l.rank_3
+),
+
+recomendacao_generica as (
+    SELECT 
+        title, 
+        media_kit_resource__poster, 
+        url_for_consumption, 
+        CONCAT(url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista
+    FROM ${ref('conteudo_enriched', 'program')}
+    WHERE id IN (27883, 28097, 12121)
+)
+
+SELECT DISTINCT 
+    globo_id,
+    CASE
+        WHEN program_title_recc1 IS NULL THEN 'Arcanjo Renegado'
+        ELSE program_title_recc1
+    END program_title_rec1,
+    CASE
+        WHEN program_title_recc2 IS NULL THEN 'Garota do Momento'
+        ELSE program_title_recc2
+    END program_title_rec2,
+    CASE
+        WHEN program_title_recc3 IS NULL THEN 'Pra Sempre Paquitas'
+        ELSE program_title_recc3
+    END program_title_rec3,
+    CASE
+        WHEN program_poster_url_recc1 IS NULL THEN 'https://s2.glbimg.com/7FwkcT_mOlSDmldJTj4z2ka0pBU=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2023/F/r/KD0OHtRQmsRQopIRyb5w/2022-3007-arcanjo-renegado-poster.jpg'
+        ELSE program_poster_url_recc1
+    END program_poster_url_rec1,
+    CASE
+        WHEN program_poster_url_recc2 IS NULL THEN 'https://s2.glbimg.com/OmmzzcKk1qvzEK_NJvb0SXHWdDI=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2024/6/2/h7Gm2PRBGBc7aYqTVkDA/2024-4507-garota-do-momento-poster.jpg'
+        ELSE program_poster_url_recc2
+    END program_poster_url_rec2,
+    CASE
+        WHEN program_poster_url_recc3 IS NULL THEN 'https://s2.glbimg.com/778M7GZ-a_naD9QCY1lOtle4hlo=/i.s3.glbimg.com/v1/AUTH_c3c606ff68e7478091d1ca496f9c5625/internal_photos/bs/2024/8/s/OUE2qTSX2zoCmJwZdiHw/2024-4423-pra-sempre-paquitas-poster.jpg'
+        ELSE program_poster_url_recc3
+    END program_poster_url_rec3,
+    CASE
+        WHEN url_add_minha_lista_recc1 IS NULL THEN 'http://globoplay.globo.com/arcanjo-renegado/p/12121/?actionType=addTitleToMyList'
+        ELSE url_add_minha_lista_recc1
+    END url_add_minha_lista_rec1,
+    CASE
+        WHEN url_add_minha_lista_recc2 IS NULL THEN 'http://globoplay.globo.com/garota-do-momento/p/28097/?actionType=addTitleToMyList'
+        ELSE url_add_minha_lista_recc2
+    END url_add_minha_lista_rec2,
+    CASE
+        WHEN url_add_minha_lista_recc3 IS NULL THEN 'http://globoplay.globo.com/pra-sempre-paquitas/p/27883/?actionType=addTitleToMyList'
+        ELSE url_add_minha_lista_recc3
+    END url_add_minha_lista_rec3,
+FROM recomendacao

@@ -1,0 +1,55 @@
+config {
+  type: "table",
+  schema: "bbb_22",
+  name: "conta_acompanhamento",
+  tags: []
+}
+
+WITH base AS (
+  SELECT * EXCEPT(Cluster_BBB_Acumulado,assinou_2022, Cluster_Share_BBB_Total),
+  CASE
+    WHEN 
+      dt_hr_cancelamento_final_ciclo IS NOT NULL 
+      AND CAST(dt_hr_cancelamento_final_ciclo AS DATE) >= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    THEN 'agendado'
+    WHEN 
+      dt_hr_cancelamento_final_ciclo IS NOT NULL
+      AND CAST(dt_hr_cancelamento_final_ciclo AS DATE) < DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    THEN 'efetivo'
+    ELSE 'desistencia_real'
+  END AS agendado,
+  CASE 
+    WHEN Cluster_BBB_Acumulado IS NULL THEN 'Sem BBB'
+    ELSE Cluster_BBB_Acumulado
+  END AS Cluster_BBB_Acumulado,
+  CASE 
+    WHEN Cluster_Share_BBB_Total IS NULL THEN False
+    ELSE assinou_2022
+  END AS assinou_2022,
+  CASE 
+    WHEN Cluster_Share_BBB_Total IS NULL THEN 'Sem BBB'
+    ELSE Cluster_Share_BBB_Total
+  END AS Cluster_Share_BBB_Total
+  FROM ${ref("bbb_22", "base_acompanhamento")} 
+  WHERE data_desistencia IS NOT NULL
+     OR (dt_hr_cancelamento_final_ciclo IS NOT NULL 
+    AND dt_hr_cancelamento_final_ciclo < '2022-07-01')
+)
+  SELECT * 
+FROM
+(
+  SELECT  assinou_2022,
+          mes_cancel_efet,
+          Cluster_BBB_Acumulado,
+          Cluster_Share_BBB_Total,
+          agendado,
+          id_asset
+  FROM base
+)
+PIVOT (
+  COUNT(id_asset)
+  FOR agendado IN ('agendado', 'efetivo', 'desistencia_real')
+)
+
+
+

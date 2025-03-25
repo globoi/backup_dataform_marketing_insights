@@ -1,0 +1,7 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-mkt-ins-hdg-prd", 
+    schema: "segmento_ge", 
+    name: "ge_bottom2", 
+    description: ""
+    }

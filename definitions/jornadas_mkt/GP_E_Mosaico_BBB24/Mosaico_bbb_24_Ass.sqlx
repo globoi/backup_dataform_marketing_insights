@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  tags: ["jornadas_mkt",
+      "schedule_tag=jornadas_mkt_mktflow_mosaico_bbb24_ass"],
+  name: 'mktflow_mosaico_bbb24_ass',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+select distinct userId
+from ${ref("consumo_enriched", "impression")} as a
+inner join ${ref("bbb_24", "raiox_bbb_24_assinantes")} as b
+on a.userId = b.globo_id
+where date >= '2024-01-08'
+and mediaid = 10101606

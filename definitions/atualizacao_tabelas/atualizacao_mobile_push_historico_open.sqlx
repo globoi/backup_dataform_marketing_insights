@@ -1,0 +1,33 @@
+config {
+  type: 'table',
+  name: 'atualizacao_mobile_push_historico_open',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_mobile_push_historico_open',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH push AS (
+  SELECT
+    *
+  EXCEPT(open_date),
+    DATETIME(open_date, "America/Sao_Paulo") AS open_date
+  FROM
+    ${ref('mkt_clean', 'mobile_push')}
+  WHERE table_suffix_date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+)
+SELECT
+  DATE(open_date) AS open_date,
+  COUNT(*) AS total
+FROM
+  push
+WHERE
+  open_date >= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  
+GROUP BY
+  1
+ORDER BY
+  1 desc

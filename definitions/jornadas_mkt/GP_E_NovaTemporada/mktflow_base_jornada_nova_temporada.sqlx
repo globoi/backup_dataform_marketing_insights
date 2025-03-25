@@ -1,0 +1,157 @@
+config {
+  type: 'table',
+  name: '_mktflow_base_jornada_nova_temporada',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_NovaTemporada','schedule_tag=jornadas_mkt__mktflow_base_jornada_nova_temporada'],
+  description: ''
+}
+
+WITH
+LF AS (
+  SELECT DISTINCT
+    globo_id,
+    "Logado Free" AS tipo_usuario
+  FROM ${ref("usuarios", "Free users")}
+),
+
+ex_assinantes AS (
+  SELECT DISTINCT
+    globo_id,
+    "Ex-assinante" AS tipo_usuario
+  FROM
+    ${ref("sales_gold", "customer_details")}
+  INNER JOIN
+    LF
+  USING 
+    (globo_id)
+),
+
+assinantes AS (
+  SELECT DISTINCT 
+    globo_id,
+    "Assinante" AS tipo_usuario
+  FROM 
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+    UNNEST(info)
+  WHERE 
+    assinatura_gplay = "nacional"
+    AND
+    lower(tipo_assinante) NOT LIKE "%trial%"
+),
+
+usuarios AS (
+  SELECT globo_id, tipo_usuario FROM ex_assinantes
+  UNION ALL 
+  SELECT globo_id, tipo_usuario FROM assinantes
+),
+
+content2 AS (
+  SELECT
+    program_id,
+    MAX(episode_rank) OVER (PARTITION BY program_id) AS program_max_episode_rank
+  FROM
+    (SELECT
+      program_id,
+      dense_rank() OVER (PARTITION BY program_id ORDER BY season, episode) AS episode_rank
+    FROM
+      ${ref("conteudo_enriched", "content")}
+    )
+),
+
+content_final AS (
+  SELECT 
+    program_id,
+    MAX(program_max_episode_rank) OVER (PARTITION BY program_id) AS program_max_episode_rank
+  FROM
+    content2
+),
+
+publicacao_nova_temporada AS (
+  SELECT 
+    program_id,
+    published_at,
+    `status`,
+    season,
+    title_url_for_consumption,
+    tipo_temporada,
+    dias_lancamento
+  FROM
+    (SELECT
+      *,
+      CASE WHEN season > 1 THEN "Nova Temporada" ELSE "Temporada Antiga" END AS tipo_temporada,
+      DATE_DIFF(current_date(), DATE(published_at), DAY) AS dias_lancamento,
+      ROW_NUMBER() OVER (PARTITION BY program_id, season ORDER BY published_at ASC) AS rank
+    FROM
+      ${ref("conteudo_enriched", "content")}
+    WHERE
+      lower(program_url_for_consumption) LIKE "%globoplay%" AND
+      lower(channel_title) NOT LIKE "%international%" AND
+      program_subset = "series" AND
+      `status` = "published"
+    )
+  WHERE
+    rank = 1 AND
+    tipo_temporada = "Nova Temporada" AND
+    dias_lancamento <= 1
+),
+
+base AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    ultimo_consumo_do_programa,
+    terminou_serie,
+    terminou_temporada,
+    horas_consumidas,
+    season_episode_rank,
+    episode_rank,
+    maior_episodio_assistido,
+    program_max_episode_rank,
+    (episode_rank/program_max_episode_rank) * 100 AS consumo,
+    IF((episode_rank/program_max_episode_rank) * 100 >= 25, True, False) AS consumiu_25
+  FROM
+    ${ref("consumo", "series_history")}
+  INNER JOIN 
+    content_final
+  USING 
+    (program_id)
+  WHERE
+    maior_episodio_assistido = True
+)
+
+
+SELECT 
+  globo_id,
+  tipo_usuario,
+  program_id,
+  program_title,
+  ultimo_consumo_do_programa,
+  terminou_serie,
+  consumo,
+  consumiu_25,
+  terminou_temporada,
+  episode_rank,
+  program_max_episode_rank,
+  maior_episodio_assistido,
+  published_at,
+  `status`,
+  season,
+  title_url_for_consumption,
+  tipo_temporada,
+  dias_lancamento 
+FROM 
+  base
+INNER JOIN
+  usuarios
+USING
+  (globo_id)
+INNER JOIN
+  publicacao_nova_temporada
+USING
+  (program_id)
+WHERE
+  terminou_serie = True 
+  OR consumiu_25 = True
+QUALIFY 
+  ROW_NUMBER() OVER (PARTITION BY globo_id, program_id, season) = 1 

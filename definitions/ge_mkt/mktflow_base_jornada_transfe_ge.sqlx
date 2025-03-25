@@ -1,0 +1,58 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=ge_mkt_mktflow_base_jornada_transfe_ge', 'schedule_cron=0 11 * * *'],
+    name: 'mktflow_base_jornada_transfe_ge',
+    schema: 'ge_mkt',
+    description:'',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "ge_mkt",
+            mktcloud:"true",
+        }
+    }
+}
+with n1 as (
+SELECT `gglobo-prodservdig-hdg-prd.foundation_ge.udf_editoria_n1`(h.pagePath) as editoriaN1
+  , IF(globoid is null or globoid in ('','undefined'), fullVisitorId, globoid) as globoid
+  , pagePath
+ 
+FROM ${ref('foundation_ge', 'foundation_ge_sessions_v3')}, unnest(hits) as h --`gglobo-prodservdig-hdg-prd.foundation_ge.foundation_ge_sessions_v3`
+ 
+INNER JOIN (SELECT DISTINCT globoid
+          FROM ${ref('public_globoid', 'users')} --`gglobo-gid-dados-hdg-prd.public_globoid.users`
+          WHERE partition_date = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+          USING(globoid)
+ 
+WHERE data >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+ 
+  -- FILTRO POR TIPO DE CONSUMO, NÃO AMBIENTE
+  and h.tipoConsumo in ('pageview','screenview')
+ 
+  -- FILTRANDO SOMENTE AMBIENTES ESPECÍFICOS
+  and lower(ambienteConsumo) = 'app'
+ 
+),
+ 
+n2 as (
+SELECT *
+  , `gglobo-prodservdig-hdg-prd.foundation_ge.udf_editoria_n2`(editoriaN1,pagePath) as editoriaN2
+FROM n1
+),
+ 
+n3 as (
+SELECT *
+  , `gglobo-prodservdig-hdg-prd.foundation_ge.udf_editoria_n3`(editoriaN2,pagePath) as editoriaN3
+FROM n2
+)
+ 
+select distinct globoid as globo_id
+from n3 as a
+inner join ${ref('ge_growth_time_coracao', 'time_unificado')} as b --`gglobo-esportes-hdg-prd.ge_growth_time_coracao.time_unificado` as b
+on a.globoid = b.USERID
+where a.editoriaN1 = 'Home ge'
+and ge_declared_team_id IS NULL
+group by all

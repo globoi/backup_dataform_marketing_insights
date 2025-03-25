@@ -1,0 +1,93 @@
+config {
+  type: 'table',
+  tags: ['jornada_consumo', 'schedule_tag=jornadas_mkt_mktflow_jornada_novos_eps_jose_e_durval'],
+  name: 'mktflow_jornada_novos_eps_jose_e_durval',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--As Aventuras de José & Durval 23253
+
+--cte1: Assinantes (quaisquer tiers) que consumiram pelo menos 1 episódio da série
+
+--cte2: Usuários que assistiram à live de estreia - Mídia Titular: 11019219
+
+--cte3: Usuários que assistiram o 1º episódio no Tela Quente dia 21/8 cte3
+
+--cte4: Usuários que deram play em Chitãozinho & Xororó, Amigos - A História Continua
+
+with cte1 as (
+with consumo_por_episodio as (
+SELECT distinct b.globo_id, a.program_title, a.mediaid, a.title
+FROM ${ref("consumo_enriched", "impression")} as a
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} as b
+ON a.userId = b.globo_id
+WHERE b.tipo_cadastro = "Assinante"
+AND date >= "2023-08-15"
+AND a.program_id = 23253
+GROUP BY 1,2,3,4
+ORDER BY 1,4),
+
+qtd_episodios_assistidos as (
+SELECT distinct globo_id, count(mediaid) as qtd
+FROM consumo_por_episodio
+GROUP BY 1
+ORDER BY 1),
+
+maximo_ep as (
+SELECT max(qtd) as maximo_ep_lancado
+FROM qtd_episodios_assistidos),
+
+qtd_episodios_assistidos_com_maximoep as (
+SELECT *
+FROM qtd_episodios_assistidos, maximo_ep)
+
+SELECT distinct globo_id
+FROM qtd_episodios_assistidos_com_maximoep
+WHERE qtd <= maximo_ep_lancado
+AND qtd >= 1),
+
+cte2 as (
+select distinct userId as globo_id
+from ${ref("consumo_enriched", "impression")} a
+where date between "2023-08-23" and "2023-08-29"
+and mediaid = 11019219
+),
+
+cte3 as (
+SELECT distinct globoid as globo_id
+FROM ${ref("simulcast", "consumo_ibope")}  
+WHERE data_consumo = "2023-08-21"
+and programa_detalhe2 LIKE "AS AVENTURAS DE JOSE E DURVAL"
+),
+
+cte4 as (
+select distinct userId as globo_id
+from ${ref("consumo_enriched", "impression")} a
+where date >= "2023-01-01"
+and program_id in (11975,20156)
+),
+
+cte5 as (
+select cte1.globo_id
+from cte1
+union distinct
+select cte2.globo_id
+from cte2
+union distinct
+select cte3.globo_id
+from cte3
+union distinct
+select cte4.globo_id
+from cte4)
+
+select distinct 'named_user' as identifier_type, globo_id 
+from cte5
+

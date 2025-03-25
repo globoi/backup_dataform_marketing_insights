@@ -1,0 +1,201 @@
+config {
+  type: "table",
+  name: "pesquisa_assinantes_cancelados_tratados_new",
+  schema: "pesquisas",
+  tags: ["pesquisas_staging_3",
+        "schedule_tag=pesquisa_pesquisa_assinantes_cancelados_tratados_new",
+        "schedule_cron=0 11 * * *"]
+}
+
+WITH
+  pesquisa_consumo_consumo AS (
+  SELECT
+    userid AS user_id,
+    SUM(hours_watched) AS SUM_of_hours_watched,
+    COUNT(userid) AS COUNT,
+    COUNT(DISTINCT(environment)) AS COUNT_DISTINCT_of_environment,
+    COUNT(DISTINCT(program_id)) AS COUNT_DISTINCT_of_program_id,
+    COUNT(DISTINCT(program_subset)) AS COUNT_DISTINCT_of_program_subset
+  FROM ${ref('consumo_enriched','impression')}
+  GROUP BY
+    userid ),
+  asset_motivo_cancelamento_1 AS (
+  SELECT
+    globo_id,
+    MAX(data_hora_cancelamento) AS MAX_of_data_hora_cancelamento,
+    MAX(motivo_cancelamento) AS MAX_of_motivo_cancelamento,
+    MAX(canal_compra) AS MAX_of_canal_compra
+  FROM ${ref('usuarios','base_cancelamento_new')}
+  WHERE
+    LOWER(name) LIKE '%globoplay%'
+  GROUP BY
+    globo_id ),
+  asset_motivo_cancelamento AS (
+  SELECT
+    * EXCEPT(MAX_of_motivo_cancelamento),
+    CASE
+      WHEN MAX_of_motivo_cancelamento = "NÃ£o identificado" THEN "Não identificado"
+    ELSE
+    MAX_of_motivo_cancelamento
+  END
+    AS MAX_of_motivo_cancelamento
+  FROM
+    asset_motivo_cancelamento_1 ),
+  status_assinatura AS (
+  SELECT
+    globo_id,
+    MAX(tipo_assinante) AS MAX_of_tipo_assinante
+  FROM
+    ${ref('usuarios','base_ativa_pagante_com_trial_new')}
+  GROUP BY
+    globo_id ),
+  base_bbb AS (
+  SELECT
+    globo_id,
+    tipo_assinante
+  FROM ${ref('bbb_20','reta_final_bbb_historico')}
+  GROUP BY
+    globo_id,
+    tipo_assinante ),
+  pesquisa_survey_dados_brutos AS (
+  SELECT
+    *
+  FROM ${ref('pesquisas','pesquisa_cancelados')}),
+  dados_trabalhados_1 AS (
+  SELECT
+    respondent_id,
+    collector_id,
+    datetime(date_modified, 'America/Sao_Paulo') as date_modified,
+    datetime(date_created, 'America/Sao_Paulo') as date_created,
+    voce_dividia_a_sua_assinatura_com_outras_pessoas as Voce_dividia_a_sua_assinatura_com_outras_pessoas,
+    
+    em_quais_dispositivos_voce_ja_teve_problemas_Computador AS Em_quais_dispositivos_voce_teve_problemas_Computador,
+    em_quais_dispositivos_voce_ja_teve_problemas_Smartphone_iOS_iPhone AS Em_quais_dispositivos_voce_teve_problemas_Smartphone_iOS_iPhone,
+    em_quais_dispositivos_voce_ja_teve_problemas_Smartphone_Android_Motorola_Samsung_LG AS Em_quais_dispositivos_voce_teve_problemas_Smartphone_Android,
+    em_quais_dispositivos_voce_ja_teve_problemas_Tablet AS Em_quais_dispositivos_voce_teve_problemas_Tablet,
+    em_quais_dispositivos_voce_ja_teve_problemas_Smart_TV AS Em_quais_dispositivos_voce_teve_problemas_SmartTV,
+    em_quais_dispositivos_voce_ja_teve_problemas_Chromecast AS Em_quais_dispositivos_voce_teve_problemas_Chromecast,
+    em_quais_dispositivos_voce_ja_teve_problemas_Apple_TV AS Em_quais_dispositivos_voce_teve_problemas_AppleTV,
+    em_quais_dispositivos_voce_ja_teve_problemas_Android_TV AS Em_quais_dispositivos_voce_teve_problemas_AndroidTV,
+    qual_o_tipo_de_problema_que_voce_teve_Travamento AS Qual_o_tipo_de_problema_que_voce_teve_Travamento,
+    qual_o_tipo_de_problema_que_voce_teve_Nunca AS Qual_o_tipo_de_problema_que_voce_teve_Nunca,
+    qual_o_tipo_de_problema_que_voce_teve_Video_nao_carregava AS Qual_o_tipo_de_problema_que_voce_teve_Video_nao_carrega,
+    qual_o_tipo_de_problema_que_voce_teve_Qualidade_do_video_eou_imagem AS Qual_o_tipo_de_problema_que_voce_teve__Qualidade_do_video_e_ou_imagem,
+    qual_o_tipo_de_problema_que_voce_teve_Problemas_com_legenda_eou_dublagem AS Qual_o_tipo_de_problema_que_voce_teve__Problemas_com_legenda_e_ou_dublagem,
+    qual_o_tipo_de_problema_que_voce_teve_Nao_conseguia_me_logar AS Qual_o_tipo_de_problema_que_voce_teve__Nao_conseguia_me_logar,
+    qual_o_tipo_de_problema_que_voce_teve_Erro AS Qual_o_tipo_de_problema_que_voce_teve_Erro,
+    qual_o_tipo_de_problema_que_voce_teve_Atraso_na_transmissao_delay as Qual_o_tipo_de_problema_que_voce_teve_Atraso_na_transmissao_delay,
+    qual_o_tipo_de_problema_que_voce_teve_A_Tv_Globo_nao_estava_disponivel_na_minha_regiao AS Qual_o_tipo_de_problema_que_voce_teve_TV_Globo,
+    _foi_por_causa_disso__que_voce_cancelou_o_globoplay AS Foi_por_causa_disso_que_voce_cancelou_o_Globoplay,
+    qual_o_tipo_de_problema_que_voce_teve_Nao_funcionou_na_minha_televisao AS Qual_o_tipo_de_problema_que_voce_teve_Nao_funcionou_tv,
+    qual_o_tipo_de_problema_que_voce_teve_other_ AS Qual_o_tipo_de_problema_que_voce_teve__Outros,
+    voce_assina_outros_servicos_de_streaming_quais_Spotify AS Voce_assina_outros_servios_de_streaming_Spotify,
+    o_catalogo_foi_decisivo_para_o_seu_cancelamento AS O_catalogo_foi_decisivo_para_o_seu_cancelamento,
+
+    voce_assina_outros_servicos_de_streaming_quais_Apple_TV_ AS Voce_assina_outros_servios_de_streaming_Appletv,
+    coalesce(voce_assina_outros_servicos_de_streaming_quais_Amazon_Prime_Video,voce_assina_outros_servicos_de_streaming_quais_Amazon_Prime) AS Voce_assina_outros_servios_de_streaming_Amazon_Prime_video,
+    voce_assina_outros_servicos_de_streaming_quais_Youtube_Premium AS Voce_assina_outros_servios_de_streaming_Youtube_premium,
+    voce_assina_outros_servicos_de_streaming_quais_HBO_Go AS Voce_assina_outros_servios_de_streaming_Hbo_Go,
+    coalesce(voce_assina_outros_servicos_de_streaming_quais_Telecine,voce_assina_outros_servicos_de_streaming_quais_Telecine_Play) AS Voce_assina_outros_servios_de_streaming_Telecine,
+    coalesce(voce_assina_outros_servicos_de_streaming_quais_Premiere,voce_assina_outros_servicos_de_streaming_quais_Premiere_Play) AS Voce_assina_outros_servios_de_streaming_Premiere,
+    voce_assina_outros_servicos_de_streaming_quais_Disney_ AS Voce_assina_outros_servios_de_streaming_Disney,
+    voce_assina_outros_servicos_de_streaming_quais_Tv_a_cabo_satelite AS Voce_assina_outros_servios_de_streaming_TV_Cabo,
+    agora_que_voce_nao_e_mais_assinante_o_que_vai_sentir_saudade_de_assistir_no_globoplay_Nao_sentirei_falta_de_nada AS Agora_que_voce_nao_e_mais_assinante_oque_vai_sentir_saudadede_assistir_no_Globoplay_Nao_sentirei_falta_de_nada,
+    voce_assina_outros_servicos_de_streaming_quais_Netflix AS Voce_assina_outros_servios_de_streaming_Netflix,
+    voce_assina_outros_servicos_de_streaming_quais_Discovery_ AS Voce_assina_outros_servios_de_streaming_Discovery,
+    coalesce(voce_assina_outros_servicos_de_streaming_quais_Max_antigo_HBO_Max,voce_assina_outros_servicos_de_streaming_quais_HBO_Max) AS Voce_assina_outros_servios_de_streaming_HBOMax,
+    voce_assina_outros_servicos_de_streaming_quais_DirecTV_GO AS Voce_assina_outros_servios_de_streaming_DirecTVGo,
+    voce_assina_outros_servicos_de_streaming_quais_Paramount_ AS Voce_assina_outros_servios_de_streaming_Paramount,
+    voce_assina_outros_servicos_de_streaming_quais_Starz_Play_Lionsgate AS Voce_assina_outros_servios_de_streaming_Starz,
+    voce_assina_outros_servicos_de_streaming_quais_Combate as Voce_assina_outros_servios_de_streaming_Combate,
+    voce_assina_outros_servicos_de_streaming_quais_Deezer AS Voce_assina_outros_servios_de_streaming_Deezer,
+    voce_assina_outros_servicos_de_streaming_quais_other_ as Voce_assina_outros_servios_de_streaming_Outros,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Nao_gostei_dessa_edicao_do_BBB AS Nao_Gostei_edicao,
+    voce_assina_outros_servicos_de_streaming_quais_Nao_assino_outros_servicos AS Voce_assina_outros_servios_de_streaming_Nao_assino_outros,
+    voce_assina_outros_servicos_de_streaming_quais_Star_ as Voce_assina_outros_servios_de_streaming_Star,
+
+
+    o_fato_de_voce_assinar_outras_plataformas_de_video_foi_decisivo_para_o_cancelamento AS O_fato_de_voce_assinar_outras_plataformas_de_video_foi_decisivo_para_o_cancelamento,
+    user_id,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Nao_gostei_das_cameras_ao_vivo AS Nao_Gostei_cameras,
+    o_big_brother_brasil_foi_um_conteudo_relevante_para_a_sua_assinatura_globoplay AS O_Big_Brother_Brasil_foi_um_conteudo_relevante_para_a_sua_assinatura_Globoplay,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_So_acompanho_BBB_pela_TV_Globo_eou_Multishow AS BBB_so_TV,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Nao_consegui_utilizar_na_minha_Televisao AS Nao_consegui_usar_tv,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Ja_possuo_o_pay_per_view_do_BBB AS Possuo_payperview,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Prefiro_acompanhar_o_programa_em_sites_especializados_como_GShow AS Prefiro_acompanhar_GShow,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Prefiro_acompanhar_o_programa_nas_redes_sociais AS Prefiro_acompanhar_programa_redes_sociais,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Tive_problemas_tecnicos AS Tive_problemas_tecnicos,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_O_valor_da_assinatura_nao_cabe_no_meu_orcamento AS Valor_Assinatura,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Meu_participante_favorito_foi_eliminado AS Meu_participante_favorito_eliminado,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_other_ AS BBB_Outro,
+    porque_voce_nao_se_interessou_por_outros_conteudos_Nao_tinha_conteudos_que_me_interessavam AS Nao_tinha_conteudos_interessavam,
+    porque_voce_nao_se_interessou_por_outros_conteudos_Nao_tenho_interesse_em_conteudos_da_Tv_Globo AS Nao_tenho_interesse_conteudos_Tv_Globo,
+    porque_voce_nao_se_interessou_por_outros_conteudos_O_BBB_ocupou_todo_o_meu_tempo_livre AS BBB_ocupou_meu_tempo_livre,
+    porque_voce_nao_se_interessou_por_outros_conteudos_Prefiro_o_conteudo_de_outras_plataformas AS Prefiro_conteudo_outras_plataformas,
+    porque_voce_nao_se_interessou_por_outros_conteudos_other_ AS outros_BBB_2,
+    qual_a_chance_de_voce__recomendar_o_globoplay__para_um_amigo_ou_familiar AS Qual_a_chance_de_voce_recomendar_o_Globoplay_para_um_amigo_ou_familiar,
+    voce_ja_teve_problemas_tecnicos_com_o_globoplay_exemplo_video_travando_qualidade_da_imagem_ AS Voce_ja_teve_problemas_tecnicos_com_o_Globoplay,
+    --   Em_quais_dispositivos_voc___j___teve_problemas_ AS Em_quais_dispositivos_voce_ja_teve_problemas,
+    deixe_um_comentario_sobre_o_nosso__site_e_aplicativo__ AS Deixe_um_comentario_sobre_o_nosso_site_e_aplicativo,
+    conteudos_originais AS Conteudos_Originais,
+    series_internacionais AS Series_Internacionais,
+    novelas,
+    infantil,
+    filmes,
+    documentarios AS Documentarios,
+    conteudos_ao_vivo AS Conteudos_Ao_Vivo,
+    deixe_um_comentario_sobre_o_nosso__catalogo_de_conteudo__ AS Deixe_um_comentario_sobre_o_nosso_catalogo_de_conteudo_,
+    assinaria_novamente_o_globoplay AS Assinaria_novamente_o_Globoplay,
+    deixe_uma_mensagem_contando_um_pouquinho_sobre_a_sua_experiencia_com_o_globoplay_ AS Deixe_uma_mensagem_contando_um_pouquinho_sobre_a_sua_experiencia_com_o_Globoplay_,
+    assinante_globoplay_tem_acesso_a_conteudos_exclusivos_incluindo_as_cameras_ao_vivo_24_horas_por_dia_porque_voce_nao_quis_continuar_acompanhando_o_bbb_Nao_gosto_de_BBB AS Nao_Gosto_BBB,
+    durante_o_periodo_do_bbb_voce_assistiu_a_outros_conteudos AS Durante_o_periodo_do_BBB_voce_assistiu_a_outros_conteudos,
+    qual_o_tipo_de_problema_que_voce_teve_Aplicativo_fechava AS Qual_o_tipo_de_problema_que_voce_teve__Aplicativo_fechava,
+    -- string_field_20 AS Em_quais_dispositivos_voce_teve_problemas_Elsys,
+    em_quais_dispositivos_voce_ja_teve_problemas_Roku AS Em_quais_dispositivos_voce_teve_problemas_Roku
+  FROM
+    pesquisa_survey_dados_brutos
+  WHERE
+    respondent_id IS NOT NULL
+    AND CAST(respondent_id AS STRING) != '' ),
+  dados_trabalhados AS (
+  SELECT
+    dt1.*,
+    dem.gender,
+    dem.age,
+    dem.address_state,
+    rfbbb.globo_id AS Base_BBB_globo_id,
+    rfbbb.tipo_assinante AS Base_BBB_tipo_assinante,
+    rfbbb.globo_id IS NOT NULL AS Cluster_BBB,
+    pcc.SUM_of_hours_watched AS Horas_assistidas,
+    pcc.COUNT AS Videoviews,
+    pcc.COUNT_DISTINCT_of_environment AS Devices,
+    pcc.COUNT_DISTINCT_of_program_id AS Qtd_programas,
+    pcc.COUNT_DISTINCT_of_program_subset AS Qtd_subsets,
+    COALESCE(sa.MAX_of_tipo_assinante, "Cancelado") AS Status_Assinatura_Atual,
+    amc.MAX_of_motivo_cancelamento AS Motivo_cancelamento,
+    amc.MAX_of_canal_compra AS canal_compra,
+  FROM
+    dados_trabalhados_1 dt1
+  LEFT JOIN ${ref('globoid_enriched','demografia')}  dem
+  ON
+    dt1.user_id = dem.globo_id
+  LEFT JOIN
+    base_bbb rfbbb
+  ON
+    dt1.user_id = rfbbb.globo_id
+  LEFT JOIN
+    pesquisa_consumo_consumo pcc
+  USING
+    (user_id)
+  LEFT JOIN
+    status_assinatura sa
+  ON
+    dt1.user_id = sa.globo_id
+  LEFT JOIN
+    asset_motivo_cancelamento amc
+  ON
+    dt1.user_id = amc.globo_id )
+SELECT
+  *
+FROM
+  dados_trabalhados

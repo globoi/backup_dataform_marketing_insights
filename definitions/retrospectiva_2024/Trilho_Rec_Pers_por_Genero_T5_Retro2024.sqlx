@@ -1,0 +1,413 @@
+config {
+    type: "table",
+    name: "Trilho_Rec_Pers_por_Genero_T5_Retro2024",
+    schema: 'retrospectiva_2024',
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: ""
+    }
+  },
+  description: 'Tabela com a recomendação baseada no consumo do usuário.',
+  columns: {
+    globo_id: 'Código de identificação do usuário.',
+    program_title: 'Título do programa.',
+    title_url_for_consumption: 'URL de destino do programa para consumo na plataforma.',
+    url_add_minha_lista: 'URL de destino para adicionar ao minha lista.',
+    media_kit_resource__poster: 'Link do poster do programa.',
+    rank_final: 'Rank do programa.',
+    genero: 'Genero do programa.',
+    program_id: 'Código do programa.',
+    title_id: 'Código do título do programa.',
+    program_description: 'Breve descrição do programa.',
+    personalizado: 'Indica se o globo_id tem recomendação.'
+  },
+}
+
+WITH impression_data AS (
+  SELECT
+    *,
+    CASE
+      WHEN (DATE_DIFF(CURRENT_DATE(), `date`, DAY) <= 30) THEN 5
+      WHEN (DATE_DIFF(CURRENT_DATE(), `date`, DAY) <= 90) THEN 3
+      WHEN (DATE_DIFF(CURRENT_DATE(), `date`, DAY) <= 180) THEN 2
+      ELSE 1
+    END AS peso
+  FROM
+   ${ref('consumo_enriched','impression')}
+  WHERE
+     `date` >= '2024-01-01'
+),
+E1_Rec_Generos_Assistidos_ AS(
+  SELECT
+    userid AS globo_id,
+    program_id,
+    peso * hours_watched AS horas_peso,
+    `date`,
+    is_live,
+    program_subset,
+    hours_watched
+  FROM
+    impression_data a
+  INNER JOIN ${ref('retrospectiva_2024','elegibilidade_2024')} b 
+    ON a.userid = b.globo_id     
+  WHERE
+    program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+    AND is_live IS NOT TRUE
+    AND program_subset NOT IN (
+      'news',
+      'disclosure',
+      'live',
+      'lutas',
+      'globo_negocios'
+    )
+    AND hours_watched >= 0.25
+),
+E1_Rec_Generos_Assistidos_2 AS (
+  SELECT
+    *
+  FROM
+    E1_Rec_Generos_Assistidos_
+   LEFT JOIN ${ref("jornadas_mkt", "genero_todas_combinacoes")} USING (program_id)
+),
+E1_Rec_Generos_Assistidos_3 AS (
+  SELECT
+    globo_id,
+    genero,
+    SUM(horas_peso) AS horas_peso_sum
+  FROM
+    E1_Rec_Generos_Assistidos_2
+  GROUP BY
+    globo_id,
+    genero
+),
+E1_Rec_Generos_Assistidos_4 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id
+      ORDER BY
+        horas_peso_sum DESC
+    ) AS E1_rank_genero
+  FROM
+    E1_Rec_Generos_Assistidos_3
+  WHERE
+    genero IS NOT NULL
+    AND genero <> 'Erótico'
+    AND horas_peso_sum >= 0.25
+),
+E1_Lst_Rec_Generos_Assistidos AS (
+  SELECT
+    DISTINCT *
+  FROM
+    E1_Rec_Generos_Assistidos_4
+),
+program_content AS (
+  SELECT
+    DISTINCT program_id
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    service_id <> 6807
+    AND status = 'published'
+    AND program_subset = 'series'
+),
+ranking_conteudos AS (
+  SELECT
+    userid AS globo_id,
+    program_id,
+    genero,
+    peso,
+  FROM
+    impression_data
+   INNER JOIN ${ref("jornadas_mkt", "genero_todas_combinacoes")} USING (program_id)
+  WHERE
+    program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+    AND genero IS NOT NULL
+    AND genero <> 'Erótico'
+),
+ranking_conteudos_2 AS (
+  SELECT
+    program_id,
+    genero,
+    peso,
+    COUNT(DISTINCT globo_id) AS cont_distintos
+  FROM
+    ranking_conteudos
+  GROUP BY
+    program_id,
+    genero,
+    peso
+),
+ranking_conteudos_3 AS (
+  SELECT
+    program_id,
+    genero,
+    SUM(cont_distintos) AS soma_peso
+  FROM
+    ranking_conteudos_2
+  GROUP BY
+    program_id,
+    genero
+),
+E2_Lst_Rec_Rank_Conteudos_Por_Genero AS (
+  SELECT
+    program_id,
+    genero,
+    ROW_NUMBER() OVER(
+      PARTITION BY genero
+      ORDER BY
+        soma_peso DESC
+    ) AS E2_rank_conteudo
+  FROM
+    ranking_conteudos_3
+    INNER JOIN program_content USING (program_id)
+),
+series_history_reduzida AS (
+  SELECT
+    globo_id,
+    program_id
+  FROM
+    ${ref("consumo", "series_history")}
+  WHERE
+    horas_consumidas > 0.25
+),
+novela_history_reduzida AS (
+  SELECT
+    globo_id,
+    program_id
+  FROM
+  ${ref("consumo", "novela_history")}
+  WHERE
+    horas_consumidas > 0.25
+),
+novelas_series AS (
+  SELECT
+    *
+  FROM
+    series_history_reduzida
+  UNION ALL
+  SELECT
+    *
+  FROM
+    novela_history_reduzida
+),
+novelas_series_2 AS (
+  SELECT
+    globo_id,
+    program_id
+  FROM
+    novelas_series
+    INNER JOIN ${ref('retrospectiva_2024','elegibilidade_2024')} USING (globo_id)
+),
+E3_Lst_Rec_Conteudos_Assistidos AS (
+  SELECT
+    DISTINCT globo_id,
+    program_id
+  FROM
+    novelas_series_2
+    INNER JOIN ${ref("jornadas_mkt", "genero_todas_combinacoes")} USING (program_id)
+),
+program_poster AS (
+  SELECT
+    DISTINCT id AS program_id,
+    media_kit_resource__poster
+  FROM
+    ${ref("conteudo_enriched", "program")}
+  WHERE
+    media_kit_resource__poster IS NOT NULL
+),
+content_info AS (
+  SELECT
+    program_id,
+    program_title_id,
+    program_title,
+    title_url_for_consumption,
+    program_description,
+    program_subset
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    service_id <> 6807
+    AND status = 'published'
+    AND program_subset = 'series'
+    AND title_url_for_consumption IS NOT NULL
+    AND program_description IS NOT NULL
+),
+content_info_2 AS (
+  SELECT
+    c.program_id,
+    c.program_title_id AS title_id,
+    c.program_title,
+    c.title_url_for_consumption,
+    c.program_description,
+    c.program_subset
+  FROM
+    content_info c
+    LEFT JOIN ${ref("raw", "Blocklist_de_Conteudos")} b USING (program_id)
+  WHERE
+    b.program_id IS NULL
+),
+content_info_3 AS (
+  SELECT
+    *,
+    CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista
+  FROM
+    content_info_2
+    INNER JOIN program_poster USING (program_id)
+),
+content_info_4 AS (
+  SELECT
+    DISTINCT program_id,
+    title_id,
+    program_title,
+    title_url_for_consumption,
+    program_description,
+    program_subset,
+    a.media_kit_resource__poster,
+    url_add_minha_lista
+  FROM
+    content_info_3 a
+    INNER JOIN program_poster b USING (program_id)
+  WHERE
+    program_subset NOT IN (
+      'news',
+      'disclosure',
+      'live',
+      'lutas',
+      'globo_negocios'
+    )
+),
+Lista_final_1 AS (
+  SELECT
+    * 
+  FROM
+    E1_Lst_Rec_Generos_Assistidos a
+    LEFT JOIN E2_Lst_Rec_Rank_Conteudos_Por_Genero b USING (genero) 
+),
+Lista_final_2 AS (
+  SELECT
+    * 
+  FROM
+    Lista_final_1 a
+    LEFT JOIN E3_Lst_Rec_Conteudos_Assistidos b USING (globo_id, program_id)
+  WHERE
+    b.globo_id IS NULL
+    AND b.program_id IS NULL
+),
+Lista_final_3 AS (
+  SELECT
+    *
+  FROM
+    Lista_final_2
+  WHERE
+    genero IS NOT NULL
+    AND genero <> 'Erótico'
+),
+Lista_final_4 AS (
+  SELECT
+    *
+  FROM
+    Lista_final_3
+    INNER JOIN content_info_4 USING (program_id)
+),
+Lista_final_5 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY E1_rank_genero, E2_rank_conteudo ASC) AS pre_rank_final,
+  FROM
+    Lista_final_4
+),
+Lista_final_6 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, program_id ORDER BY E1_rank_genero, E2_rank_conteudo ASC) AS rank_aux
+  FROM
+    Lista_final_5
+
+),
+Lista_final_7 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY pre_rank_final) AS rank_final
+  FROM
+    Lista_final_6
+  WHERE
+    rank_aux < 2
+),
+Lst_Rec_Pers_Genero_T10 AS (
+  SELECT
+    program_id,
+    globo_id,
+    genero,
+    horas_peso_sum,
+    E1_rank_genero,
+    E2_rank_conteudo,
+    title_id,
+    program_title,
+    title_url_for_consumption,
+    program_description,
+    media_kit_resource__poster,
+    url_add_minha_lista,
+    pre_rank_final,
+    rank_aux,
+    rank_final
+  FROM
+    Lista_final_7
+  WHERE
+    rank_final <= 10
+),
+cont5 AS (
+  SELECT
+    DISTINCT globo_id 
+  FROM
+    Lst_Rec_Pers_Genero_T10
+  WHERE
+    rank_final >= 5
+),
+T5_lista_final AS (
+  SELECT
+    *
+  FROM
+    Lst_Rec_Pers_Genero_T10
+    INNER JOIN cont5 USING (globo_id) 
+),
+Lst_Rec_Pers_Genero_T5 AS (
+  SELECT
+    globo_id,
+    program_title,
+    title_url_for_consumption,
+    url_add_minha_lista,
+    media_kit_resource__poster,
+    rank_final,
+    genero,
+    program_id,
+    title_id,
+    program_description,
+    IF (globo_id IS NOT NULL, TRUE, FALSE) AS personalizado
+  FROM
+    T5_lista_final
+  WHERE
+    rank_final <=5
+)
+SELECT
+  *
+FROM
+  Lst_Rec_Pers_Genero_T5
+
+
+
+
+
+
+
+
+
+
+
+
+

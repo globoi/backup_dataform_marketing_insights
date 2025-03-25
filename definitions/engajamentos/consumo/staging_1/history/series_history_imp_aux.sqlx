@@ -1,0 +1,82 @@
+config {
+  type: "incremental",
+  name: "series_history_imp_aux",
+  schema: "consumo",
+  tags: ["consumo_staging_1_history",
+        "schedule_tag=consumo_series_history_imp_aux"
+  ],
+  uniqueKey: ["globo_id", "program_id", "program_title", "mediaid"]
+}
+
+WITH impression AS (
+  SELECT
+    userid AS globo_id,
+    program_id,
+    program_title,
+    played,
+    mediaid,
+    duration,
+    MIN(timestamp) OVER(PARTITION BY userid, mediaid) AS primeiro_consumo,
+    MAX(timestamp) OVER(PARTITION BY userid, mediaid) AS ultimo_consumo,
+    (
+      100 - (INSTR(REVERSE(history), '1') + 1)
+    ) AS history,
+    date
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  WHERE
+    program_subset = 'series' AND userid IS NOT NULL
+    ${when(incremental(), `AND date > (SELECT DATE(MAX(update_date)) FROM ${self()})
+      UNION ALL
+      SELECT
+      globo_id,
+      program_id,
+      program_title,
+      tempo_assistido AS played,
+      mediaid,
+      duration,
+      primeiro_consumo,
+      ultimo_consumo,
+      history_sum AS history,
+      update_date AS date
+      FROM ${self()}
+  `)}
+),
+impression_grouped AS (
+  SELECT
+    globo_id,
+    program_id,
+    program_title,
+    mediaid,
+    MIN(primeiro_consumo) AS primeiro_consumo,
+    MAX(ultimo_consumo) AS ultimo_consumo,
+    MAX(history) AS history_sum,
+    MAX(duration) AS duration,
+    SUM(played) AS tempo_assistido,
+    MAX(date) AS update_date
+  FROM
+    impression
+  GROUP BY
+    globo_id,
+    program_id,
+    program_title,
+    mediaid
+),
+impression_time AS (
+  SELECT
+    *,
+    SAFE_DIVIDE(tempo_assistido, duration) AS completude_tempo,
+    tempo_assistido / 3600000 AS horas_consumidas
+  FROM
+    impression_grouped
+)
+SELECT
+  *,
+  CASE
+    WHEN history_sum >= 75
+    AND completude_tempo >= 0.30 THEN TRUE
+    WHEN completude_tempo >= 0.75 THEN TRUE
+    ELSE FALSE
+  END AS terminou_episodio
+FROM
+  impression_time

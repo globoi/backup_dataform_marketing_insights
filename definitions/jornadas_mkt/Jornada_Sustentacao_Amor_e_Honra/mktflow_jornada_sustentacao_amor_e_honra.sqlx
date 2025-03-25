@@ -1,0 +1,46 @@
+config {
+  type: 'table',
+  tags: ['jornada_consumo', 'schedule_tag=jornadas_mkt_mktflow_jornada_sustentacao_amor_e_honra'],
+  name: 'mktflow_jornada_sustentacao_amor_e_honra',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+with consumo_por_episodio_amor_e_honra as (
+SELECT distinct b.globo_id, a.program_title, a.mediaid, a.title
+FROM ${ref("consumo_enriched", "impression")} as a
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} as b
+ON a.userId = b.globo_id
+WHERE b.tipo_cadastro = "Assinante"
+AND date >= "2022-01-01"
+AND a.program_id = 20046
+GROUP BY 1,2,3,4
+ORDER BY 1,4),
+
+qtd_episodios_assistidos_amor_e_honra as (
+SELECT distinct globo_id, count(mediaid) as qtd
+FROM consumo_por_episodio_amor_e_honra
+GROUP BY 1
+ORDER BY 1),
+
+maximo_ep as (
+SELECT max(qtd) as maximo_ep_lancado
+FROM qtd_episodios_assistidos_amor_e_honra),
+
+qtd_episodios_assistidos_amor_e_honra_com_maximoep as (
+SELECT *
+FROM qtd_episodios_assistidos_amor_e_honra, maximo_ep)
+
+SELECT distinct globo_id, qtd, maximo_ep_lancado
+FROM qtd_episodios_assistidos_amor_e_honra_com_maximoep
+WHERE qtd < maximo_ep_lancado
+AND qtd > maximo_ep_lancado*0.3
+

@@ -1,0 +1,39 @@
+config {
+  type: "view",
+  disabled: true
+}
+
+js {
+  // Go to validation.js to change the constants
+  const table_gcp = ref(validation.schema_gcp, validation.table_name_gcp);
+  const schema_export = validation.schema_export;
+  const table_name_export = validation.table_name_export;
+  const table_export = ref(schema_export, table_name_export);
+  const database_export = validation.database_export;
+  const join_key = validation.join_key;
+  const incremental_condition = validation.incremental_condition;
+  const columns = validation.all_columns_count;
+}
+
+WITH input_table AS (
+  SELECT * FROM ${table_gcp} ${incremental_condition} 
+),
+diff_rows AS (
+  ${validation.count_differences_per_column_join(columns, 'input_table', table_export, join_key)}
+),
+total_diff AS (
+  ${validation.count_total_differences(columns, 'input_table', table_export)}
+),
+data_types AS (
+  SELECT column_name as `column`, data_type
+    FROM `${database_export}.${schema_export}.INFORMATION_SCHEMA.COLUMNS`
+  WHERE table_name = '${table_name_export}'
+)
+SELECT * FROM (SELECT 'TABLE_SIZE_DIFFERENCE' AS problem, 
+(SELECT COUNT(*) FROM input_table) - (SELECT COUNT(*) FROM ${table_export}) AS diff_count,
+'' AS `column`
+UNION ALL 
+SELECT 'TOTAL DIFFERENT ROWS' AS problem, * FROM total_diff unpivot(diff_count for `column` in (TOTAL)) where diff_count > 0
+UNION ALL
+SELECT 'DIFFERENT VALUES' AS problem, * FROM diff_rows unpivot(diff_count for `column` in (${columns})) where diff_count > 0)
+LEFT JOIN data_types USING(`column`)

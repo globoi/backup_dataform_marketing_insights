@@ -1,0 +1,412 @@
+config {
+  type: 'table',
+  name: 'Raiox_BBB_23_LF_Simulcast',
+  schema: 'bbb_23',
+  tags: ['bbb_23', 'bbb_23_simulcast'],
+  description: '',
+  columns: {}
+}
+
+with usuarios as (select * except(tipo_usuario),   case
+    when tipo_usuario is null then tipo_cadastro
+    else tipo_usuario
+  end as tipo_usuario, from ${ref("bbb_23", "Consumo_ao_vivo_bbb")}
+inner join ${ref("comunicacao", "ultima_comunicacao_geral")}
+ using(globo_id)
+    left join (
+      select
+        distinct globo_id,
+        'Ex-Assinante' as tipo_usuario
+      from
+      ${ref("sales_enriched", "asset_v2")}
+    ) using(globo_id)
+where tipo_cadastro ='Logado Free'),
+  conteudo AS (
+  SELECT
+    id AS mediaid,
+    kind,
+    service_id
+  FROM ${ref("conteudo_enriched", "all_content")}),
+impression as (
+  select
+    userid as globo_id,
+    mediaid,
+    program_id,
+    date,
+    hours_watched,
+    date_trunc(date, WEEK(MONDAY)) as semana,
+    program_subset,
+    case
+      when service_id = 6807 then 'mais_canais'
+      when program_subset = 'novelas' then 'novela'
+      when program_subset = 'series' then 'series'
+      when program_subset in('filmes', 'movies') then 'filmes'
+      when program_id = 9095 then 'ao_vivo_globo'
+      else 'outros_conteudos'
+    end as grupo
+  from
+    ${ref("consumo_enriched", "all_impression")}
+
+
+    left join conteudo using(mediaid)
+  where
+    date between '2023-01-16'
+    and '2023-04-26'
+    and program_id not in (
+      12082,
+      16280,
+      16281,
+      16284,
+      13492,
+      24008,
+      8568,
+      24022
+    )
+),
+
+base_geral as (
+  select
+    distinct globo_id,
+    tipo_usuario
+  from
+    usuarios
+),
+ai as (
+  select
+    *
+  from
+    base_geral
+    left join impression using(globo_id)
+),
+ai2 as (
+  select
+    *
+  from
+    (
+      select
+        distinct globo_id,
+        tipo_usuario,
+        semana,
+        hours_watched,
+        program_id,
+        mediaid,
+        date,
+        grupo
+      from
+        ai
+    ) pivot(
+      sum(hours_watched) horas,
+      count(distinct mediaid) qtd_midias,
+      count(distinct date) freq,
+      count(distinct program_id) qtd_programas for grupo in (
+        'mais_canais',
+        'novela',
+        'series',
+        'filmes',
+        'ao_vivo_globo',
+        'outros_conteudos'
+      )
+    )
+),
+consulta as (
+  select
+    *
+  except
+    (
+      horas_mais_canais,
+      horas_novela,
+      horas_series,
+      horas_filmes,
+      horas_ao_vivo_globo,
+      horas_outros_conteudos
+    ),
+    case
+      when horas_mais_canais is null then 0
+      else horas_mais_canais
+    end as horas_mais_canais,case
+      when horas_novela is null then 0
+      else horas_novela
+    end as horas_novela,case
+      when horas_series is null then 0
+      else horas_series
+    end as horas_series,
+    case
+      when horas_filmes is null then 0
+      else horas_filmes
+    end as horas_filmes,
+    case
+      when horas_ao_vivo_globo is null then 0
+      else horas_ao_vivo_globo
+    end as horas_ao_vivo_globo,case
+      when horas_outros_conteudos is null then 0
+      else horas_outros_conteudos
+    end as horas_outros_conteudos
+  from
+    ai2
+),
+consulta2 as (
+  select
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,
+    freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  from
+    consulta
+),
+consulta3 as (
+  select
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_mais_canais,
+    qtd_midias_mais_canais,case
+      when freq_mais_canais >= 8 then 7
+      else freq_mais_canais
+    end as freq_mais_canais,
+    qtd_programas_mais_canais,
+    horas_novela,
+    qtd_midias_novela,case
+      when freq_novela >= 8 then 7
+      else freq_novela
+    end as freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,case
+      when freq_series >= 8 then 7
+      else freq_series
+    end as freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,case
+      when freq_filmes >= 8 then 7
+      else freq_filmes
+    end as freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,case
+      when freq_ao_vivo_globo >= 8 then 7
+      else freq_ao_vivo_globo
+    end as freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,case
+      when freq_outros_conteudos >= 8 then 7
+      else freq_outros_conteudos
+    end as freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  from
+    consulta2
+),
+basebbb as (
+  select
+    * except(horas_ao_vivo_globo),
+      coalesce(horas_ao_vivo_globo,0) as horas_ao_vivo_globo
+  from
+    usuarios
+    left join consulta3 using(globo_id, tipo_usuario, semana)
+),
+
+lf as (select distinct  globo_id,
+tipo_usuario,
+  semana,
+   frequencia_ao_vivo as frequencia,
+  0 as horas_episode,
+  0 as qtd_midias_episode,
+  0 as freq_episode,
+  0 as horas_excerpt,
+  0 as qtd_midias_excerpt,
+  0 as freq_excerpt,
+  0 as horas_extra,
+  0 as qtd_midias_extra,
+  0 as freq_extra,
+  0 as horas_teaser,
+  0 as qtd_midias_teaser,
+  0 as freq_teaser,
+  0 as horas_trailer,
+  0 as qtd_midias_trailer,
+  0 as freq_trailer,
+  total_horas_ao_vivo_bbb,
+  frequencia_ao_vivo as frequencia_ao_vivo_bbb,
+  total_horas_ao_vivo_bbb as total_horas_bbb,
+  '5. Somente Simulcast' cluster_bbb,
+    (
+      total_horas_ao_vivo_bbb /(
+        horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_ao_vivo_bbb
+      )
+    ) as share_bbb,
+    case
+      when (
+        total_horas_ao_vivo_bbb /(
+          horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_ao_vivo_bbb
+        )
+      ) <= 0.5 then '00%-50%'
+      when (
+        total_horas_ao_vivo_bbb /(
+          horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_ao_vivo_bbb
+        )
+      ) <= 0.8 then '51%-80%'
+      else '81%-100%'
+    end as cluster_share_bbb,
+  COALESCE(horas_mais_canais,0) as horas_mais_canais,
+  COALESCE(qtd_midias_mais_canais,0) as qtd_midias_mais_canais,
+  COALESCE(freq_mais_canais,0) as freq_mais_canais,
+  COALESCE(qtd_programas_mais_canais,0) as qtd_programas_mais_canais,
+  COALESCE(horas_novela,0) as horas_novela,
+  COALESCE(qtd_midias_novela,0) as qtd_midias_novela,
+  COALESCE(freq_novela,0) as freq_novela,
+  COALESCE(qtd_programas_novela,0) as qtd_programas_novela,
+  COALESCE(horas_series,0) as horas_series,
+  COALESCE(qtd_midias_series,0) as qtd_midias_series,
+  COALESCE(freq_series,0) as freq_series,
+  COALESCE(qtd_programas_series,0) as qtd_programas_series,
+  COALESCE(horas_filmes,0) as horas_filmes,
+  COALESCE(qtd_midias_filmes,0) as qtd_midias_filmes,
+  COALESCE(freq_filmes,0) as freq_filmes,
+  COALESCE(qtd_programas_filmes,0) as qtd_programas_filmes,
+     case
+      when (horas_ao_vivo_globo - total_horas_ao_vivo_bbb) <= 0 then 0
+      else (horas_ao_vivo_globo - total_horas_ao_vivo_bbb)
+    end as horas_ao_vivo_globo,
+  COALESCE(freq_ao_vivo_globo,0) as freq_ao_vivo_globo,
+  COALESCE(horas_outros_conteudos,0) as horas_outros_conteudos,
+  COALESCE(qtd_midias_outros_conteudos,0) as qtd_midias_outros_conteudos,
+  COALESCE(freq_outros_conteudos,0) as freq_outros_conteudos,
+  COALESCE(qtd_programas_outros_conteudos,0) as qtd_programas_outros_conteudos,
+  false as assistiu_fora_da_casa,
+  false as assistiu_a_eliminacao,
+  false as assistiu_bbb23_exclusivo_gshow,
+  false as assistiu_bate_papo_bbb,
+  false as assistiu_click_bbb,
+  false as assistiu_maratona_bbb,
+  false as assistiu_bbb_ta_on,
+  false as assistiu_maratona_big_day,
+    case
+    when ((total_horas_ao_vivo_bbb>horas_filmes)
+    and (total_horas_ao_vivo_bbb>horas_novela)
+    and (total_horas_ao_vivo_bbb>horas_series)
+    and (total_horas_ao_vivo_bbb>horas_mais_canais)
+    and (total_horas_ao_vivo_bbb>horas_outros_conteudos)
+    and (total_horas_ao_vivo_bbb>horas_ao_vivo_globo)) then 'Somente Simulcast'
+      when (
+        (horas_filmes > horas_novela)
+        and (horas_filmes > horas_series)
+        and (horas_filmes > horas_mais_canais)
+        and (horas_filmes > horas_outros_conteudos)
+        and (horas_filmes > horas_ao_vivo_globo)
+      ) then 'Filmes'
+      when (
+        (horas_novela > horas_outros_conteudos)
+        and (horas_novela > horas_series)
+        and (horas_novela > horas_mais_canais)
+        and (horas_novela > horas_ao_vivo_globo)
+      ) then 'Novelas'
+      when (
+        (horas_series > horas_outros_conteudos)
+        and (horas_series > horas_mais_canais)
+        and (horas_series > horas_ao_vivo_globo)
+      ) then 'Series'
+      when (
+        (horas_mais_canais > horas_outros_conteudos)
+        and (horas_mais_canais > horas_ao_vivo_globo)
+      ) then 'Mais Canais'
+      when (horas_ao_vivo_globo > total_horas_ao_vivo_bbb)
+      and (horas_ao_vivo_globo > horas_novela)
+      and (horas_ao_vivo_globo > horas_series)
+      and (horas_ao_vivo_globo > horas_mais_canais)
+      and (horas_ao_vivo_globo > horas_outros_conteudos)
+      and (horas_ao_vivo_globo > horas_filmes) then 'Ao Vivo Globo'
+      ELSE 'Outros Conteudos'
+    end as perfil_consumo
+ from basebbb),
+
+  base_perfil AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, semana ORDER BY globo_id, semana ) AS rm,
+  FROM
+    lf QUALIFY rm = 1 ),
+perfil_fim as (SELECT
+  * EXCEPT (rm,cluster_bbb,share_bbb,cluster_share_bbb),
+  cast(cluster_bbb as string) as cluster_bbb,
+  case when share_bbb is null then 0 else share_bbb end as share_bbb ,
+  cast(cluster_share_bbb as string) as cluster_share_bbb
+  FROM
+  base_perfil
+  inner join (select distinct globo_id from usuarios) using (globo_id))
+  select 
+globo_id,
+tipo_usuario,
+  semana,
+  frequencia,
+  horas_episode,
+  qtd_midias_episode,
+  freq_episode,
+  horas_excerpt,
+  qtd_midias_excerpt,
+  freq_excerpt,
+  horas_extra,
+  qtd_midias_extra,
+  freq_extra,
+  horas_teaser,
+  qtd_midias_teaser,
+  freq_teaser,
+  horas_trailer,
+  qtd_midias_trailer,
+  freq_trailer,
+  total_horas_ao_vivo_bbb,
+  frequencia_ao_vivo_bbb,
+  total_horas_bbb,
+cluster_bbb,
+share_bbb ,
+cluster_share_bbb ,
+  horas_mais_canais,
+  qtd_midias_mais_canais,
+  freq_mais_canais,
+  qtd_programas_mais_canais,
+  horas_novela,
+  qtd_midias_novela,
+  freq_novela,
+  qtd_programas_novela,
+  horas_series,
+  qtd_midias_series,
+  freq_series,
+  qtd_programas_series,
+  horas_filmes,
+  qtd_midias_filmes,
+  freq_filmes,
+  qtd_programas_filmes,
+  horas_ao_vivo_globo,
+  freq_ao_vivo_globo,
+  horas_outros_conteudos,
+  qtd_midias_outros_conteudos,
+  freq_outros_conteudos,
+  qtd_programas_outros_conteudos,
+  assistiu_fora_da_casa,
+  assistiu_a_eliminacao,
+  assistiu_bbb23_exclusivo_gshow,
+  assistiu_bate_papo_bbb,
+  assistiu_click_bbb,
+  assistiu_maratona_bbb,
+  assistiu_bbb_ta_on,
+  assistiu_maratona_big_day,
+perfil_consumo
+  from perfil_fim

@@ -1,0 +1,23 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_inativos_mais_de_1mes','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_inativos_mais_de_1mes',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+select distinct 'named_user' as identifier_type, globo_id as UUID
+from ${ref("report_staging", "report_rodada")} a
+where date(ultima_escalacao_dt) <= CURRENT_DATE()-30
+and date(ultima_escalacao_dt) >= CURRENT_DATE()-180
+and temporada = 2024

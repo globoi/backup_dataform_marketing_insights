@@ -1,0 +1,140 @@
+config {
+  type: 'table',
+  name: 'asset_tratada',
+  schema: "usuarios",
+  tags: ["usuarios_staging_1"],
+  description: '',
+  columns: {
+    AssetId: '',
+    globo_id: '',
+    AssetName: '',
+    status: '',
+    caracteristica_produto: '',
+    tipo_de_pedido: '',
+    data_hora_compra: '',
+    canal_compra: '',
+    data_conversao_efetiva: '',
+    periodo_trial_form: '',
+    data_da_suspensao: '',
+    motivo_suspensao: '',
+    data_reativacao: '',
+    data_hora_cancelamento: '',
+    dt_hr_cancelamento_final_ciclo: '',
+    ato_de_cancelamento: '',
+    canal_cancelamento: '',
+    motivo_cancelamento: '',
+    tipo_cancelamento: '',
+    forma_cancelamento: '',
+    ProductCodeUnique__c: '',
+    ProductCode: '',
+    data_da_migracao: '',
+    cliente_migrado: '',
+    OldValue: '',
+    NewValue: '',
+    Cancelamento: '',
+    teve_trial: '',
+    dt_trial_inicio: '',
+    dt_trial_fim: '',
+    em_tria: '',
+  }
+}
+
+WITH asset_history AS (
+  SELECT
+    AssetId,
+    OldValue,
+    NewValue,
+    ROW_NUMBER() OVER (
+      PARTITION BY AssetId
+      ORDER BY
+        AssetHistoryCreatedDate DESC
+    ) AS last
+  FROM
+    ${ref("sales_clean", "asset_history_status")} QUALIFY last = 1
+),
+asset as (
+  SELECT
+    globo_id,
+    AssetId,
+    AssetName,
+    status,
+    caracteristica_produto,
+    tipo_de_pedido,
+    data_hora_compra,
+    canal_compra,
+    data_conversao_efetiva,
+    periodo_trial_form,
+    data_da_suspensao,
+    motivo_suspensao,
+    data_reativacao,
+    data_hora_cancelamento,
+    dt_hr_cancelamento_final_ciclo,
+    ato_de_cancelamento,
+    canal_cancelamento,
+    motivo_cancelamento,
+    tipo_cancelamento,
+    forma_cancelamento,
+    ProductCodeUnique__c,
+    ProductCode,
+    data_da_migracao,
+    IF(ASSINATURA_ID IS NOT NULL, TRUE, FALSE) AS cliente_migrado,
+  FROM
+    ${ref("sales_enriched", "asset")} QUALIFY ROW_NUMBER() OVER (
+      PARTITION BY globo_id
+      ORDER BY
+        data_hora_compra DESC
+    ) = 1
+),
+asset_join as (
+  SELECT
+    * EXCEPT (AssetId, last),
+    a.AssetId,
+    CASE
+      WHEN LOWER(status) LIKE '%cancelado%'
+      AND LOWER(canal_compra) LIKE '%apple%' THEN 'Cancelado_Apple'
+      WHEN LOWER(status) LIKE '%ativo%'
+      AND dt_hr_cancelamento_final_ciclo IS NOT NULL THEN 'Cancelado_Voluntário'
+      WHEN LOWER(status) LIKE '%cancelado%'
+      AND LOWER(canal_compra) LIKE '%web%' THEN CONCAT(status, '_', tipo_cancelamento)
+      WHEN LOWER(status) LIKE '%cancelado%'
+      AND LOWER(canal_compra) LIKE '%google%'
+      AND LOWER(OldValue) LIKE '%ativo%'
+      AND LOWER(NewValue) LIKE '%cancelado%' THEN 'Cancelado_Voluntário'
+      WHEN LOWER(status) LIKE '%cancelado%'
+      AND LOWER(canal_compra) LIKE '%google%'
+      AND LOWER(OldValue) LIKE '%suspenso%'
+      AND LOWER(NewValue) LIKE '%cancelado%' THEN 'Cancelado_Involuntário'
+      WHEN LOWER(status) LIKE '%cancelado%' THEN CONCAT(status, '_', tipo_cancelamento)
+    END AS Cancelamento,
+    IF(periodo_trial_form > 0, TRUE, FALSE) AS teve_trial
+  FROM
+    asset a
+    LEFT JOIN asset_history ah ON a.AssetId = ah.AssetId
+),
+asset_inc as(
+  SELECT
+    *,
+    CASE
+      WHEN teve_trial THEN data_hora_compra
+    END AS dt_trial_inicio,
+    CASE
+      WHEN teve_trial THEN DATE_ADD(
+        data_hora_compra,
+        INTERVAL CAST(periodo_trial_form AS INT64) DAY
+      )
+    END AS dt_trial_fim
+  FROM
+    asset_join
+)
+SELECT
+  *,
+  CASE
+    WHEN teve_trial
+    AND CURRENT_DATE() BETWEEN DATE(dt_trial_inicio)
+    AND DATE(dt_trial_fim) THEN TRUE
+    ELSE FALSE
+  END AS em_trial,
+from
+  asset_inc
+
+

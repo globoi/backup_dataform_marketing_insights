@@ -1,0 +1,711 @@
+config {
+    type: "table",
+    schema: 'cross',
+    tags: ["cross",
+        "schedule_tag=cross_base_jornadas_unificadas_cross",
+        'schedule_cron=30 11 * * *'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "cross",
+            owner: "martech",
+            horario: "11h30min"
+        }
+    },
+    description: 'Tabela com os dados de e-mail dos usuários que foram impactados pelas jornadas cross.',
+    columns: {
+        globo_id: "Código que identifica o usuário.",
+        send_date: "Data de envio do e-mail.",
+        data_ativacao: "Data da ativação da jornada.",
+        journey_id: "O identificador exclusivo da jornada. Existem um ou mais VersionIDs associados a um JourneyID.",
+        email_subject: "O assunto do e-mail enviado.",
+        open_date: "Data de abertura do email.",
+        click_date: "Data do clique.",
+        activity_id: "O identificador exclusivo da atividade.",
+        activity_name: "O nome da atividade.",
+        nome_jornada: "Nome da jornada.",
+        tipo_comunicacao: "Tipo de canal pelo qual a jornada foi enviada. Ex: Email, push, etc.",
+        publico: "Público alvo da jornada.",
+        produto_sender: "Produto gatilho da jornada.",
+        produto_alvo: "Produto alvo da jornada."
+    }
+}
+
+WITH
+  cte_ge AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_ge_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  ge AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_ge
+  WHERE
+    nome_jornada='ge_jorn_a_cross-gcom-ge'
+  ORDER BY
+    open_date DESC),
+  cte_gshow AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_gshow_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  gshow AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_gshow
+  WHERE
+    nome_jornada='gshow_jorn_a_cross-gcom-gshow'
+  ORDER BY
+    open_date DESC),
+  cte_receitas AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_receitas_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  receitas AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_receitas
+  WHERE
+    nome_jornada='jornada_cross_receitas_globocom'),
+  cte_lf AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (7)] AS data_ativacao,
+    -- SPLIT(ActivityName, '_')[offset(8)] AS versao,
+    JourneyID,
+    EmailSubject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    ActivityID,
+    ActivityName,
+    LOWER(JourneyName_original) AS nome_jornada,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(ActivityName, '_')[ OFFSET (6)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(ActivityName, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(ActivityName,"-","_") AS ActivityName2
+  FROM
+    ${ref("mkt_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  lf AS (
+  SELECT
+    * EXCEPT(ActivityName2),
+    LOWER(SPLIT(ActivityName2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_lf
+  WHERE
+    nome_jornada='gp_jorn_a_cross-gcom-globoplay'),
+  cte_ass AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (7)] AS data_ativacao,
+    -- SPLIT(ActivityName, '_')[offset(8)] AS versao,
+    JourneyID,
+    EmailSubject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    ActivityID,
+    ActivityName,
+    LOWER(JourneyName_original) AS nome_jornada,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(ActivityName, '_')[ OFFSET (6)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(ActivityName, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(ActivityName,"-","_") AS ActivityName2
+  FROM
+    ${ref("mkt_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  ass AS (
+  SELECT
+    * EXCEPT(ActivityName2),
+    LOWER(SPLIT(ActivityName2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_ass
+  WHERE
+    nome_jornada='gp_jorn_e_cross-gcom-globoplay'),
+  cte_g1 AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_familiag_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  cte_g1_2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_g1
+  WHERE
+    nome_jornada IN ('g1_jorn_a_cross-gcom-g1',
+      'g1_jorn_a_cross-gcom-g1_ge')
+  ORDER BY
+    open_date DESC),
+  g1 AS (
+  SELECT
+    * EXCEPT(produto_alvo),
+    CASE
+      WHEN produto_alvo='ge' THEN 'gcom'
+      ELSE produto_alvo
+  END
+    AS produto_alvo
+  FROM
+    cte_g1_2),
+  ct_ge AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_cartola_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  ct_ge2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    ct_ge
+  WHERE
+    LOWER(email_subject) LIKE '%forme a melhor dupla de ataque com o ge%' ),
+  cte_ct_gplay AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_cartola_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  cte_ct_gplay2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_ct_gplay
+  WHERE
+    LOWER(email_subject) LIKE '%a tabelinha que te faz campeão%' ),
+  cte_ge_ct AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_ge_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  cte_ge_ct2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_ge_ct
+  WHERE
+    nome_jornada ='ge_jorn_cross-brasileirão-cartola' ),
+  cte_ge_gplay AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_ge_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  cte_ge_gplay2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_ge_gplay
+  WHERE
+    nome_jornada='ge_jorn_cross-brasileirão-gp' ),
+  cte_gplay_ct AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (7)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    JourneyID,
+    EmailSubject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    ActivityID,
+    ActivityName,
+    LOWER(JourneyName_original) AS nome_jornada,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(ActivityName, '_')[ OFFSET (6)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(ActivityName, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(ActivityName,"-","_") AS ActivityName2
+  FROM
+    ${ref("mkt_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  cte_gplay_ct2 AS (
+  SELECT
+    * EXCEPT(ActivityName2),
+    LOWER(SPLIT(ActivityName2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_gplay_ct
+  WHERE
+    nome_jornada='gp_jorn_cross_brasileirao_globoplay_cartola' ),
+  cte_gplay_ge AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (7)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    JourneyID,
+    EmailSubject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    ActivityID,
+    ActivityName,
+    LOWER(JourneyName_original) AS nome_jornada,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(ActivityName, '_')[ OFFSET (6)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(ActivityName, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(ActivityName,"-","_") AS ActivityName2
+  FROM
+    ${ref("mkt_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  cte_gplay_ge2 AS (
+  SELECT
+    * EXCEPT(ActivityName2),
+    LOWER(SPLIT(ActivityName2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_gplay_ge
+  WHERE
+    nome_jornada=' gp_jorn_cross_ brasileirão_globoplay_ge' ),
+  cte_gplay_premiere AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (7)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    JourneyID,
+    EmailSubject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    ActivityID,
+    ActivityName,
+    LOWER(JourneyName_original) AS nome_jornada,
+    SPLIT(ActivityName, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(ActivityName, '_')[ OFFSET (6)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(ActivityName, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(ActivityName,"-","_") AS ActivityName2
+  FROM
+    ${ref("mkt_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(JourneyName_original) LIKE '%cross%' ),
+  cte_gplay_premiere2 AS (
+  SELECT
+    * EXCEPT(ActivityName2),
+    LOWER(SPLIT(ActivityName2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_gplay_premiere
+  WHERE
+    nome_jornada='gp_jorn_cross-brasileirao-globoplay_premiere' ),
+  cte_premiere_gplay AS (
+  SELECT
+    GLOBO_ID AS globo_id,
+    DATE(send_date) AS send_date,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (6)] AS data_ativacao,
+    -- SPLIT(activity_name, '_')[offset(8)] AS versao,
+    journey_id,
+    email_subject,
+    DATE(open_date) AS open_date,
+    DATE(click_date) AS click_date,
+    activity_id,
+    activity_name,
+    LOWER(journey_name_original) AS nome_jornada,
+    SPLIT(activity_name, '_')[
+  OFFSET
+    (3)] AS tipo_comunicacao,
+    CASE
+      WHEN SPLIT(activity_name, '_')[ OFFSET (5)] = 'ASS' THEN 'assinante'
+      ELSE 'logado_free'
+  END
+    AS publico,
+    LOWER(SPLIT(activity_name, '_')[
+    OFFSET
+      (0)]) AS produto_sender,
+    REPLACE(activity_name,"-","_") AS activity_name2
+  FROM
+    ${ref("mktcloud_premiere_enriched", "email_send")}
+  WHERE
+    date >= "2024-05-01"
+    AND LOWER(journey_name_original) LIKE '%cross%' ),
+  cte_premiere_gplay2 AS (
+  SELECT
+    * EXCEPT(activity_name2),
+    LOWER(SPLIT(activity_name2, '_')[
+    OFFSET
+      (5)]) AS produto_alvo
+  FROM
+    cte_premiere_gplay
+  WHERE
+    nome_jornada='pr_jorn_cross_brasileirao_premiere_gp'
+  ORDER BY
+    open_date DESC)
+SELECT
+  *
+FROM
+  ge
+UNION ALL
+SELECT
+  *
+FROM
+  gshow
+UNION ALL
+SELECT
+  *
+FROM
+  receitas
+UNION ALL
+SELECT
+  *
+FROM
+  lf
+UNION ALL
+SELECT
+  *
+FROM
+  ass
+UNION ALL
+SELECT
+  *
+FROM
+  g1
+UNION ALL
+SELECT
+  *
+FROM
+  ct_ge2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_ct_gplay2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_ge_ct2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_ge_gplay2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_gplay_ct2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_gplay_ge2
+UNION ALL
+SELECT
+  *
+FROM
+  cte_gplay_premiere2
+UNION ALL
+SELECT
+  *
+FROM
+cte_premiere_gplay2

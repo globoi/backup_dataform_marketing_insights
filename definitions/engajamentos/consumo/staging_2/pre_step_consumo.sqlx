@@ -1,0 +1,61 @@
+config {
+    type: 'table',
+    name: 'pre_step_consumo',
+    schema: 'consumo',
+    tags: ['consumo_staging_2',
+        "schedule_tag=consumo_pre_step_consumo"
+    ],
+    description: '',
+    columns: {}
+}
+
+WITH
+  ativa AS (
+  SELECT
+    globo_id,
+    info_trial.id_asset AS assetid,
+    TIMESTAMP(data_hora_compra) AS data_hora_compra
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")},
+    UNNEST (info) AS info_trial
+  WHERE
+    LOWER(tipo_assinante) NOT LIKE '%trial' ),
+  consumo AS (
+  SELECT
+    userid,
+    mediaid,
+    sessionid,
+    environment,
+    is_full_content,
+    `timestamp`,
+    program_id,
+    assinante_only,
+    hours_watched,
+    `date`
+  FROM
+    ${ref("consumo_enriched", "all_impression")} ),
+  program AS (
+  SELECT
+    id AS program_id,
+    title AS program_title,
+    subset AS program_subset
+  FROM
+    ${ref("conteudo_enriched", "program")} ),
+  join_all AS (
+  SELECT
+    *
+  FROM
+    ativa a
+  LEFT JOIN
+    consumo c
+  ON
+    c.userid = a.globo_id
+    AND c.`timestamp` >= a.data_hora_compra
+  LEFT JOIN
+    program p
+  USING
+    (program_id) )
+SELECT
+  *
+FROM
+  join_all

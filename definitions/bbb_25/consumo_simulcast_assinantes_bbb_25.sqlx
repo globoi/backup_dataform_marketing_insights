@@ -1,0 +1,102 @@
+config {
+    type: "table",
+    schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_consumo_simulcast_assinantes_bbb_25',
+        "schedule_cron=0 10 * * *"
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "bbb_25",
+            owner: "martech",
+            horario: "10h00min"
+        }
+    },
+    description: 'Tabela com assinantes que assistem o bbb 25 via simulcast e estão ou não na tabela raiox_bbb_25_assinantes. OBS: Dados em D-2.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        canal: 'Canal em que o assinante assistiu o programa.',
+        programa: 'Programa relacionado ao BBB que o assinante assistiu.',
+        semana: 'Semana em que o assinante assistiu o programa.',
+        frequencia_simulcast: 'Total de dias na semana em que o assinante consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+        total_horas_simulcast_bbb: 'Total de horas na semana em que o assinante consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+        raiox_bbb: 'Flag se o assinante está ou não na tabela raiox_bbb_25_assinantes.'
+    }
+}
+
+WITH
+  base AS (
+  SELECT
+    globoid AS globo_id,
+    canal,
+    programa,
+    CASE
+      WHEN playtime_hours IS NULL THEN 0
+      ELSE playtime_hours
+  END
+    AS playtime_hours,
+    DATE_TRUNC(data_consumo, WEEK(MONDAY)) AS semana,
+    COUNT(DISTINCT data_consumo) OVER(PARTITION BY globoid, DATE_TRUNC(data_consumo, WEEK(MONDAY)) ) AS frequencia_ao_vivo,
+  FROM
+    ${ref('simulcast', 'consumo_ibope')}
+  WHERE
+    data_consumo BETWEEN "2025-01-13"
+    AND '2025-04-28'
+    AND ( LOWER(programa) LIKE '%big brother%'
+      OR LOWER(programa) LIKE '%bbb%' )
+    AND ( program_id = '9095'
+      OR LOWER(canal) LIKE '%multishow%' )
+    AND globoid IS NOT NULL
+    AND LENGTH(globoid) - LENGTH(REPLACE(globoid, '-', '')) = 4 ),
+  assinantes AS (
+  SELECT
+    DISTINCT globo_id,
+    MAX(dt_assinatura_comeco) OVER(PARTITION BY globo_id) AS dt_assinatura_comeco,
+    MAX(dt_proc) OVER(PARTITION BY globo_id) AS base_ativa
+  FROM
+    ${ref('usuarios', 'base_ativa_incremental_new')}
+  WHERE
+    dt_proc >= '2023-01-14'
+    AND tipo_assinante != 'trial'
+    AND assinatura_gplay = 'nacional' ),
+  assinantes2 AS (
+  SELECT
+    globo_id,
+    base_ativa,
+    dt_assinatura_comeco,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, base_ativa, dt_assinatura_comeco ORDER BY globo_id, base_ativa, dt_assinatura_comeco ) AS rm,
+  FROM
+    assinantes
+  QUALIFY
+    rm = 1 )
+SELECT
+  DISTINCT globo_id,
+  canal,
+  programa,
+  b.semana,
+  CASE
+    WHEN frequencia_ao_vivo >= 8 THEN 7
+    ELSE frequencia_ao_vivo
+END
+  AS frequencia_simulcast,
+  SUM(playtime_hours) OVER (PARTITION BY globo_id, b.semana) AS total_horas_simulcast_bbb,
+  IFNULL(raiox_bbb, FALSE) AS raiox_bbb
+FROM
+  base AS b
+INNER JOIN
+  assinantes2
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    semana,
+    TRUE AS raiox_bbb
+  FROM
+    ${ref('bbb_25', 'raiox_bbb_25_assinantes')})
+USING
+  (globo_id,
+    semana)
+ORDER BY
+  globo_id,
+  semana ASC

@@ -1,0 +1,14 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_permutive_ex_ass_gp'],
+  name: 'permutive_ex_ass_gp',
+  schema: 'segment_api',
+  description: 'base de ex assinantes globoplay',
+  columns: {
+  }
+}
+
+SELECT DISTINCT globo_id AS user_id
+--FROM `gglobo-mkt-ins-hdg-prd.usuarios.base_ex_assinantes_e_logado_free` 
+FROM ${ref("usuarios","base_ex_assinantes_e_logado_free")}
+WHERE tipo_usuario = "Ex-Assinante"

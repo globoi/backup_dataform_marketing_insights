@@ -1,0 +1,34 @@
+config {
+  type: "table",
+  schema: 'campanhas_mkt',
+  tags: [
+    "schedule_tag=campanhas_mkt_mktflow_lf_bbb_24_categorias"
+  ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech" 
+    }
+  }
+}
+with maxsemana as (
+  SELECT max(a.semana) as ultima_semana
+    FROM ${ref("bbb_24", "raiox_bbb_24_lf")} as a 
+),
+base_final as (
+  SELECT
+    DISTINCT b.globo_id,b.semana,
+  CASE
+    WHEN cluster_bbb = '1. Light User' THEN 'light user'
+    WHEN cluster_bbb = '2. Mid-Light User' THEN 'light user'
+    WHEN cluster_bbb = '3. Mid-Heavy User' THEN 'mid user'
+    WHEN cluster_bbb = '4. Heavy User' THEN 'heavy user'
+    ELSE '0. No Live'
+  END AS categoria,
+  FROM ${ref("bbb_24", "raiox_bbb_24_lf")} as b
+    WHERE semana = ((SELECT ultima_semana FROM maxsemana)-7)
+)
+
+SELECT distinct globo_id, categoria
+FROM base_final

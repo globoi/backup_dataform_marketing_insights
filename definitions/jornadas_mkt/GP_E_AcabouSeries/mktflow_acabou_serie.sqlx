@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  name: "mktflow_acabou_serie",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries", 'schedule_tag=jornadas_mkt_mktflow_acabou_serie']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+globo_id,
+program_id,
+DATETIME(ultimo_consumo) AS data_terminou_serie,
+season,
+info.assinatura_gplay,
+CURRENT_DATE() AS dt_proc,
+CASE
+  WHEN program_id in (12887,11758,12121,12764,10853,11873,13067,13331,13340,11612,12090,13495,13718,12331,13938,14035,13966,14144,14678,14868) 
+  THEN 'parte_2'
+  ELSE 'parte_1'
+END AS jornada
+FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")}, UNNEST(info) AS info
+INNER JOIN  ${ref("consumo", "series_history")}
+USING (globo_id)
+WHERE (mediaid != 8683996 AND program_id != 12917)
+AND terminou_serie 
+AND LOWER(assinatura_gplay) = "nacional"
+AND LOWER(tipo_assinante) NOT LIKE "%trial%"
+AND DATE_DIFF(CURRENT_DATE(), DATE(ultimo_consumo), DAY) <= 7

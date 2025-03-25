@@ -1,0 +1,119 @@
+config {
+  type: 'table',
+  name: 'dependentes_sf',
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_BoasVindasDependentes",'schedule_tag=jornadas_mkt_dependentes_sf'],
+  description: ' '
+}
+
+WITH base_titular AS (
+  SELECT
+    globo_id,
+    i.id_asset,
+    tipo_assinante,
+    i.mais_canais,
+    i.Produto_Contratado,
+    i.produto,
+    i.origem
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS ativa, UNNEST(info) as i
+),
+
+account AS (
+    SELECT
+        id AS AccountId,
+        globo_id,
+    FROM
+        ${ref("sales_gold", "customer_details")}
+),
+
+union_account_legacy AS (
+    SELECT * FROM account
+    UNION DISTINCT
+    SELECT AccountId, globo_id FROM `gglobo-foundation-psd-hdg-prd.sales_clean.account_legacy` AS leg
+    WHERE leg.table_suffix <= current_date()
+)
+
+,dep AS (
+  SELECT
+    *
+  FROM
+    ${ref("sales_gold", "subscription_dependent_details")}
+)
+
+,base_relacionamento_step_1 AS (
+  SELECT 
+    AccountId,
+    globo_id AS globo_id_titular,
+    d.globo_id_dependente,
+    d.data_criacao_dependente,
+    d.data_ultima_modificacao,
+    d.status
+  FROM
+    union_account_legacy a
+  INNER JOIN
+    (
+      SELECT
+        dependent_globoid AS globo_id_dependente,
+        parent_customer_id AS AccountId,
+        start_date AS data_criacao_dependente,
+        end_date AS data_cancelamento_dependente,
+        extract_date AS data_ultima_modificacao,
+        status AS status
+      FROM
+        dep 
+      WHERE dependent_globoid IS NOT NULL
+    ) AS d USING (AccountId)
+)
+
+,base_relacionamento_step_2 AS (
+  SELECT
+    globo_id_dependente,
+    globo_id_titular,
+    MIN(status) AS status,
+    MIN(data_criacao_dependente) AS data_criacao_dependente,
+    MIN(data_ultima_modificacao) AS data_ultima_modificacao
+  FROM
+    base_relacionamento_step_1
+  GROUP BY globo_id_dependente, globo_id_titular
+)
+
+,base_relacionamento_step_3 AS (
+  SELECT
+    * EXCEPT(status, data_ultima_modificacao, data_criacao_dependente),
+    IF(data_criacao_dependente IS NULL, TIMESTAMP(data_ultima_modificacao), data_criacao_dependente) AS data_criacao_dependente
+  FROM 
+    base_relacionamento_step_2
+  WHERE LOWER(status) = 'active' 
+)
+,base_relacionamento_step_4 AS (
+  SELECT 
+     *,
+     ROW_NUMBER() OVER(PARTITION BY globo_id_dependente) AS rn
+  FROM base_relacionamento_step_3
+  QUALIFY rn = 1
+)
+
+,base_relacionamento_final AS (
+  SELECT 
+     * EXCEPT (rn)
+  FROM base_relacionamento_step_4
+
+)
+,base_dependentes_sf AS (
+  SELECT 
+    globo_id AS globo_id_titular,
+    r.globo_id_dependente,
+    r.data_criacao_dependente,
+    'dependente' AS tipo_assinante,
+    produto,
+    mais_canais,
+    Produto_Contratado,
+    origem
+  FROM
+    base_titular t 
+  INNER JOIN base_relacionamento_final r
+  ON t.globo_id = r.globo_id_titular
+
+)
+SELECT DISTINCT * FROM base_dependentes_sf

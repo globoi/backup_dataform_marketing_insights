@@ -1,0 +1,23 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=campanhas_mkt_mktflow_cartoleiros_pro_2023_2024'],
+  name: 'mktflow_cartoleiros_pro_2023_2024',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  },
+
+    bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_",
+      urban: "list"
+    }
+  }
+}
+
+
+SELECT DISTINCT 'named_user' as identifier_type, globo_id as UUID
+FROM ${ref("report_staging", "report_temporada")}
+WHERE pro_em is not null
+AND temporada >= 2023

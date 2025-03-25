@@ -1,0 +1,26 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_ex_jornada_boas_vindas_paulistao', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_automatica_ex_jornada_boas_vindas_paulistao',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT cartola_id AS globo_id,
+  MIN(create_date) AS create_date
+FROM
+  `gglobo-cartola-express-hdg-prd.dfs.user`
+WHERE
+  cartola_id IS NOT NULL
+GROUP BY
+  1

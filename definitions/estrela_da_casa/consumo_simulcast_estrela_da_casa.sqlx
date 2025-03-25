@@ -1,0 +1,66 @@
+config {
+    type: 'table',
+    name: 'consumo_simulcast_estrela_da_casa',
+    schema: 'estrela_da_casa',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "estrela_da_casa",
+            owner: "martech",
+            horario: "18h40min"
+
+        }
+    },
+    description: 'Tabela com os usuários que assistiram algum conteúdo relacionado ao programa Estrela da Casa via simulcast (FONTE GA).',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        canal: 'Canal em que o usuário assistiu o programa.',
+        programa: 'Programa relacionado ao Estrela da Casa que o usuário assistiu.',
+        semana: 'Semana em que o usuário assistiu o programa.',
+        frequencia_simulcast: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao Estrela da Casa ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+        total_horas_simulcast: 'Total de horas na semana em que o usuário consumiu os programas relacionados ao Estrela da Casa ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).'
+    }
+
+}
+
+WITH
+  base AS (
+  SELECT
+    globoid,
+    canal,
+    programa,
+    CASE
+      WHEN playtime_hours IS NULL THEN 0
+      ELSE playtime_hours
+  END
+    AS playtime_hours,
+    DATE_TRUNC(data_consumo, WEEK(MONDAY)) AS semana,
+    COUNT(DISTINCT data_consumo) OVER(PARTITION BY globoid, DATE_TRUNC(data_consumo, WEEK(MONDAY)) ) AS frequencia_ao_vivo,
+  FROM
+    ${ref('simulcast', 'consumo_ibope')}
+  WHERE
+    data_consumo >= "2024-08-13"
+    AND ( LOWER(programa) LIKE '%estrela%' )
+    AND ( program_id = '9095'
+      OR LOWER(canal) LIKE '%multishow%' ) )
+SELECT
+  DISTINCT globoid AS globo_id,
+  tipo_cadastro,
+  canal,
+  programa,
+  semana,
+  CASE
+    WHEN frequencia_ao_vivo >= 8 THEN 7
+    ELSE frequencia_ao_vivo
+END
+  AS frequencia_simulcast,
+  SUM(playtime_hours) OVER (PARTITION BY globoid, semana) AS total_horas_simulcast
+FROM
+  base AS b
+INNER JOIN
+  ${ref('comunicacao', 'ultima_comunicacao_geral')} AS c
+ON
+  c.globo_id = b.globoid
+ORDER BY
+  globo_id,
+  semana asc

@@ -1,0 +1,12 @@
+config {
+  type: 'table',
+  tags: ['sales_gold',
+         "schedule_tag=temp_final_test"],
+  name: 'final_test',
+  schema: 'temp',
+  description: 'Tabela para testar o reset do scheduler',
+}
+
+SELECT * FROM ${ref("temp", "dependence_1")}
+UNION ALL
+SELECT * FROM ${ref("temp", "dependence_2")}

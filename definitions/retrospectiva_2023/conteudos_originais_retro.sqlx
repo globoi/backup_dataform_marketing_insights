@@ -1,0 +1,56 @@
+config {
+  type: "table",
+  name: "conteudos_originais_retro",
+  schema: "retrospectiva_2023"
+}
+
+SELECT
+  distinct program_id,
+  program_title,
+  media_kit_resource__poster
+FROM
+  ${ref('conteudo_enriched', 'all_content')} as c
+  left join ${ref('conteudo_enriched', 'program')} as p on p.id = c.program_id
+where
+  program_id in(
+    11190,
+    11626,
+    11782,
+    11873,
+    17394,
+    19803,
+    22244,
+    22446,
+    22448,
+    22459,
+    23160,
+    23192,
+    23192,
+    23253,
+    23762,
+    24046,
+    24418,
+    24806,
+    24807,
+    24809,
+    24828,
+    25211,
+    25303,
+    25489,
+    25538,
+    25538,
+    25538,
+    25539,
+    25644,
+    25689,
+    25796,
+    25814,
+    25815,
+    26072,
+    26259,
+    26499,
+    26557,
+    26549,
+    26189,
+    23674
+  )

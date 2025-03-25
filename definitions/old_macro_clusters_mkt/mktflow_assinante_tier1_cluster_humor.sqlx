@@ -1,0 +1,64 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_assinante_tier1_cluster_humor'],
+  name: 'mktflow_assinante_tier1_cluster_humor',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+--macro cluster tier 1 humor
+--assinantes tier 1 que consumiram programas de humor vod (filmes,series ou programas) ou programas de humor ao vivo nos ultimos 180 dias.
+
+with todos_os_generos as (
+SELECT distinct  g.name, c.program.title, c.program.id, c.program.subset, c.program.metadata_scheme, c.program.format
+FROM ${ref("conteudo", "all_content_program")} c,
+UNNEST(c.genres) g
+),
+
+genero_humor as (
+SELECT *
+FROM todos_os_generos
+WHERE name in ('Humor', 'Comédia') 
+),
+
+consumo_em_genero_humor as (
+SELECT distinct a.userId as globo_id
+FROM ${ref("consumo_enriched", "impression")} a
+INNER JOIN genero_humor b
+ON a.program_id = b.id
+WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+),
+
+consumo_em_programas_ao_vivo_humor as (
+SELECT distinct globoid
+FROM ${ref("simulcast", "consumo_ibope")} 
+WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+AND subgenero_programa in ('COMEDIA','HUMORISTICO')
+),
+
+uniao_consumo_vod_e_ao_vivo as (
+SELECT globo_id, 'consumo humor' as base
+FROM consumo_em_genero_humor
+UNION DISTINCT
+SELECT globoid as globo_id, 'consumo humor' as base
+FROM consumo_em_programas_ao_vivo_humor)
+
+SELECT distinct 'named_user' as identifier_type, e.globo_id
+FROM uniao_consumo_vod_e_ao_vivo d
+INNER JOIN ${ref("comunicacao", "ultima_comunicacao_geral")} e
+ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+AND e.mais_canais = false
+
+
+
+
+

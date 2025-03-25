@@ -1,0 +1,7 @@
+config { 
+    type: "declaration", 
+    database: "gglobo-mkt-ins-hdg-prd", 
+    schema: "retrospectiva_2023", 
+    name: "optin_gplay_whatsapp", 
+    description: ""
+    }

@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  schema: "jornadas_mkt",
+  name: "auxiliar_tier",
+  tags: ["jornadas_mkt_conteudo",'schedule_tag=jornadas_mkt_auxiliar_tier']
+}
+
+
+SELECT
+CASE
+  WHEN service_id != 6807 THEN 'tier_1'
+  ELSE NULL
+END AS tier_1,
+program_id
+FROM ${ref("conteudo_enriched", "content")}
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY program_id 
+  ORDER BY COALESCE(published_at, scheduled_publication_in) DESC) = 1

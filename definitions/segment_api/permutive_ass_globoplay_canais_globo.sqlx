@@ -1,0 +1,16 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=segment_permutive_ass_globoplay_canais_globo'],
+    name: 'permutive_ass_globoplay_canais_globo',
+    schema: 'segment_api',
+    description: 'assinantes de globoplay e canais globo avulso',
+    columns: {}
+}
+
+SELECT
+  DISTINCT globo_id AS user_id
+FROM
+  ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS a,
+  UNNEST(info) AS h
+WHERE
+  Produto_Contratado = "Globoplay + canais"

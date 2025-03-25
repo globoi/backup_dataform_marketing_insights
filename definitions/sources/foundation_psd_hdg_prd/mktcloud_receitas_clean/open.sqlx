@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "open",
+    schema: "mktcloud_receitas_clean",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

@@ -1,0 +1,14 @@
+config {
+  type: 'table',
+  name: 'entrada_no_cluster_bbb22',
+  tags: ['bbb_22'],
+  schema: 'bbb_22',
+}
+
+SELECT 
+  globo_id,
+  MIN(semana) AS min_of_semana
+FROM
+    ${ref("bbb_22", "RaioxBBB22")}
+GROUP by globo_id
+

@@ -1,0 +1,13 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=segment_api_permutive_ge_controle'],
+    name: 'permutive_ge_controle',
+    schema: 'segment_api',
+    description: 'base de controle mensal full dos globoids para teste no ge',
+    columns: {}
+}
+
+SELECT
+  DISTINCT globo_id AS user_id
+FROM ${ref("segmento_ge", "ge_controle")}
+--`gglobo-mkt-ins-hdg-prd.segmento_ge.ge_controle`

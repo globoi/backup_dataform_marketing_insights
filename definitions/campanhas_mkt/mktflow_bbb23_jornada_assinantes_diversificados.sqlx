@@ -1,0 +1,40 @@
+config {
+  type: 'table',
+  tags: ['bbb_23'],
+  name: 'mktflow_bbb23_jornada_assinantes_diversificados',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+maxsemana as (    
+
+  SELECT max(a.semana) as ultima_semana
+    FROM ${ref("bbb_23", "Raiox_BBB_23_Assinantes")} as a 
+), 
+
+base_final as (
+  SELECT 
+    b.globo_id,
+    perfil_consumo,
+    --(date(b.semana) - 7 ), --Linha não utilizada
+    semana
+  FROM ${ref("bbb_23", "Raiox_BBB_23_Assinantes")} as b 
+  WHERE cluster_share_bbb = '00%-50%'
+    AND base_ativa = current_date('America/Sao_Paulo')
+
+    --and semana = (select ultima_semana from maxsemana) --Linha alterada para puxar da ultima semana fechada
+    AND semana = ((SELECT ultima_semana FROM maxsemana)-7)
+)
+
+SELECT globo_id,
+  MAX(perfil_consumo) as perfil_consumo
+FROM base_final
+GROUP BY 1

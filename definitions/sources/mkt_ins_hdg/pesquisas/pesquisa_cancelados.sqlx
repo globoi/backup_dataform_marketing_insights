@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "pesquisas",
+  name: "pesquisa_cancelados",
+  description: ""
+}

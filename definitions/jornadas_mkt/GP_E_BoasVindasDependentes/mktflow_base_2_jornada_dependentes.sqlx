@@ -1,0 +1,96 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_2_jornada_dependentes',
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_BoasVindasDependentes",'schedule_tag=jornadas_mkt_mktflow_base_2_jornada_dependentes'],
+  description: 'x'
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+WITH
+dependentes AS (
+    SELECT
+        DISTINCT(globo_id_dependente),
+        * EXCEPT(data_criacao_dependente, mais_canais, globo_id_dependente),
+        LOWER(Produto_Contratado) LIKE '%disney%' AS possui_disney,
+        LOWER(Produto_Contratado) LIKE '%telecine%' AS possui_telecine,
+        LOWER(Produto_Contratado) LIKE '%premiere%' AS possui_premiere,
+        LOWER(Produto_Contratado) LIKE '%combate%' AS possui_combate,
+        mais_canais AS possui_mais_canais,
+        TIMESTAMP(data_criacao_dependente) AS data_criacao_dependente
+    FROM
+        ${ref("jornadas_mkt", "dependentes_sf")}
+    WHERE
+        DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) <= DATE(data_criacao_dependente)
+),
+
+consumo_A_1 AS (
+    SELECT
+        userId as globo_id,
+        TIMESTAMP(`timestamp`) AS `timestamp`,
+        program_id,
+        MAX(TIMESTAMP(`timestamp`)) OVER(PARTITION BY globo_id) AS ultimo_consumo
+    FROM
+        ${ref("consumo_enriched", "impression")} 
+),
+
+consumo_A AS (
+    SELECT DISTINCT
+        globo_id AS globo_id_dependente,
+        DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) <= DATE(ultimo_consumo) AS consumiu_7_dias 
+    FROM
+        consumo_A_1
+),
+
+consumo_B_1 AS (
+    SELECT
+        userId as globo_id,
+        program_id,
+        TIMESTAMP(`timestamp`) AS `timestamp`,
+        MAX(`timestamp`) OVER(PARTITION BY globo_id) AS ultimo_consumo,
+        COUNT(DISTINCT(program_id)) OVER(PARTITION BY globo_id) qtd_programas_consumidos
+    FROM 
+        ${ref("consumo_enriched", "impression")} 
+),
+
+consumo_B AS (
+    SELECT
+        globo_id AS globo_id_dependente,
+        ultimo_consumo,
+        qtd_programas_consumidos,
+        DATE_DIFF(CURRENT_TIMESTAMP(), ultimo_consumo, DAY) AS dias_ultimos_consumo
+    FROM
+        consumo_B_1
+),
+
+base_2_1 AS (
+    SELECT
+        DISTINCT *
+    FROM
+        dependentes
+        LEFT JOIN consumo_A USING(globo_id_dependente)
+        LEFT JOIN consumo_B USING(globo_id_dependente)
+),
+
+base_2 AS (
+    SELECT
+        globo_id_dependente AS globo_id,
+        data_criacao_dependente,
+        possui_disney,
+        possui_telecine,
+        possui_premiere,
+        possui_combate,
+        possui_mais_canais,
+        COALESCE(consumiu_7_dias,FALSE) AS consumiu_7_dias,
+        CASE
+            WHEN dias_ultimos_consumo<=14 AND qtd_programas_consumidos >=8 THEN TRUE
+            ELSE FALSE
+        END AS diversificou,
+        CURRENT_DATE() AS dt_proc
+    FROM
+        base_2_1
+)
+SELECT * FROM base_2

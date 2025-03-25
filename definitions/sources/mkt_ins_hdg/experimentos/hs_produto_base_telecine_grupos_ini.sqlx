@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  database: "gglobo-mkt-ins-hdg-prd",
+  schema: "experimentos",
+  name: "hs_produto_base_telecine_grupos_ini"
+}
+
+-- gglobo-mkt-ins-hdg-prd.experimentos.hs_produto_base_telecine_grupos_ini

@@ -1,0 +1,62 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=experimentos_hi24_exp01_bbb24_v1_usuarios_da_semana'],
+  name: 'hi24_exp01_bbb24_v1_usuarios_da_semana',
+  schema: 'experimentos',
+  description: '',
+  columns: {
+  }
+}
+
+-- Segunda etapa
+-- Tabela que separa os noveleiros da semana atual
+-- tem que rodar DEPOIS da rotina hi24_exp01_bbb24_v1_relacao_grupos
+
+-- Filtros Trabalhados
+-- (1) Assinou para BBB24
+-- (2) Plano Mensal
+-- (3) cluster_bbb -> Heavy user (primeiro play não é BBB, mas ele é heavy user BBB) (intensidade no consumo em BBB)
+-- (4) cluster_share_bbb (se é concentrado ou diversificado na plataforma)
+-- (5) Plano Globoplay Básico (Tier 1)
+-- (6) Cluster dinâmico (assumir pessoas entrantes ao longo do experimento)
+
+WITH 
+dado_assinatura AS ( -- tabela com dados referentes a assinatura dos usuários necessários para alguns filtros
+  SELECT
+    DISTINCT globo_id
+  --FROM ${ref("usuarios", "base_ativa_pagante_com_trial_new")}
+   FROM  ${ref("usuarios", "base_ativa_pagante_com_trial_new")} t, t.info 
+  WHERE 
+    info.produto = 'Mensal' -- (2)
+    AND info.Produto_Contratado = 'Globoplay' -- (5)
+),
+
+grupo_experimento AS( -- aplica os filtros relacionados a BBB e adiciona referencia do tipo do experimento 
+  SELECT
+    a.globo_id,
+    DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7 as semana_ref_raioxbbb24, -- Para dar referencia de data do usuário no experimento
+  FROM ${ref("bbb_24", "raiox_bbb_24_assinantes")} as a
+  -- FROM `gglobo-mkt-ins-hdg-prd.bbb_24.raiox_bbb_24_assinantes` AS a
+  INNER JOIN dado_assinatura AS b ON a.globo_id = b.globo_id
+  WHERE
+    assinou_2024 = true -- (1)
+  --  AND cluster_bbb = '4. Heavy User' -- (3)
+    AND cluster_share_bbb = '81%-100%' -- (4)
+    AND semana = DATE_TRUNC(CURRENT_DATE, WEEK(MONDAY))-7 -- (6) pegar a ultima segunda feira, referencia da ultima semana fechada
+),
+
+  base_pre_final as (
+  SELECT
+    aa.globo_id,
+    aa.grupo_n,
+    bb.semana_ref_raioxbbb24
+  FROM
+    ${ref("experimentos", "hi24_exp01_bbb24_v1_relacao_grupos")} as aa
+  INNER JOIN grupo_experimento as bb ON aa.globo_id = bb.globo_id -- trazendo a info de qual grupo é o usuário
+  )
+
+SELECT
+  * 
+FROM
+  base_pre_final
+

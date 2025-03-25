@@ -1,0 +1,7 @@
+config {
+    type:"declaration",
+    database:"gglobo-bd-pug-hdg-prd",
+    schema:"visao_360_analitica",
+    name:"globoid_demografico_visao_360_atributos",
+    description:""
+}

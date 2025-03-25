@@ -1,0 +1,152 @@
+config {
+  type: "table",
+  name: "push_content",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_1",'schedule_tag=comunicacao_push_content']
+}
+
+WITH urban_push_campaign AS (
+  SELECT
+    push_id,
+    payload__audience,
+    payload__device_types,
+    payload__notification__alert,
+    payload__notification__ios__alert__title,
+    payload__notification__android__alert,
+    payload__notification__android__title,
+    push_occurred,
+    payload__notification__actions__open__type,
+    payload__notification__actions__open__content,
+    REGEXP_EXTRACT(payload__notification__actions__open__content, '/./|/transmissoes/|/categorias/|/ao-vivo/|/program/') AS padrao,
+    product
+  FROM
+    ${ref("enriched", "urban_push_campaign")}
+
+),
+
+up1 AS (
+  SELECT 
+    *,
+    CASE
+      WHEN padrao LIKE '%/t/%' THEN 'Programa'
+      WHEN padrao LIKE '%/p/%' THEN 'Programa'
+      WHEN padrao LIKE '%/v/%' THEN 'Media'
+      WHEN padrao LIKE '%/transmissoes/%' THEN 'Transmissao/Ao_vivo'
+      WHEN padrao LIKE '%/categorias/%' THEN 'Agrupador'
+      WHEN padrao LIKE '%/ao-vivo/%' THEN 'Transmissao/Ao_vivo'
+      WHEN padrao LIKE '%/program/%' THEN 'Programa'
+      WHEN payload__notification__actions__open__content = 'https://globoplay.globo.com/' THEN 'Home'
+      WHEN payload__notification__actions__open__content LIKE '%/assine-mobile/%' THEN 'Landing_page'
+      WHEN payload__notification__actions__open__content LIKE '%agora-na-globo%' THEN 'Transmissao/Ao_vivo'
+      WHEN payload__notification__actions__open__type LIKE 'url' THEN 'Link_externo'
+    END AS enviado_para
+  FROM 
+    urban_push_campaign
+),
+
+up2 AS (
+  SELECT
+    *,
+    IF(enviado_para IN ('Media', 'Transmissao/Ao_vivo'),
+      REGEXP_EXTRACT(payload__notification__actions__open__content, '/([0-9]+)'),
+      NULL) AS media,
+    CASE
+      WHEN payload__notification__actions__open__content LIKE '%agora-na-globo%' 
+        THEN '9095'
+      WHEN enviado_para = 'Programa' 
+        THEN REGEXP_EXTRACT(payload__notification__actions__open__content, 
+                            r"[vmtp]\/(\w+)[\/|\?]?$")
+    END AS program,
+    REGEXP_REPLACE(
+      REGEXP_EXTRACT(payload__notification__actions__open__content, r".+\/categorias\/(.+)\/"), 
+      r"\W", " ") AS agrupador
+  FROM
+    up1
+),
+
+medias AS (
+  SELECT
+    * REPLACE(
+      CAST(media AS INT64) AS media
+    )
+  FROM
+    up2
+  WHERE media IS NOT NULL
+),
+
+cnt AS (
+  SELECT DISTINCT
+    id,
+    program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref("conteudo_enriched", "all_content")}
+),
+
+mv AS (
+  SELECT DISTINCT
+    id AS id_m,
+    title AS title_movie,
+    program_title_id AS title_id_mv
+  FROM
+    ${ref("conteudo_enriched", "all_content")}
+  WHERE
+    program_subset = "movies"
+)
+
+SELECT
+  push_id,
+  product,
+  payload__audience,
+  payload__device_types,
+  payload__notification__alert,
+  payload__notification__ios__alert__title,
+  payload__notification__android__alert,
+  payload__notification__android__title,
+  TIMESTAMP(DATETIME(push_occurred, "America/Sao_Paulo")) AS push_occurred,
+  payload__notification__actions__open__type,
+  payload__notification__actions__open__content,
+  padrao,
+  enviado_para,
+  media,
+  program,
+  agrupador,
+  NULL AS id,
+  NULL AS program_id,
+  NULL AS program_title,
+  NULL AS program_title_id,
+  NULL AS title_movie
+FROM
+  up2
+WHERE
+  media IS NULL
+
+UNION ALL
+
+SELECT
+  push_id,
+  product,
+  payload__audience,
+  payload__device_types,
+  payload__notification__alert,
+  payload__notification__ios__alert__title,
+  payload__notification__android__alert,
+  payload__notification__android__title,
+  TIMESTAMP(DATETIME(push_occurred, "America/Sao_Paulo")) AS push_occurred,
+  payload__notification__actions__open__type,
+  payload__notification__actions__open__content,
+  padrao,
+  IF(program_id = 10122, "Filme", enviado_para) AS enviado_para,
+  CAST(media AS STRING) AS media,
+  program,
+  agrupador,
+  COALESCE(id, id_m) AS id,
+  program_id,
+  program_title,
+  program_title_id,
+  title_movie
+FROM
+  medias
+  LEFT JOIN cnt ON (media = cnt.id)
+  LEFT JOIN mv ON (media = mv.id_m OR program = mv.title_id_mv)

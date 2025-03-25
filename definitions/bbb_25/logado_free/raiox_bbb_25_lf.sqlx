@@ -1,0 +1,794 @@
+config {
+    type: 'table',
+    schema: 'bbb_25',
+    tags: ['schedule_tag=bbb_25_raiox_bbb_25_lf',
+        "schedule_cron=0 11 * * *"
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "bbb_25",
+            owner: "martech",
+            horario: "11h00min"
+
+        }
+    },
+    description: 'Esta tabela contém os usuários LFs e Ex-Assinantes que assistiram algum conteúdo relacionado ao BBB 25 (FONTE GA). A tabela é atualizada diariamente empilhando o consumo do usuário na semana.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        tipo_usuario: 'Classificação do usuário em Logado Free/Ex-Assinante.',
+        consumiu_bbb_20: 'Flag se o usuário consumiu o BBB 2020.',
+        assinou_cancelou_bbb_20: 'Flag se o usuário assinou entre 01/01/2020 e 30/04/2020, solicitou o cancelamento entre 01/04/2020 e 31/05/2020 e teve a assinatura cancelada no ano de 2020.',
+        consumiu_bbb_21: 'Flag se o usuário consumiu o BBB 2021.',
+        assinou_cancelou_bbb_21: 'Flag se o usuário assinou entre 01/01/2021 e 30/04/2021, solicitou o cancelamento entre 01/04/2021 e 31/05/2021 e teve a assinatura cancelada no ano de 2021.',
+        consumiu_bbb_22: 'Flag se o usuário consumiu o BBB 2022.',
+        assinou_cancelou_bbb_22: 'Flag se o usuário assinou entre 01/01/2022 e 30/04/2022, solicitou o cancelamento entre 01/04/2022 e 31/05/2022 e teve a assinatura cancelada no ano de 2022.',
+        consumiu_bbb_23: 'Flag se o usuário consumiu o BBB 2023.',
+        consumiu_bbb_23_simulcast: 'Flag se o usuário consumiu o BBB 2023 ao vivo via GA/SIMULCAST.',
+        assinou_cancelou_bbb_23: 'Flag se o usuário assinou entre 01/01/2023 e 30/04/2023, solicitou o cancelamento entre 01/04/2023 e 31/05/2023 e teve a assinatura cancelada no ano de 2023.',
+        consumiu_bbb_24: 'Flag se o usuário consumiu o BBB 2024.',
+        assinou_cancelou_bbb_24: 'Flag se o usuário assinou entre 01/01/2024 e 30/04/2024, solicitou o cancelamento entre 01/04/2024 e 31/05/2024 e teve a assinatura cancelada no ano de 2024.',
+        semana: 'Semana em que o usuário assistiu o programa.',
+        frequencia: 'Quantidade de dias em que o usuário assistiu o programa na semana.',
+        horas_episode: 'Quantidade de horas em íntegra que o usuário assistiu na semana.',
+        qtd_midias_episode: 'Quantidade de mídias de íntegras dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_episode: 'Quantidade de dias que o usuário consumiu em íntegras na semana.',
+        horas_excerpt: 'Quantidade de horas em trechos que o usuário assistiu na semana.',
+        qtd_midias_excerpt: 'Quantidade de mídias de trechos dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_excerpt: 'Quantidade de dias que o usuário consumiu em trechos na semana.',
+        horas_extra: 'Quantidade de horas em extras que o usuário assistiu na semana.',
+        qtd_midias_extra: 'Quantidade de mídias de extras dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_extra: 'Quantidade de dias que o usuário consumiu em extras na semana.',
+        horas_teaser: 'Quantidade de horas em teaser que o usuário assistiu na semana.',
+        qtd_midias_teaser: 'Quantidade de mídias de teasers dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_teaser: 'Quantidade de dias que o usuário consumiu em teaser na semana.',
+        horas_trailer: 'Quantidade de horas em trailer que o usuário assistiu na semana.',
+        qtd_midias_trailer: 'Quantidade de mídias de trailer dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_trailer: 'Quantidade de dias que o usuário consumiu em trailer na semana.',
+        horas_live: 'Quantidade de horas em live que o usuário assistiu na semana.',
+        qtd_midias_live: 'Quantidade de mídias de lives dos programas relacionados ao BBB, que o usuário assistiu na semana.',
+        freq_live: 'Quantidade de dias que o usuário consumiu em lives na semana.',
+        qtd_midias_simulcast: 'Quantidade de midias em simulcast que o usuário assistiu na semana.',
+        horas_simulcast: 'Total de horas em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW.',
+        freq_simulcast: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW.',
+        total_horas_bbb: 'Total de horas que o usuário consumiu os programas relacionados ao BBB.',
+        cluster_bbb: 'Cluster em que consideramos o total de horas assistidas para classificar o usuário.',
+        share_bbb: 'Horas consumidas em BBB sob todo o consumo dos usuários inclusive o BBB',
+        cluster_share_bbb: 'Porcentagem de consumo do usuário sob o BBB.',
+        horas_novela: 'Total de horas consumidas pelo usuário em novelas.',
+        qtd_midias_novela: 'Total de mídias consumidas pelo usuário em novelas.',
+        freq_novela: 'Total de dias consumidos pelo usuário em novelas.',
+        qtd_programas_novela: 'Total de programas consumidos pelo usuário em novelas.',
+        horas_series: 'Total de horas consumidas pelo usuário em séries.',
+        qtd_midias_series: 'Total de mídias consumidas pelo usuário em séries.',
+        freq_series: 'Total de dias consumidos pelo usuário em séries.',
+        qtd_programas_series: 'Total de programas consumidos pelo usuário em séries.',
+        horas_filmes: 'Total de horas consumidas pelo usuário em filmes.',
+        qtd_midias_filmes: 'Total de mídias consumidas pelo usuário em filmes.',
+        freq_filmes: 'Total de dias consumidos pelo usuário em filmes.',
+        qtd_programas_filmes: 'Total de programas consumidos pelo usuário em filmes.',
+        horas_esportes: 'Quantidade de horas de conteúdos esportivos assistidos na semana. Exemplo: Conteúdos do Combate, Premiere, Sportv, GE ou que tenham o subset sports atrelado.',
+        qtd_programas_esportes: 'Quantidade de programas de conteúdos esportivos assistidos na semana.',
+        freq_esportes: 'Quantidades de dias que o usuário assistiu algum conteúdo esportivo na semana.',
+        qtd_midias_esportes: 'Quantidade de mídias distintas de conteúdos esportivos assistidos na semana.',
+        horas_variedades: 'Quantidade de horas de conteúdos de variedades assistidos na semana. Exemplo: Conteúdos do Receitas, Multishow, Viva (que não contenha o subset novela) e programas com o subset varieties.',
+        qtd_programas_variedades: 'Quantidade de programas de conteúdos de variedades assistidos na semana.',
+        freq_variedades: 'Quantidades de dias que o usuário assistiu algum conteúdo de variedades na semana.',
+        qtd_midias_variedades: 'Quantidade de mídias distintas de conteúdos de variedades assistidos na semana.',
+        horas_jornalismo: 'Quantidade de horas de conteúdos jornalísticos assistidos na semana. Exemplo: Conteúdos GloboNews, G1 ou programas que contenham o subset news.',
+        qtd_programas_jornalismo: 'Quantidade de programas de conteúdos jornalísticos assistidos na semana.',
+        freq_jornalismo: 'Quantidades de dias que o usuário assistiu algum conteúdo jornalístico na semana.',
+        qtd_midias_jornalismo: 'Quantidade de mídias distintas de conteúdos jornalísticos assistidos na semana.',
+        horas_reality: 'Quantidade de horas de realities assistidos na semana. Exemplo: Programas que contenham o subset realities.',
+        qtd_programas_reality: 'Quantidade de programas de realities assistidos na semana.',
+        freq_reality: 'Quantidades de dias que o usuário assistiu algum conteúdo de reality na semana.',
+        qtd_midias_reality: 'Quantidade de mídias distintas de realities assistidos na semana.',
+        horas_ao_vivo_globo: 'Total de horas consumidas pelo usuário no ao vivo da globo.',
+        freq_ao_vivo_globo: 'Total de dias consumidos pelo usuário no ao vivo da globo.',
+        horas_outros_conteudos: 'Total de horas consumidas pelo usuário em outros tipos de conteúdos.',
+        qtd_midias_outros_conteudos: 'Total de mídias consumidas pelo usuário em outros tipos de conteúdos.',
+        freq_outros_conteudos: 'Total de dias consumidos pelo usuário em outros tipos de conteúdos.',
+        qtd_programas_outros_conteudos: 'Total de programas consumidos pelo usuário em outros tipos de conteúdos.',
+        assistiu_big_show: 'Flag se o usuário assistiu ou não ao programa Big Show.',
+        assistiu_bbb24_exclusivo_gshow: 'Flag se o usuário assistiu ou não ao programa BBB 24 Exclusivo Gshow.',
+        assistiu_bate_papo_bbb: 'Flag se o usuário assistiu ou não ao programa Bate Papo BBB.',
+        assistiu_click_bbb: 'Flag se o usuário assistiu ou não ao programa Click BBB.',
+        assistiu_bbb25_exclusivo_gshow: 'Flag se o usuário assistiu ou não ao programa BBB 25 Exclusivo Gshow.',
+        assistiu_maratona_big_day: 'Flag se o usuário assistiu ou não ao programa Maratona Big Day.',
+        assistiu_mesacast: 'Flag se o usuário assistiu ou não ao programa Mesacast.',
+        assistiu_maratona_big_day: 'Flag se o usuário assistiu ou não ao programa Maratona Big Day.',
+        assistiu_doc_bbb: 'Flag se o usuário assistiu ou não ao BBB: O Documentário.',
+        perfil_consumo: 'Subset mais assistido pelo usuário na semana desconsiderando o consumo em BBB.'
+    }
+
+}
+
+WITH
+  conteudo AS (
+  SELECT
+    id AS mediaid,
+    kind,
+    service_id,
+    program_subset,
+    channel_title,
+    program_title,
+    program_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    program_id IN (26751,
+      28633,
+      16280,
+      28644,
+      12082,
+      16284,
+      28191) ),
+  base AS (
+  SELECT
+    b.globo_id,
+    b.tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    consumiu_bbb_24,
+    assinou_cancelou_bbb_24,
+    mediaid,
+    program_id,
+    hours_watched,
+    tipo_video,
+    DATE_TRUNC(date, WEEK(MONDAY)) AS semana,
+    COUNT(DISTINCT date) OVER(PARTITION BY b.globo_id, DATE_TRUNC(date, WEEK(MONDAY)) ) AS frequencia_total,
+    date
+  FROM
+    ${ref('bbb_25', 'consumo_ga_bbb_25_lf')} AS a
+  INNER JOIN
+    ${ref('bbb_25', 'base_dados_lfs_bbb_25')} AS b
+  ON
+    b.globo_id = a.globo_id
+ ),
+  base1 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      tipo_usuario,
+      consumiu_bbb_20,
+      assinou_cancelou_bbb_20,
+      consumiu_bbb_21,
+      assinou_cancelou_bbb_21,
+      consumiu_bbb_22,
+      assinou_cancelou_bbb_22,
+      consumiu_bbb_23,
+      consumiu_bbb_23_simulcast,
+      assinou_cancelou_bbb_23,
+      consumiu_bbb_24,
+      assinou_cancelou_bbb_24,
+      semana,
+      frequencia_total,
+      mediaid,
+      hours_watched,
+      date,
+      tipo_video
+    FROM
+      base )
+  PIVOT
+    ( SUM(hours_watched) horas,
+      COUNT(DISTINCT mediaid) qtd_midias,
+      COUNT(DISTINCT date) freq FOR tipo_video IN ( 'episode',
+        'excerpt',
+        'extra',
+        'teaser',
+        'trailer',
+        'simulcast',
+        'live' ) ) ),
+  base2 AS(
+  SELECT
+    globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    consumiu_bbb_24,
+    assinou_cancelou_bbb_24,
+    semana,
+    frequencia_total,
+    IFNULL(horas_episode,0) AS horas_episode,
+    qtd_midias_episode,
+    freq_episode,
+    IFNULL(horas_excerpt,0) AS horas_excerpt,
+    qtd_midias_excerpt,
+    freq_excerpt,
+    IFNULL(horas_extra,0) AS horas_extra,
+    qtd_midias_extra,
+    freq_extra,
+    IFNULL(horas_teaser,0) AS horas_teaser,
+    qtd_midias_teaser,
+    freq_teaser,
+    IFNULL(horas_trailer,0) AS horas_trailer,
+    qtd_midias_trailer,
+    freq_trailer,
+    IFNULL(horas_live,0) AS horas_live,
+    qtd_midias_live,
+    freq_live,
+    IFNULL(horas_simulcast,0) AS horas_simulcast,
+    qtd_midias_simulcast,
+    freq_simulcast
+  FROM
+    base1 ),
+  base5 AS (
+  SELECT
+    *,
+    ( SUM( horas_episode + horas_excerpt + horas_extra + horas_teaser + horas_trailer + horas_live + horas_simulcast ) OVER (PARTITION BY globo_id, semana) ) AS total_horas_bbb
+  FROM
+    base2
+  GROUP BY
+    ALL ),
+  base6 AS (
+  SELECT
+    *
+  FROM
+    base5 where total_horas_bbb >=0.0166667),
+  impression AS (
+  SELECT
+    t.customDimensions.globoid AS globo_id,
+    v.customDimensions.video_id AS mediaid,
+    v.customDimensions.program_id AS program_id,
+    v.customDimensions.program_nm AS program_title,
+    v.customDimensions.epg_program_nm,
+    t.date AS date,
+    IFNULL(v.customMetrics.playtime,0)/ 3600 AS hours_watched,
+    DATE_TRUNC(t.date, WEEK(MONDAY)) AS semana,
+    v.customDimensions.categoria,
+    c.program_subset,
+    CASE
+      WHEN (c.program_subset = 'novelas' OR (LOWER(c.channel_title) LIKE 'viva%' AND (c.program_subset='novelas' OR c.program_subset='live'))) THEN 'novela'
+      WHEN ((LOWER(c.channel_title) LIKE '%combate%'
+        AND LOWER(c.program_title) NOT LIKE '%teste%')
+      OR (LOWER(c.channel_title) LIKE '%premiere%'
+        AND LOWER(c.program_title) NOT LIKE '%teste%')
+      OR (LOWER(c.channel_title) LIKE '%sportv%'
+        AND LOWER(c.program_title) NOT LIKE '%teste%')
+      OR (LOWER(c.channel_title) LIKE 'ge%'
+        AND LOWER(c.program_title) NOT LIKE '%teste%')
+      OR c.program_subset='sports') THEN 'esportes'
+      WHEN ((LOWER(c.channel_title) LIKE '%globonews%' AND LOWER(c.program_title) NOT LIKE '%teste%') OR c.program_subset ='news' OR c.channel_title='G1' OR LOWER(c.program_title) LIKE 'g1%') THEN 'jornalismo'
+      WHEN c.program_subset = 'series' THEN 'series'
+      WHEN c.program_subset='realities' THEN 'reality'
+      WHEN (c.program_subset IN ('filmes',
+        'movies'))
+    OR LOWER(c.channel_title) IN ('telecine',
+      'megapix',
+      'universal',
+      'studio universal',
+      'studio universal ott',
+      'megapix ott',
+      'universal ott',
+      'usa ott') THEN 'filmes'
+      WHEN ((c.service_id=6807 OR c.program_subset='varieties' OR c.channel_title='Receitas' OR LOWER(c.channel_title) LIKE '%multishow%' OR LOWER(c.channel_title) LIKE 'viva%' OR LOWER(channel_title) LIKE '%gnt%') AND LOWER(c.program_title) NOT LIKE '%teste%') THEN 'variedades'
+      WHEN c.program_id = 9095 THEN 'ao_vivo_globo'
+      ELSE 'outros_conteudos'
+  END
+    AS grupo
+  FROM
+    ${ref('google_analytics', 'all_globo_videos_globoplay')} AS t,
+    UNNEST(t.videos) AS v
+  LEFT JOIN
+    ${ref('conteudo_enriched', 'all_content')} AS c
+  ON
+    CAST(c.id AS STRING) = v.customDimensions.video_id
+  INNER JOIN (
+    SELECT
+      DISTINCT globo_id,
+      tipo_usuario
+    FROM
+      ${ref('bbb_25', 'base_dados_lfs_bbb_25')}) as lf
+  ON
+    lf.globo_id=t.customDimensions.globoid
+  WHERE
+    t.date BETWEEN '2025-01-13'
+    AND '2025-04-28'
+    AND v.customDimensions.program_id NOT IN ('26751',
+      '28633',
+      '16280',
+      '28644',
+      '12082',
+      '16284',
+      '28191') 
+    AND (LOWER(v.customDimensions.epg_program_nm) NOT LIKE '%big brother%'
+      OR LOWER(v.customDimensions.epg_program_nm) NOT LIKE '%bbb%' )
+    AND (v.customDimensions.program_id != '9095'
+      OR LOWER(v.customDimensions.channel_nm) NOT LIKE '%multishow%' )
+    AND LOWER(v.customDimensions.epg_program_nm) NOT LIKE '%big brother%' ),
+  base_geral AS (
+  SELECT
+    DISTINCT globo_id,
+    tipo_usuario
+  FROM
+    base5 ),
+  ai AS (
+  SELECT
+    *
+  FROM
+    base_geral
+  LEFT JOIN
+    impression
+  USING
+    (globo_id) ),
+  ai2 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      DISTINCT globo_id,
+      tipo_usuario,
+      semana,
+      hours_watched,
+      program_id,
+      mediaid,
+      date,
+      grupo
+    FROM
+      ai )
+  PIVOT
+    ( SUM(hours_watched) horas,
+      COUNT(DISTINCT mediaid) qtd_midias,
+      COUNT(DISTINCT date) freq,
+      COUNT(DISTINCT program_id) qtd_programas FOR grupo IN ( 'esportes',
+        'jornalismo',
+        'novela',
+        'series',
+        'reality',
+        'filmes',
+        'variedades',
+        'ao_vivo_globo',
+        'outros_conteudos' ) ) ),
+  consulta AS (
+  SELECT
+    * EXCEPT ( horas_esportes,
+      horas_jornalismo,
+      horas_reality,
+      horas_variedades,
+      horas_novela,
+      horas_series,
+      horas_filmes,
+      horas_ao_vivo_globo,
+      horas_outros_conteudos ),
+    IFNULL(horas_novela,0) AS horas_novela,
+    IFNULL(horas_series,0) AS horas_series,
+    IFNULL(horas_filmes,0) AS horas_filmes,
+    IFNULL(horas_ao_vivo_globo,0) AS horas_ao_vivo_globo,
+    IFNULL(horas_outros_conteudos,0) AS horas_outros_conteudos,
+    IFNULL(horas_esportes,0) AS horas_esportes,
+    IFNULL(horas_jornalismo,0) AS horas_jornalismo,
+    IFNULL(horas_reality,0) AS horas_reality,
+    IFNULL(horas_variedades,0) AS horas_variedades
+  FROM
+    ai2 ),
+  consulta2 AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_esportes,
+    qtd_programas_esportes,
+    freq_esportes,
+    qtd_midias_esportes,
+    horas_jornalismo,
+    qtd_programas_jornalismo,
+    freq_jornalismo,
+    qtd_midias_jornalismo,
+    horas_reality,
+    qtd_programas_reality,
+    freq_reality,
+    qtd_midias_reality,
+    horas_variedades,
+    qtd_programas_variedades,
+    freq_variedades,
+    qtd_midias_variedades,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos
+  FROM
+    consulta ),
+  consulta3 AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    semana,
+    horas_novela,
+    qtd_midias_novela,
+  IF
+    (freq_novela >= 8, 7, freq_novela) AS freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+  IF
+    (freq_series >= 8, 7, freq_series) AS freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+  IF
+    (freq_filmes >= 8, 7, freq_filmes) AS freq_filmes,
+    qtd_programas_filmes,
+    horas_ao_vivo_globo,
+  IF
+    (freq_ao_vivo_globo >= 8, 7, freq_ao_vivo_globo) AS freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+  IF
+    ( freq_outros_conteudos >= 8, 7, freq_outros_conteudos ) AS freq_outros_conteudos,
+    qtd_programas_outros_conteudos,
+    horas_esportes,
+    qtd_programas_esportes,
+  IF
+    ( freq_esportes >= 8, 7, freq_esportes ) AS freq_esportes,
+    qtd_midias_esportes,
+    horas_jornalismo,
+    qtd_programas_jornalismo,
+  IF
+    ( freq_jornalismo >= 8, 7, freq_jornalismo ) AS freq_jornalismo,
+    qtd_midias_jornalismo,
+    horas_reality,
+    qtd_programas_reality,
+  IF
+    ( freq_reality >= 8, 7, freq_reality ) AS freq_reality,
+    qtd_midias_reality,
+    horas_variedades,
+    qtd_programas_variedades,
+  IF
+    ( freq_variedades >= 8, 7, freq_variedades ) AS freq_variedades,
+    qtd_midias_variedades
+  FROM
+    consulta2 ),
+  basebbb AS (
+  SELECT
+    *
+  FROM
+    base6
+  LEFT JOIN
+    consulta3
+  USING
+    (globo_id,
+      tipo_usuario,
+      semana) ),
+
+  prog_extras AS (
+SELECT
+  DISTINCT t.customDimensions.globoid AS globo_id,
+  DATE_trunc(t.date, WEEK(MONDAY)) AS semana,
+  MAX(CASE WHEN t.date >= '2025-01-20' AND v.customDimensions.program_id = '28633' THEN TRUE ELSE FALSE END) AS assistiu_big_show,
+  MAX(CASE WHEN t.date >= '2025-01-13' AND v.customDimensions.program_id = '28191' THEN TRUE ELSE FALSE END) AS assistiu_bbb25_exclusivo_gshow,
+  MAX(CASE WHEN t.date = '2025-01-14' AND v.customDimensions.program_id = '16280' THEN TRUE ELSE FALSE END) AS assistiu_bate_papo_bbb,
+  MAX(CASE WHEN t.date >= '2025-01-13' AND v.customDimensions.program_id = '16284' THEN TRUE ELSE FALSE END) AS assistiu_click_bbb,
+  MAX(CASE WHEN t.date >= '2025-01-13' AND v.customDimensions.program_id = '26751' THEN TRUE ELSE FALSE END) AS assistiu_mesacast,
+  MAX(CASE WHEN t.date = '2025-01-09' AND  v.customDimensions.video_id = '8642899' THEN TRUE ELSE FALSE END) AS assistiu_maratona_big_day,
+  MAX(CASE WHEN t.date >= '2025-01-07' AND v.customDimensions.program_id = '28644' THEN TRUE ELSE FALSE END) AS assistiu_doc_bbb
+FROM
+${ref('google_analytics', 'all_globo_videos_globoplay')} AS t,
+    UNNEST(t.videos) AS v
+WHERE
+  t.date >= '2025-01-07'
+GROUP BY
+1,2
+  ),
+  basebbb3 AS (
+  SELECT
+    DISTINCT globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    consumiu_bbb_24,
+    assinou_cancelou_bbb_24,
+    semana,
+    frequencia_total AS frequencia,
+    IFNULL(horas_episode,0) AS horas_episode,
+    IFNULL(qtd_midias_episode,0) AS qtd_midias_episode,
+    IFNULL(freq_episode,0) AS freq_episode,
+    IFNULL(horas_excerpt,0) AS horas_excerpt,
+    IFNULL(qtd_midias_excerpt,0) AS qtd_midias_excerpt,
+    IFNULL(freq_excerpt,0) AS freq_excerpt,
+    IFNULL(horas_extra,0) AS horas_extra,
+    IFNULL(qtd_midias_extra,0) AS qtd_midias_extra,
+    IFNULL(freq_extra,0) AS freq_extra,
+    IFNULL(horas_teaser,0) AS horas_teaser,
+    IFNULL(qtd_midias_teaser,0) AS qtd_midias_teaser,
+    IFNULL(freq_teaser,0) AS freq_teaser,
+    IFNULL(horas_trailer,0) AS horas_trailer,
+    IFNULL(qtd_midias_trailer,0) AS qtd_midias_trailer,
+    IFNULL(freq_trailer,0) AS freq_trailer,
+    IFNULL(horas_live,0) AS horas_live,
+    IFNULL(qtd_midias_live,0) AS qtd_midias_live,
+    IFNULL(freq_live,0) AS freq_live,
+    IFNULL(horas_simulcast,0) AS horas_simulcast,
+    IFNULL(qtd_midias_simulcast,0) AS qtd_midias_simulcast,
+    IFNULL(freq_simulcast,0) AS freq_simulcast,
+    total_horas_bbb,
+    IFNULL(horas_novela,0) AS horas_novela,
+    IFNULL(qtd_midias_novela,0) AS qtd_midias_novela,
+    IFNULL(freq_novela,0) AS freq_novela,
+    IFNULL(qtd_programas_novela,0) AS qtd_programas_novela,
+    IFNULL(horas_series,0) AS horas_series,
+    IFNULL(qtd_midias_series,0)AS qtd_midias_series,
+    IFNULL(freq_series,0) AS freq_series,
+    IFNULL(qtd_programas_series,0) AS qtd_programas_series,
+    IFNULL(horas_filmes,0) AS horas_filmes,
+    IFNULL(qtd_midias_filmes,0) AS qtd_midias_filmes,
+    IFNULL(freq_filmes,0) AS freq_filmes,
+    IFNULL(qtd_programas_filmes,0) AS qtd_programas_filmes,
+    IFNULL(horas_esportes,0) AS horas_esportes,
+    IFNULL(qtd_midias_esportes,0) AS qtd_midias_esportes,
+    IFNULL(freq_esportes,0) AS freq_esportes,
+    IFNULL(qtd_programas_esportes,0) AS qtd_programas_esportes,
+    IFNULL(horas_jornalismo,0) AS horas_jornalismo,
+    IFNULL(qtd_programas_jornalismo,0) AS qtd_programas_jornalismo,
+    IFNULL(freq_jornalismo,0) AS freq_jornalismo,
+    IFNULL(qtd_midias_jornalismo,0) AS qtd_midias_jornalismo,
+    IFNULL(horas_reality,0) AS horas_reality,
+    IFNULL(qtd_programas_reality,0) AS qtd_programas_reality,
+    IFNULL(freq_reality,0) AS freq_reality,
+    IFNULL(qtd_midias_reality,0) AS qtd_midias_reality,
+    IFNULL(horas_variedades,0) AS horas_variedades,
+    IFNULL(qtd_programas_variedades,0) AS qtd_programas_variedades,
+    IFNULL(freq_variedades,0) AS freq_variedades,
+    IFNULL(qtd_midias_variedades,0) AS qtd_midias_variedades,
+    IFNULL(horas_ao_vivo_globo,0) AS horas_ao_vivo_globo,
+    IFNULL(freq_ao_vivo_globo,0) AS freq_ao_vivo_globo,
+    IFNULL(horas_outros_conteudos,0) AS horas_outros_conteudos,
+    IFNULL(qtd_midias_outros_conteudos,0) AS qtd_midias_outros_conteudos,
+    IFNULL(freq_outros_conteudos,0) AS freq_outros_conteudos,
+    IFNULL(qtd_programas_outros_conteudos,0) AS qtd_programas_outros_conteudos,
+    CASE
+      WHEN assistiu_big_show IS NULL THEN FALSE
+      ELSE assistiu_big_show
+  END
+    AS assistiu_big_show,
+    CASE
+      WHEN assistiu_bbb25_exclusivo_gshow IS NULL THEN FALSE
+      ELSE assistiu_bbb25_exclusivo_gshow
+  END
+    AS assistiu_bbb25_exclusivo_gshow,
+    CASE
+      WHEN assistiu_bate_papo_bbb IS NULL THEN FALSE
+      ELSE assistiu_bate_papo_bbb
+  END
+    AS assistiu_bate_papo_bbb,
+    CASE
+      WHEN assistiu_click_bbb IS NULL THEN FALSE
+      ELSE assistiu_click_bbb
+  END
+    AS assistiu_click_bbb,
+    CASE
+      WHEN assistiu_maratona_big_day IS NULL THEN FALSE
+      ELSE assistiu_maratona_big_day
+  END
+    AS assistiu_maratona_big_day,
+    CASE
+      WHEN assistiu_mesacast IS NULL THEN FALSE
+      ELSE assistiu_mesacast
+  END
+    AS assistiu_mesacast,
+        CASE
+      WHEN assistiu_doc_bbb IS NULL THEN FALSE
+      ELSE assistiu_doc_bbb
+  END
+    AS assistiu_doc_bbb
+  FROM
+    basebbb
+  LEFT JOIN
+    prog_extras
+  USING
+    (globo_id,
+      semana)),
+  final AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_filmes > horas_novela AND horas_filmes > horas_series AND horas_filmes > horas_esportes AND horas_filmes > horas_jornalismo AND horas_filmes > horas_reality AND horas_filmes > horas_variedades AND horas_filmes > horas_outros_conteudos AND horas_filmes > horas_ao_vivo_globo THEN 'Filmes'
+      WHEN horas_novela > horas_outros_conteudos
+    AND horas_novela > horas_series
+    AND horas_novela > horas_esportes
+    AND horas_novela > horas_jornalismo
+    AND horas_novela > horas_reality
+    AND horas_novela > horas_variedades
+    AND horas_novela > horas_ao_vivo_globo THEN 'Novelas'
+      WHEN horas_series > horas_outros_conteudos AND horas_series > horas_esportes AND horas_series > horas_jornalismo AND horas_series > horas_reality AND horas_series > horas_variedades AND horas_series > horas_ao_vivo_globo THEN 'Series'
+      WHEN horas_esportes > horas_outros_conteudos
+    AND horas_esportes > horas_ao_vivo_globo THEN 'Esportes'
+      WHEN horas_jornalismo > horas_outros_conteudos AND horas_jornalismo > horas_ao_vivo_globo THEN 'Jornalismo'
+      WHEN horas_reality > horas_outros_conteudos
+    AND horas_reality > horas_ao_vivo_globo THEN 'Reality'
+      WHEN horas_variedades > horas_outros_conteudos AND horas_variedades > horas_ao_vivo_globo THEN 'Variedades'
+      WHEN horas_ao_vivo_globo > horas_outros_conteudos THEN 'Ao_Vivo_Tv_Globo'
+      ELSE 'Outros_Conteudos'
+  END
+    AS perfil_consumo
+  FROM
+    basebbb3
+  ORDER BY
+    globo_id,
+    semana ASC ),
+  basebbb2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN total_horas_bbb>=5 THEN '4. Heavy User'
+      WHEN total_horas_bbb BETWEEN 0.05
+    AND 1 THEN '1. Light User'
+      WHEN total_horas_bbb BETWEEN 1 AND 2 THEN '2. Mid-Light User'
+      WHEN total_horas_bbb BETWEEN 2
+    AND 5 THEN '3. Mid-Heavy User'
+      ELSE '0. No Live'
+  END
+    AS cluster_bbb,
+    SAFE_DIVIDE( total_horas_bbb,(horas_esportes+horas_jornalismo+horas_reality+horas_variedades + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb ) ) AS share_bbb,
+    CASE
+      WHEN SAFE_DIVIDE( total_horas_bbb,(horas_esportes+ horas_jornalismo+ horas_reality+ horas_variedades + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb ) ) <= 0.5 THEN '00%-50%'
+      WHEN SAFE_DIVIDE( total_horas_bbb,( horas_esportes+ horas_jornalismo+ horas_reality+ horas_variedades + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_horas_bbb ) ) <= 0.8 THEN '51%-80%'
+      ELSE '81%-100%'
+  END
+    AS cluster_share_bbb
+  FROM
+    final ),
+  lf AS (
+  SELECT
+    globo_id,
+    tipo_usuario,
+    consumiu_bbb_20,
+    assinou_cancelou_bbb_20,
+    consumiu_bbb_21,
+    assinou_cancelou_bbb_21,
+    consumiu_bbb_22,
+    assinou_cancelou_bbb_22,
+    consumiu_bbb_23,
+    consumiu_bbb_23_simulcast,
+    assinou_cancelou_bbb_23,
+    consumiu_bbb_24,
+    assinou_cancelou_bbb_24,
+    semana,
+    frequencia,
+    IFNULL(horas_episode,0) AS horas_episode,
+    IFNULL(qtd_midias_episode,0) AS qtd_midias_episode,
+    IFNULL(freq_episode,0) AS freq_episode,
+    IFNULL(horas_excerpt,0) AS horas_excerpt,
+    IFNULL(qtd_midias_excerpt,0) AS qtd_midias_excerpt,
+    IFNULL(freq_excerpt,0) AS freq_excerpt,
+    IFNULL(horas_extra,0) AS horas_extra,
+    IFNULL(qtd_midias_extra,0) AS qtd_midias_extra,
+    IFNULL(freq_extra,0) AS freq_extra,
+    IFNULL(horas_teaser,0) AS horas_teaser,
+    IFNULL(qtd_midias_teaser,0) AS qtd_midias_teaser,
+    IFNULL(freq_teaser,0) AS freq_teaser,
+    IFNULL(horas_trailer,0) AS horas_trailer,
+    IFNULL(qtd_midias_trailer,0) AS qtd_midias_trailer,
+    IFNULL(freq_trailer,0) AS freq_trailer,
+    IFNULL(horas_live,0) AS horas_live,
+    IFNULL(qtd_midias_live,0) AS qtd_midias_live,
+    IFNULL(freq_live,0) AS freq_live,
+    IFNULL(horas_simulcast,0) AS horas_simulcast,
+    IFNULL(qtd_midias_simulcast,0) AS qtd_midias_simulcast,
+    IFNULL(freq_simulcast,0) AS freq_simulcast,
+    total_horas_bbb,
+    cluster_bbb,
+    share_bbb,
+    cluster_share_bbb,
+    horas_novela,
+    qtd_midias_novela,
+    freq_novela,
+    qtd_programas_novela,
+    horas_series,
+    qtd_midias_series,
+    freq_series,
+    qtd_programas_series,
+    horas_filmes,
+    qtd_midias_filmes,
+    freq_filmes,
+    qtd_programas_filmes,
+    horas_esportes,
+    qtd_programas_esportes,
+    freq_esportes,
+    qtd_midias_esportes,
+    horas_jornalismo,
+    qtd_programas_jornalismo,
+    freq_jornalismo,
+    qtd_midias_jornalismo,
+    horas_reality,
+    qtd_programas_reality,
+    freq_reality,
+    qtd_midias_reality,
+    horas_variedades,
+    qtd_programas_variedades,
+    freq_variedades,
+    qtd_midias_variedades,
+    horas_ao_vivo_globo,
+    freq_ao_vivo_globo,
+    horas_outros_conteudos,
+    qtd_midias_outros_conteudos,
+    freq_outros_conteudos,
+    qtd_programas_outros_conteudos,
+    assistiu_big_show,
+    assistiu_bbb25_exclusivo_gshow,
+    assistiu_bate_papo_bbb,
+    assistiu_click_bbb,
+    assistiu_maratona_big_day,
+    assistiu_mesacast,
+    assistiu_doc_bbb,
+    perfil_consumo
+  FROM
+    basebbb2 AS f
+  ORDER BY
+    globo_id,
+    semana ASC ),
+  base_perfil AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, semana ORDER BY globo_id, semana ) AS rm,
+  FROM
+    lf
+  QUALIFY
+    rm = 1 ),
+  baself AS (
+  SELECT
+    * EXCEPT (rm)
+  FROM
+    base_perfil ),
+  tabela AS (
+  SELECT
+    *
+  FROM
+    baself ),
+  tabela2 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY globo_id, cluster_bbb ORDER BY globo_id DESC ) dup
+  FROM
+    tabela ),
+  tabela_lf AS (
+  SELECT
+    *,
+    RANK() OVER (PARTITION BY globo_id, semana ORDER BY globo_id, semana, cluster_bbb ASC ) rm
+  FROM
+    tabela2
+  WHERE
+    dup = 1
+  QUALIFY
+    rm = 1 )
+SELECT
+  * EXCEPT(rm,
+    dup)
+FROM
+  tabela_lf where LENGTH(globo_id) - LENGTH(REPLACE(globo_id, '-', '')) = 4

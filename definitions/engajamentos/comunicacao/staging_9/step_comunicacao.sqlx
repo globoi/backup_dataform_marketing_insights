@@ -1,0 +1,23 @@
+config {
+  type: "view",
+  name: "step_comunicacao",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_9", 'schedule_tag=comunicacao_step_comunicacao'],
+}
+
+SELECT
+  u.globo_id,
+  acesso_flag_30D,
+  acesso_qtd_dias,
+Flag_Abriu_App_30D,
+Flag_Abriu_Email_30D,
+Flag_Recebeu_Email_30D,
+Perfil_Email,
+Flag_Abriu_Push_30D,
+Flag_Recebeu_Push_30D,
+Perfil_Uso_Push,
+Status_Opt_In
+FROM
+  ${ref("comunicacao", "ultima_comunicacao_assinante")} as u
+  left join ${ref('comunicacao','ultima_comunicacao_geral_staging_1')} using(globo_id)
+

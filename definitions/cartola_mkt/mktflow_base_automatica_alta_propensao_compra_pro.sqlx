@@ -1,0 +1,47 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_alta_propensao_compra_pro','schedule_cron=10 16 * * *'],
+  name: 'mktflow_base_automatica_alta_propensao_compra_pro',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+
+    bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt",
+      urban: "list"
+    }
+  }
+}
+
+with cte1 as (
+SELECT distinct globo_id
+from ${ref("cartola_modelos_staging", "predict_2024")} a
+where PROP_SEGMENTS_DESC = 'HIGH'),
+
+base_ativa_cartola as (
+SELECT
+    DISTINCT ss.globo_id
+  FROM
+    ${ref("sales_gold", "subscription_state")} ss
+  LEFT JOIN
+    ${ref("sales_gold", "subscription_details")} sd
+  ON
+    ss.object_id = sd.id
+  LEFT JOIN
+    ${ref("sales_gold", "product_details")} pd
+  ON
+    sd.product_id = pd.id
+  WHERE
+    DATE(ss.state_date) = CURRENT_DATE() - 1
+    AND LOWER(pd.name) LIKE '%cartola%'
+    AND ss.state = 'active'
+)
+
+SELECT DISTINCT 'named_user' as identifier_type, cte1.globo_id as UUID
+FROM cte1
+LEFT JOIN base_ativa_cartola b
+ON cte1.globo_id = b.globo_id
+WHERE b.globo_id IS NULL

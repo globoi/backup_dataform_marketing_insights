@@ -1,0 +1,8 @@
+config {
+  type: "declaration",
+  database: "estrutura-esportes",
+  schema: "Cartola",
+  name: "TimeCoracao_Cart18_20_GE"
+}
+
+-- estrutura-esportes.Cartola.TimeCoracao_Cart18_20_GE

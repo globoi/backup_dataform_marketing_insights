@@ -1,0 +1,87 @@
+config {
+  type: 'table',
+  tags: [
+    'jornada_consumo',
+    'schedule_tag=macro_clusters_mkt_mktflow_assinante_premium_cluster_infantil',
+    "schedule_cron=00 11 * * 1"
+    ],
+  name: 'mktflow_assinante_premium_cluster_infantil',
+  schema: 'macro_clusters_mkt',
+  description: 'assinantes premium que consumiram programas vod do genero infantil ou programas ao vivo do genero infantil nos ultimos 180 dias ou que são assinantes ou ex-assinantes de Giga Gloob.',
+  bigquery: {
+    labels: {
+      owner: "martech",
+      urban: "list",
+      mktcloud: "true"
+    }
+  }
+}
+
+--macro cluster premium infantil
+--assinantes premium que consumiram programas vod do genero infantil ou programas ao vivo do genero infantil nos ultimos 180 dias ou que são assinantes ou ex-assinantes de Giga Gloob.
+
+with consumo_em_genero_infantil as (
+  SELECT distinct a.userId as globo_id, sum(hours_watched) as hrs_consumidas
+  FROM ${ref('consumo_enriched','impression')} a
+  INNER JOIN ${ref('jornadas_mkt','genero_todas_combinacoes')} b
+    ON a.program_id = b.program_id
+  WHERE date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero in ('Infantil', 'Infantojuvenil', 'Animação')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+consumo_em_programas_ao_vivo_infantis as (
+  SELECT distinct globoid, sum(playtime_hours) as hrs_consumidas
+  FROM ${ref('simulcast','consumo_ibope')}
+  WHERE data_consumo >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 180 DAY)
+    AND genero_programa in ('INFANTIL')
+  GROUP BY ALL
+  HAVING hrs_consumidas >= 0.5
+),
+
+--Assinantes e Ex-assinantes de Giga Gloob
+giga_gloob as (
+  SELECT DISTINCT globo_id, 'usuário giga gloob' as base
+  FROM ${ref('temp','assinantes_e_ex_giga_gloob')}
+),
+
+--União de todos os usuários premium que consumiram programas vod do genero infantil ou programas ao vivo do genero infantil nos ultimos 180 dias e que são assinantes ou ex-assinantes de Giga Gloob.
+
+basefinal as (
+  with uniao as (
+  SELECT globo_id, 'consumo infantil' as base
+  FROM consumo_em_genero_infantil
+
+  UNION DISTINCT
+  
+  SELECT globoid as globo_id, 'consumo infantil' as base
+  FROM consumo_em_programas_ao_vivo_infantis
+
+  UNION DISTINCT 
+
+  SELECT globo_id, base FROM giga_gloob
+),
+
+  
+ base_ordenada as (
+    SELECT *
+    FROM uniao
+    ORDER BY 1,2
+  )
+  
+  --tirando réplicas de GLOBO_ID da base_ordenada
+  SELECT DISTINCT globo_id, array_to_string(ARRAY_agg(base),', ') as bases
+  FROM base_ordenada
+  GROUP BY 1
+)
+
+
+SELECT distinct 'named_user' as identifier_type, d.globo_id
+FROM basefinal d
+INNER JOIN ${ref('comunicacao','ultima_comunicacao_geral')} e
+  ON d.globo_id = e.globo_id
+WHERE e.tipo_cadastro = "Assinante"
+  AND e.mais_canais = true
+
+

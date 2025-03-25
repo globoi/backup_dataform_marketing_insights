@@ -1,0 +1,20 @@
+config {
+  type: "table",
+  schema: 'internacional',
+  name:'base_lf_internacional',
+  tags: ['schedule_tag=internacional_base_lf_internacional',
+         'schedule_cron=30 16 * * *']
+
+}
+  with lf as (SELECT
+  DISTINCT globoid AS globo_id,
+  assinatura_gold,
+  oferta_consumo,
+  ROW_NUMBER() OVER (
+  PARTITION BY globoid) as qtd  
+FROM
+  ${ref('Consumo','video_subs_ga_v4')}
+WHERE
+  assinatura_gold = 'Logado Free'
+qualify qtd =1 )
+select * except(qtd) from lf

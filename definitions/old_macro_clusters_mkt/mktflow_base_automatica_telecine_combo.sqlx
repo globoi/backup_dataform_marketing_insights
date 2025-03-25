@@ -1,0 +1,25 @@
+config {
+    type: "table",
+    name: "mktflow_base_automatica_telecine_combo",
+    schema: "macro_clusters_mkt",
+    tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_base_automatica_telecine_combo'],
+    bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech" ,
+      horario: "09h00min",
+      urban: "list",
+      mktcloud: "true"
+    }
+  },
+}
+
+SELECT DISTINCT 
+   'named_user' as identifier_type, globo_id
+FROM 
+    ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ,
+    UNNEST(info) i
+WHERE 
+   lower(Produto_Contratado) like '%telecine%'
+   AND assinatura_gplay = 'nacional'

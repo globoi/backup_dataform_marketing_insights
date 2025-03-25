@@ -1,0 +1,25 @@
+config {
+  type: 'table',
+  name: 'atualizacao_mobile_push',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas', 
+         'atualizacao_tabelas_2', 
+         'schedule_tag=atualizacao_tabelas_atualizacao_mobile_push',
+         "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {}
+}
+
+WITH push AS (
+  SELECT
+    DATETIME(date_time_send, "America/Sao_Paulo") AS date_time_send,
+    DATETIME(open_date, "America/Sao_Paulo") AS open_date
+  FROM
+    ${ref('mkt_clean', 'mobile_push')}
+  where table_suffix_date <= CURRENT_DATE()
+)
+SELECT
+  max(date_time_send) as max_date_time_send,
+  max(open_date) as max_open_date
+FROM
+  push

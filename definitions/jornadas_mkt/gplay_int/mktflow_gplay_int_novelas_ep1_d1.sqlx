@@ -1,0 +1,34 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_novelas_ep1_d1',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 'schedule_tag=jornadas_mkt_mktflow_gplay_int_novelas_ep1_d1']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT 
+  current_date() AS dt_proc,
+  userid AS globo_id,
+  program_id,
+  case when GP_internacional_ind like '%globo-play-%' then 'INT' else 'BR' end AS GP_internacional_ind
+FROM
+  ${ref("consumo_enriched", "all_impression")} AS imp
+INNER JOIN
+  ${ref("conteudo_enriched", 'program')} AS pr ON imp.program_id = pr.id
+INNER JOIN
+  ${ref("usuarios", 'free_users_all')} AS fr ON fr.globo_id = imp.userid
+WHERE
+  `timestamp` >= '2020-05-21'
+  AND `date` >= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  AND program_subset = 'novelas'
+
+AND title_id NOT IN ("HFbkdv5bs2","H7s5dLsVmV","g56h6HmYYZ","LFvgcHWxBc","xpPmXwgN2k","sKLwmqfJ2w","WsnrKKVfMB","6M9SmwNsGm","kF2gNpsJFB","KxKVvK6Vvq","C86VK9vggk")
+
+QUALIFY row_number() OVER (
+  PARTITION BY userid
+  order by timestamp asc
+) = 1

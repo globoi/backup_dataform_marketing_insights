@@ -1,0 +1,16 @@
+config {
+  type: "view",
+  name: "dados_usuarios_canais",
+  schema: "usuarios",
+  tags: ["usuarios_staging_4",
+        "schedule_tag=usuarios_dados_usuarios_canais"
+  ]
+}
+
+SELECT
+    DISTINCT *
+    FROM
+        ${ref("usuarios","dados_usuarios_assinantes")}
+    WHERE
+        mais_canais AND
+        globo_id IS NOT NULL

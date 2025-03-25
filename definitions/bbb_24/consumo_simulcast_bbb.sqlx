@@ -1,0 +1,68 @@
+config {
+  type: 'table',
+  name: 'consumo_simulcast_bbb',
+  schema: 'bbb_24',
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech",
+      horario: "18h40min"
+
+    }
+  },
+  description: 'Tabela com os usuários que assistiram algum conteúdo relacionado ao BBB 24 via simulcast (FONTE GA).',
+  columns: {
+    globo_id: 'Código que identifica o usuário.',
+    canal: 'Canal em que o usuário assistiu o programa.',
+    programa: 'Programa relacionado ao BBB que o usuário assistiu.',
+    semana: 'Semana em que o usuário assistiu o programa.',
+    frequencia_simulcast: 'Total de dias na semana em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).',
+    total_horas_simulcast_bbb: 'Total de horas na semana em que o usuário consumiu os programas relacionados ao BBB ao vivo na TV GLOBO/MULTISHOW (SIMULCAST FONTE GA).'
+  }
+
+}
+
+with base as (
+  SELECT
+    globoid,
+    canal,
+    programa,
+    case
+      when playtime_hours is null then 0
+      else playtime_hours
+    end as playtime_hours,
+    date_trunc(data_consumo, WEEK(MONDAY)) as semana,
+    count(distinct data_consumo) over(
+      partition by globoid,
+      date_trunc(data_consumo, WEEK(MONDAY))
+    ) as frequencia_ao_vivo,
+  FROM ${ref('simulcast', 'consumo_ibope')}
+  WHERE
+    data_consumo >= "2024-01-08"
+    and (
+      lower(programa) like '%big brother%'
+      or lower(programa) like '%bbb%'
+    )
+    and (
+      program_id = '9095'
+      or lower(canal) like '%multishow%'
+    )
+)
+select
+  distinct globoid as globo_id,
+  tipo_cadastro,
+  canal,
+  programa,
+  semana,
+  case
+    when frequencia_ao_vivo >= 8 then 7
+    else frequencia_ao_vivo
+  end as frequencia_simulcast,
+  sum(playtime_hours) OVER (PARTITION BY globoid, semana) as total_horas_simulcast_bbb
+from
+  base as b
+  inner join ${ref('comunicacao', 'ultima_comunicacao_geral')} as c on c.globo_id = b.globoid
+order by
+  globo_id,
+  semana asc

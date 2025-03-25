@@ -1,0 +1,50 @@
+config {
+  type: 'table',
+  tags: ['macrocluster_old','schedule_tag=macro_clusters_mkt_mktflow_internacional_lf_cluster_ex_assinantes'],
+  name: 'mktflow_internacional_lf_cluster_ex_assinantes',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+---Contar quantas vezes um globoid aparece por ordem temporal de aparição na base ativa internacional
+---por exemplo: uma pessoa fez a assinatura dia 17/05 no produto gplay internacional, entao ela aparecerá na base ativa a partir desse dia e todos os outros ate ela cancelar a assinatura. se ela cancenlar dia 17/07, entao essa vai ser a ultima aparição dela na base. a partir do dia 18/07 ela nao aparecerá mais. numerando quantas vezes ela aparece na base e ordenando da mais recente para mais antiga (desc), podemos ver qual foi a ultima vez que o globoid apareceu na base.
+
+with base as
+(SELECT 
+  ROW_NUMBER() OVER (PARTITION BY globo_id order by state_date DESC) linha, *
+FROM
+   ${ref("sales_gold", "subscription_state")} ss 
+JOIN 
+  ${ref("sales_gold", "subscription_details")} sd ON ss.object_id = sd.id 
+JOIN 
+  ${ref("sales_gold", "product_details")} pd ON sd.product_id = pd.id
+WHERE
+   DATE(ss.state_date) >= '2023-01-01'  
+   AND ss.state = 'active'                  
+   AND pd.is_international = TRUE
+   AND LOWER(pd.name) LIKE '%globoplay%'     
+),
+
+---Se a ultima vez que a pessoa apareceu na base foi ontem, entao podemos considerar que ela esta ativa. Mas se a ultima vez que a pessoa apareceu na base foi antes de ontem ela ja nao é mais ativa.
+
+base_ultimo_status as (
+select 
+state_date = CURRENT_DATE-1 flag_ativo, *
+from base 
+where linha = 1)
+
+---Pegar apenas os globoids que nao apareceram na base ativa de ontem, ou seja, nao estao mais ativos ou com status cancelado.
+
+select distinct globo_id
+from base_ultimo_status
+where
+flag_ativo = false
+and subscription_status = 'Cancelado'
+and globo_id is not null

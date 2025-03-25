@@ -1,0 +1,59 @@
+config {
+  type: "table",
+  name: "Trial_Mes",
+  schema: "consumo"
+ /* tags: ['consumo_staging_1',
+        "schedule_tag=consumo_Trial_Mes"
+  ]*/
+}
+
+
+SELECT 
+    trial_user.*,
+    EXTRACT(MONTH FROM (DATE(trial_user.data_hora_compra, 'America/Sao_Paulo'))) AS mes,
+    EXTRACT(DAY FROM (DATE(trial_user.data_hora_compra, 'America/Sao_Paulo'))) AS dia,
+    DATE(trial_user.data_hora_compra, 'America/Sao_Paulo') AS data_inicio,
+    CASE
+        WHEN lower(trial_user.produto_id) LIKE '%pro-0130%' THEN 'Anual'
+        ELSE 'Mensal'
+    END AS Plano,
+    CASE
+        WHEN trial_user.convertido THEN TRUE
+        ELSE FALSE
+    END AS D8,
+    CASE
+        WHEN trial_user.convertido = FALSE THEN FALSE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NOT NULL AND DATE_DIFF(trial_user.dt_hr_cancelamento_final_ciclo, data_hora_compra, DAY) >= 38 THEN TRUE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NULL AND trial_user.convertido AND DATE_DIFF(CURRENT_DATE(), DATE(trial_user.data_hora_compra), DAY) >= 38 THEN TRUE
+        ELSE FALSE
+    END AS D38,
+    CASE
+        WHEN trial_user.convertido = FALSE THEN FALSE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NOT NULL AND DATE_DIFF(trial_user.dt_hr_cancelamento_final_ciclo, trial_user.data_hora_compra, DAY) >= 68 THEN TRUE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NULL AND trial_user.convertido AND DATE_DIFF(CURRENT_DATE(), DATE(trial_user.data_hora_compra), DAY) >= 68 THEN TRUE
+        ELSE FALSE
+    END AS D68,
+    CASE
+        WHEN trial_user.convertido = FALSE THEN FALSE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NOT NULL AND DATE_DIFF(trial_user.dt_hr_cancelamento_final_ciclo, trial_user.data_hora_compra, DAY) >= 98 THEN TRUE
+        WHEN trial_user.dt_hr_cancelamento_final_ciclo IS NULL AND trial_user.convertido AND DATE_DIFF(CURRENT_DATE(), DATE(trial_user.data_hora_compra), DAY) >= 98 THEN TRUE
+        ELSE FALSE
+    END AS D98,
+    program.subset AS subset,
+    program.default_category AS categoria,
+    demografia.gender AS genero,
+    demografia.age AS idade,
+    demografia.address_state AS estado,
+    demografia.address_city AS cidade,
+    imp.mediaid
+FROM 
+  ${ref("consumo_derived", "trial_user")}  trial_user
+LEFT JOIN ${ref("conteudo_enriched", "program")} program
+ON trial_user.firstWatched = program.id
+LEFT JOIN ${ref("globoid_enriched", "demografia")} demografia
+ON trial_user.globo_id = demografia.globo_id
+LEFT JOIN ${ref("consumo_enriched", "all_impression")} imp
+ON trial_user.globo_id = imp.userid AND trial_user.timestamp_for_first_program = imp.timestamp
+WHERE DATE(trial_user.data_hora_compra, 'America/Sao_Paulo') > '2019-01-01'
+AND LOWER(trial_user.canal_compra) NOT LIKE 'vivo'
+

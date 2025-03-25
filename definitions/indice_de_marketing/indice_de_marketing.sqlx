@@ -1,0 +1,161 @@
+config {
+  type: 'table',
+  name: 'indice_de_marketing',
+  schema: 'indice_de_marketing',
+  tags: ['indice_de_marketing','schedule_tag=indice_de_marketing_indice_de_marketing',],
+  description: '',
+}
+WITH
+
+classificacoes AS (
+    SELECT DISTINCT
+        globo_id,
+        COALESCE(AVG(diversidade),0) AS diversidade,
+        COALESCE(AVG(diversidade_conteudo),0) AS diversidade_conteudo,
+        COALESCE(AVG(total_horas),0) AS total_horas
+    FROM
+        ${ref("usuarios", "RaioXAssinante_Reduzido")}
+    GROUP BY
+        globo_id
+)
+
+,clusters_1 AS (
+    SELECT * FROM
+        (SELECT globo_id,
+        CASE
+            WHEN cluster_engajamento = "1. Light Users" THEN "_1_Light_Users"
+            WHEN cluster_engajamento = "2. Mid-Light Users" THEN "_2_Mid_Light_Users"
+            WHEN cluster_engajamento = "3. Mid-Heavy Users" THEN "_3_Mid_Heavy_Users"
+            WHEN cluster_engajamento = "4. Heavy Users" THEN "_4_Heavy_Users"
+        END AS cluster_engajamento
+        FROM ${ref("usuarios", "RaioXAssinante_Reduzido")})
+        PIVOT(COUNT(*) FOR cluster_engajamento IN ("_4_Heavy_Users", "_3_Mid_Heavy_Users", "_2_Mid_Light_Users", "_1_Light_Users"))
+)
+
+,clusters AS (
+    SELECT DISTINCT
+        globo_id,
+        CASE
+            WHEN _4_Heavy_Users >=_3_Mid_Heavy_Users
+                AND _4_Heavy_Users >=_2_Mid_Light_Users
+                AND _4_Heavy_Users >= _1_Light_Users
+            THEN '4. Heavy Users'
+            WHEN _3_Mid_Heavy_Users >=_2_Mid_Light_Users
+                AND _3_Mid_Heavy_Users >= _1_Light_Users
+            THEN '3. Mid-Heavy Users'
+            WHEN _2_Mid_Light_Users >= _1_Light_Users
+            THEN '2. Mid-Light Users'
+            WHEN _1_Light_Users>0
+            THEN '1. Light Users'
+            ELSE '0. No Users'
+        END AS cluster_engajamento
+    FROM
+        clusters_1
+)
+
+,ultima_comunicaca_assinante_1 AS (
+    SELECT DISTINCT
+        *,
+        (
+            COALESCE(CAST(appopen_flag_30D AS INT64),0) +
+            COALESCE(CAST(push_flag_enviado_30D AS INT64),0) +
+            COALESCE(CAST(email_flag_aberto_30D AS INT64),0) +
+            COALESCE(CAST(whatsapp_optin_status AS INT64),0)
+        ) AS canais,
+        CASE
+            WHEN Produto_Contratado = 'Globoplay'  THEN 'Tier 1'
+            WHEN (Produto_Contratado <> 'Globoplay' AND NOT mais_canais) OR
+            (Produto_Contratado = 'Globoplay') THEN 'Combo'
+            WHEN Produto_Contratado = 'Globoplay + canais ao vivo' THEN 'Canais'
+            WHEN (Produto_Contratado <> 'Globoplay + canais ao vivo' AND mais_canais) OR
+            (Produto_Contratado = 'Globoplay + canais ao vivo') THEN 'Combo e Canais'
+            ELSE 'Analisar'
+        END AS combo,
+        CASE
+            WHEN tempo_de_base_agrupado = '1. Até 1 mês'
+            OR tempo_de_base_agrupado ='2. Entre 1 e 2 Meses'
+            OR tempo_de_base_agrupado = '3. Entre 2 e 3 Meses'
+            THEN '1. Até 3 meses'
+            WHEN tempo_de_base_agrupado = '4. Entre 3 e 6 Meses'
+            THEN '2. Entre 3 e 6 meses'
+            WHEN tempo_de_base_agrupado = '5. Entre 6 e 12 Meses'
+            THEN '3. Entre 6 e 12 meses'
+            WHEN tempo_de_base_agrupado = '6. Entre 12 e 24 Meses'
+            THEN '4. Entre 12 e 24 meses'
+            ELSE '5. Mais de 24 meses'
+        END AS tempo_base
+    FROM
+        ${ref("comunicacao", "ultima_comunicacao_geral_staging_1")}
+        LEFT JOIN clusters USING(globo_id)
+        LEFT JOIN classificacoes USING(globo_id)
+        where tipo_cadastro='Assinante'
+
+)
+
+,ultima_comunicaca_assinante_2 AS (
+    SELECT
+        *,
+        CASE
+            WHEN tempo_base = '1. Até 3 meses' THEN 4
+            WHEN tempo_base = '2. Entre 3 e 6 meses' THEN 8
+            WHEN tempo_base = '3. Entre 6 e 12 meses' THEN 12
+            WHEN tempo_base = '4. Entre 12 e 24 meses' THEN 16
+            WHEN tempo_base = '5. Mais de 24 meses' THEN 20
+            ELSE 0
+        END AS pontos_tempo_base,
+        CASE
+            WHEN canais =0 THEN 0
+            WHEN canais =1 THEN 5
+            WHEN canais =2 THEN 8
+            WHEN canais =3 THEN 12
+            WHEN canais =4 THEN 20
+            ELSE 0
+        END AS pontos_comunicacoes,
+        CASE
+            WHEN Cluster_Engajamento = '1. Light Users' THEN 5
+            WHEN Cluster_Engajamento = '2. Mid-Light Users' THEN 10
+            WHEN Cluster_Engajamento = '3. Mid-Heavy Users' THEN 15
+            WHEN Cluster_Engajamento = '4. Heavy Users' THEN 20
+            ELSE 0
+        END AS pontos_consumo,
+        CASE
+            WHEN produto = 'mensal' THEN 5
+            WHEN produto = 'anual' THEN 15
+            WHEN produto = 'bianual' THEN 20
+            ELSE 0
+        END AS pontos_plano,
+        CASE
+            WHEN Combo = 'Tier 1' THEN 5
+            WHEN Combo = 'Combo' THEN 10
+            WHEN Combo = 'Canais' THEN 15
+            WHEN Combo = 'Combo e Canais' THEN 20
+            ELSE 0
+        END AS pontos_combo
+    FROM
+        ultima_comunicaca_assinante_1
+)
+
+,ultima_comunicaca_assinante AS (
+    SELECT
+        globo_id, Pontos_Combo, Pontos_Plano, Pontos_Consumo, Pontos_Comunicacoes,
+        Pontos_Tempo_Base, Tempo_Base, Combo, tempo_de_base_agrupado, produto, Canais, Produto_Contratado,
+        mais_canais, tipo_assinante, dt_assinatura_comeco, canal_compra, gender,
+        age, address_state, first_play, ultimo_consumo, data_ultimo_consumo, origem, id_asset, data_hora_compra,
+        first_play_subset, ultimo_consumo_subset telefone, endereco, dt_aniversario,email_perfil_30D as Perfil_Email,
+        email_flag_enviado_30D as Flag_Recebeu_Email_30D,email_flag_aberto_30D as Flag_Abriu_Email_30D, push_flag_enviado_30D as Flag_Recebeu_Push_30D, appopen_flag_30D as Flag_Abriu_App_30D, push_flag_aberto_30D as Flag_Abriu_Push_30D,
+        whatsapp_optin_status as whatsapp_optin_status, Cluster_Engajamento, push_perfil_uso as Perfil_Uso_Push, Diversidade, Diversidade_Conteudo, total_horas,
+        (Pontos_Combo+Pontos_Comunicacoes+Pontos_Consumo+Pontos_Plano+Pontos_Tempo_Base) AS Pontuacao_Total
+    FROM
+        ultima_comunicaca_assinante_2
+)
+
+SELECT DISTINCT *,
+        CASE
+            WHEN Pontuacao_Total<=29 THEN 'Nível 01'
+            WHEN Pontuacao_Total<=44 THEN 'Nível 02'
+            WHEN Pontuacao_Total<=59 THEN 'Nível 03'
+            WHEN Pontuacao_Total<=79 THEN 'Nível 04'
+            WHEN Pontuacao_Total>79 THEN 'Nível 05'
+            ELSE 'Nível 00'
+        END AS im_nivel
+FROM  ultima_comunicaca_assinante

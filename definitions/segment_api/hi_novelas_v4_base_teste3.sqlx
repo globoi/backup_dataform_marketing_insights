@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_hi_novelas_v4_base_teste3'],
+  name: 'hi_novelas_v4_base_teste3',
+  schema: 'segment_api'
+}
+
+-- ${ref("segment_api", "hi_novelas_v4_base_teste3")}
+-- `gglobo-mkt-ins-hdg-prd.segment_api.hi_novelas_v4_base_teste3`
+
+-- gglobo-mkt-ins-hdg-prd.experimentos.hi_novelas_v4_grupos
+
+SELECT a.globo_id AS user_id 
+FROM ${ref("experimentos", "hi_novelas_v4_grupos")} AS a
+INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial_new")} AS b ON a.globo_id = b.globo_id
+WHERE grupo_n = 3
+
+UNION ALL
+SELECT 
+  '1c459be8-347c-493a-87ab-56594c8ee3ed' as user_id
+

@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_20",
+  name: "20200421_base_jump",
+  description: ""
+}

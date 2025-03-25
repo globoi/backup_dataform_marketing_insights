@@ -1,0 +1,27 @@
+config {
+  type: "table",
+  name: "de_para_subset",
+  schema: "conteudo",
+  tags: ['consumo_staging_1',
+        "schedule_tag=conteudo_de_para_subset",
+        "schedule_cron=0 7 * * *"
+  ]
+}
+
+SELECT
+  id,
+  title,
+  content_owner,
+  default_category,
+  p.subset,
+  channel_title,
+  Estdio as new_Estdio,
+    case when new_Studio_Tratado is null then INITCAP(content_owner) else new_Studio_Tratado end as new_Studio_Tratado,
+  new_Nacionalinternacional_Tratado,
+  new_Categoria_Tratada,
+  Categoria as Subset_Tratado
+FROM
+  ${ref('conteudo_enriched', 'program')} as p
+  left join (select * except (ID_programa), ID_programa as id from  ${ref('raw', 'programas')}) using (id)
+  left join (select id, Studio_Tratado as new_Studio_Tratado, Nacionalinternacional_Tratado as new_Nacionalinternacional_Tratado,Categoria_Tratada as new_Categoria_Tratada from ${ref('conteudo', 'acervo')})using (id)
+  left join (select Categoria, Subset from ${ref('raw', 'De_para_subset_padronizado')}) as s on s.Subset=p.subset

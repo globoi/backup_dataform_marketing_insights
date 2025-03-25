@@ -1,0 +1,59 @@
+config {
+    type: "table",
+    name: "base_demografia_consumo",
+    schema: 'datacloud',
+    tags: ['schedule_tag=datacloud_base_demografia_consumo',
+        "schedule_cron=35 11 * * *"
+    ]
+}
+
+WITH
+  usuarios AS (
+  SELECT
+    DISTINCT globo_id
+  FROM
+    ${ref('datacloud', 'base_datacloud')}),
+  demografia_usuarios AS (
+  SELECT
+    globo_id,
+    age AS idade,
+    address_state AS estado,
+    address_city AS cidade,
+    COALESCE(gender, gender_inf) AS genero
+  FROM
+    ${ref('globoid_enriched', 'demografia')})
+SELECT
+  * EXCEPT(mes2)
+FROM
+  usuarios
+LEFT JOIN (
+  SELECT
+    globo_id,
+    mes,
+    Cluster_Engajamento AS cluster_engajamento_gplay,
+    frequencia_mensal AS frequencia_mensal_gplay,
+    ROUND(total_horas_Mes, 0) AS total_horas_mes_gplay,
+    diversidade_mensal AS diversidade_mensal_gplay,
+    diversidade_conteudo_mensal AS diversidade_conteudo_mensal_gplay,
+    perfil_periodo_do_dia_mes AS perfil_periodo_do_dia_mes_gplay,
+    perfil_dia_da_semana_mes AS perfil_dia_da_semana_mes_gplay,
+    Cluster_Conteudo_Mais_Assistido_Mes AS cluster_conteudo_mais_assistido_mes_gplay,
+    ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY mes DESC ) AS mes2
+  FROM
+    ${ref('usuarios', 'RaioXAssinanteMensal')} QUALIFY mes2 = 1 )
+USING
+  (globo_id)
+LEFT JOIN
+  demografia_usuarios
+USING
+  (globo_id)
+LEFT JOIN (
+  SELECT
+    DISTINCT globo_id,
+    inativo
+  FROM
+    ${ref('usuarios', 'perfil_assinantes_ativo_reduzido')})
+USING
+  (globo_id) QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY globo_id DESC ) = 1
+ORDER BY
+  mes DESC

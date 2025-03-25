@@ -1,0 +1,37 @@
+config {
+  type: 'table',
+  tags: ['bbb_23'],
+  name: 'mktflow_bbb23_assinantes_intensos',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+with maxsemana as (
+  SELECT max(a.semana) as ultima_semana
+    FROM ${ref("bbb_23", "Raiox_BBB_23_Assinantes")} as a 
+),
+base_final as (
+  SELECT
+    DISTINCT b.globo_id,
+    --(date(b.semana) - 7 ), --Linha não utilizada
+    semana
+  FROM ${ref("bbb_23", "Raiox_BBB_23_Assinantes")} as b 
+  WHERE
+
+    -- esse campo não existe, alterado para poder rodar a tag
+    -- cluster_bbb_new in ('3. Mid-Heavy User', '4. Heavy User')
+    cluster_bbb in  ('3. Mid-Heavy User', '4. Heavy User')
+    AND base_ativa = current_date('America/Sao_Paulo')
+
+    --AND semana = (SELECT ultima_semana FROM maxsemana) --Linha alterada para puxar da ultima semana fechada
+    AND semana = ((SELECT ultima_semana FROM maxsemana)-7)
+)
+
+SELECT distinct globo_id
+FROM base_final

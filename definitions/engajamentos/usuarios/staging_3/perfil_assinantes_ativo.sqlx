@@ -1,0 +1,55 @@
+config {
+  type: "table",
+  name: "perfil_assinantes_ativo",
+  schema: "usuarios"
+  }
+
+WITH acervo AS (
+  SELECT 
+    id AS program_id,
+    channel_title,
+    Exclusividade,
+    Ineditismo,
+    Nacionalinternacional_Tratado,
+    Studio_Tratado,
+    Categoria_Tratada
+  FROM ${ref("conteudo", "acervo")}
+),
+
+perfil_assinantes_ativo_1 AS (
+  SELECT 
+    *,
+    (DATE_DIFF(
+      CURRENT_DATE(), 
+      COALESCE(CAST(data_ultimo_consumo AS DATE), DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY)),
+      DAY) >= 30) 
+    AND
+    (DATE_DIFF(
+      CURRENT_DATE(), 
+      dt_assinatura_comeco, 
+      DAY) > 30) 
+    AS inativo
+  FROM ${ref("usuarios", "step_info")}
+  LEFT JOIN ${ref("consumo", "step_consumo")}
+  USING (globo_id)
+),
+
+perfil_assinantes_ativo_acervo AS (
+  SELECT *
+  FROM perfil_assinantes_ativo_1
+  LEFT JOIN acervo 
+  USING (program_id)
+  WHERE lower(assinatura_gplay) = "nacional"
+)
+
+SELECT 
+  * EXCEPT (cluster),
+  COALESCE(cluster, "Não Clusterizado") AS cluster
+FROM perfil_assinantes_ativo_acervo
+LEFT JOIN ${ref("palantir_export", "export_Cluster")}
+USING (globo_id)
+
+
+
+
+

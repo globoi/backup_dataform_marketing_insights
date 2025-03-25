@@ -1,0 +1,252 @@
+config {
+  type: 'table',
+  name: 'base_cancelamento',
+  schema: 'usuarios',
+  tags: ['usuarios_staging_2',
+        "schedule_tag=usuarios_base_cancelamento"
+  ],
+  description: '',
+  columns: {
+  }
+}
+
+WITH
+dependentes AS (
+  SELECT
+    COUNT(DISTINCT(globo_id_dependente)) AS n_dependentes,
+    AssetId
+  FROM
+    ${ref("sales_enriched", "relacionamento")}
+  GROUP BY
+    AssetId
+),
+
+asset_hs_step_1 AS (
+  SELECT
+    AssetId,
+    OldValue,
+    NewValue,
+  FROM
+    ${ref("sales_clean", "asset_history_status")}
+  QUALIFY 
+    ROW_NUMBER() OVER(PARTITION BY AssetId ORDER BY AssetHistoryCreatedDate DESC) = 1
+),
+
+asset_v2_step_1 AS (
+  SELECT
+    globo_id, AssetId, AssetName,
+    `status`, caracteristica_produto, tipo_de_pedido,
+    data_hora_compra, canal_compra, forma_pagamento,
+    data_conversao_efetiva, periodo_trial_form, data_da_suspensao,
+    motivo_suspensao, data_reativacao, assinatura_internacional,
+    data_hora_cancelamento, dt_hr_cancelamento_final_ciclo, ato_de_cancelamento,
+    canal_cancelamento, motivo_cancelamento, tipo_cancelamento,
+    forma_cancelamento, ProductCodeUnique__c, ProductCode,
+    data_da_migracao, gift_card,
+    ASSINATURA_ID IS NOT NULL AS cliente_migrado,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY data_hora_compra DESC) AS `last`,
+    CASE
+      WHEN LOWER(AssetName) LIKE '%globoplay premium%' AND (LOWER(AssetName) NOT LIKE 'globoplay padrão' AND LOWER(AssetName) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais
+      FROM
+    ${ref("sales_enriched", "asset_v2")}
+),
+
+asset_v2_step_2 AS (
+  SELECT 
+    *,
+    MAX(`last`) OVER(PARTITION BY globo_id) AS numero_assinaturas,
+  FROM
+    asset_v2_step_1
+    LEFT JOIN asset_hs_step_1 USING(AssetId)
+  WHERE
+    dt_hr_cancelamento_final_ciclo IS NOT NULL
+    AND canal_compra IN ('WEB', 'Inapp Google', 'Inapp Apple')
+    AND forma_pagamento != 'Gift Card'
+    AND LOWER(forma_pagamento) NOT LIKE '%billing%'
+    AND gift_card IS NULL
+    AND NOT assinatura_internacional
+    AND LOWER(motivo_cancelamento) NOT LIKE '%globoplay%'
+    AND LOWER(motivo_cancelamento) NOT LIKE '%upgrade%'
+    AND LOWER(motivo_cancelamento) NOT LIKE '%downgrade%'
+    AND LOWER(motivo_cancelamento) NOT LIKE '%cross up%'
+),
+
+asset_v2_step_3 AS (
+  SELECT
+  *,
+  CASE
+    WHEN LOWER(ato_de_cancelamento) LIKE '%agendado%' AND dt_hr_cancelamento_final_ciclo IS NOT NULL
+    THEN 'Cancelado_Voluntário'
+    WHEN LOWER(`status`) LIKE '%cancelado%'
+    AND (LOWER(canal_compra) LIKE '%web%' OR LOWER (canal_compra) LIKE '%apple%')
+    THEN CONCAT(`status`, '_', tipo_cancelamento)
+    WHEN LOWER(`status`) LIKE '%cancelado%' 
+    AND LOWER(canal_compra) LIKE '%google'
+    AND LOWER(OldValue) LIKE '%ativo%'
+    AND LOWER(NewValue) LIKE '%cancelado%'
+    THEN 'Cancelado_Voluntário'
+    WHEN LOWER(`status`) LIKE '%cancelado%'
+    AND LOWER(canal_compra) LIKE '%google'
+    AND LOWER(OldValue) LIKE '%suspenso%'
+    AND LOWER(NewValue) LIKE '%cancelado%'
+    THEN 'Cancelado_Involuntario'
+    WHEN LOWER(`status`) LIKE '%cancelado%'
+    THEN CONCAT(`status`, '_', tipo_cancelamento)
+  END AS Cancelamento,
+  periodo_trial_form > 0 AS teve_trial,
+  CASE
+    WHEN periodo_trial_form > 0 THEN data_hora_compra
+  END AS dt_trial_inicio,
+  CASE
+    WHEN periodo_trial_form > 0
+    AND periodo_trial_form BETWEEN 0 AND 41
+    THEN DATE_ADD(data_hora_compra, INTERVAL CAST(periodo_trial_form AS INT64) DAY)
+  END AS dt_trial_fim
+  FROM
+    asset_v2_step_2
+),
+
+asset_v2_step_4 AS (
+  SELECT
+    *,
+    CASE
+      WHEN teve_trial
+      THEN CURRENT_DATE() BETWEEN DATE(dt_trial_inicio) AND DATE(dt_trial_fim)
+      ELSE FALSE
+    END AS em_trial
+  FROM
+    asset_v2_step_3
+  WHERE
+    NOT(
+      teve_trial
+      AND data_conversao_efetiva IS NULL
+      AND NOT cliente_migrado
+    )
+    AND (Cancelamento = 'Cancelado_Voluntário' OR Cancelamento = 'Cancelado_Voluntario')
+),
+
+ultimo_consumo_step_1 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    dt_hr_cancelamento_final_ciclo,
+    data_hora_compra
+  FROM
+    asset_v2_step_4
+),
+
+ultimo_consumo_step_2 AS (
+  SELECT
+    globo_id,
+    asset.AssetId,
+    ultimo_consumo,
+    data_ultimo_consumo,
+    ultimo_consumo_subset,
+    FORMAT_DATE("%a", data_ultimo_consumo) AS dia_semana_ultimo_consumo,
+    EXTRACT(HOUR FROM DATETIME(data_ultimo_consumo, 'America/Sao_Paulo')) AS `hour`
+    FROM
+      ${ref("consumo", "ultimo_consumo")} ult
+    INNER JOIN ultimo_consumo_step_1 asset
+    USING (globo_id)
+    WHERE
+      data_ultimo_consumo  BETWEEN data_hora_compra AND dt_hr_cancelamento_final_ciclo
+),
+
+ultimo_consumo_step_3 AS (
+  SELECT 
+    *,
+    CASE
+      WHEN `hour` BETWEEN 6 AND 11 THEN "Manhã"
+      WHEN `hour` BETWEEN 12 AND 17 THEN "Tarde"
+      WHEN `hour` BETWEEN 18 AND 23 THEN "Noite"
+      WHEN `hour` BETWEEN 0 AND 5 THEN "Madrugada"
+    END AS periodo_ultimo_consumo 
+  FROM
+    ultimo_consumo_step_2
+
+),
+
+ultimo_30_step_1 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    data_hora_cancelamento,
+    data_hora_compra,
+    CASE
+      WHEN DATE_SUB(data_hora_cancelamento, INTERVAL 30 DAY) >= data_hora_compra
+      THEN DATE_SUB(data_hora_cancelamento, INTERVAL 30 DAY)
+      ELSE data_hora_compra
+    END AS `last`
+  FROM
+    asset_v2_step_4
+),
+
+ultimo_30_step_3 AS (
+  SELECT
+    globo_id,
+    asset.AssetId AS AssetId,
+    assinante_only,
+    hours_watched,
+    program_id
+  FROM
+    ${ref("consumo", "ultimo_consumo")} ult
+    INNER JOIN ultimo_30_step_1 asset
+    USING (globo_id)
+  WHERE
+    data_ultimo_consumo BETWEEN `last`AND data_hora_cancelamento
+),
+
+ultimo_30_step_4 AS (
+  SELECT
+    *
+  FROM
+    ultimo_30_step_3
+    PIVOT(
+      SUM(hours_watched) h,
+      COUNT(DISTINCT program_id) pg
+      FOR assinante_only
+      IN (true, false))
+),
+
+ultimo_30_step_5 AS (
+  SELECT
+    globo_id,
+    AssetId,
+    COALESCE(h_true, 0) + COALESCE(h_false, 0) AS u30_total_de_horas,
+    COALESCE(pg_true, 0) + COALESCE(pg_false) AS u30_programas_distintos,
+    COALESCE(h_true,0) AS u30_total_horas_conteudos_pagos,
+    COALESCE(pg_true,0) AS u30_programas_pagos
+  FROM
+    ultimo_30_step_4
+),
+
+demografia AS (
+  SELECT
+    COALESCE(gender, gender_inf) AS gender,
+    globo_id,
+    age,
+    address_state,
+    address_city
+  FROM
+    ${ref("globoid_enriched", "demografia")}
+)
+
+SELECT
+  * EXCEPT (`last`, ProductCodeUnique__c, OldValue, NewValue, n_dependentes),
+  CASE
+    WHEN ProductCodeUnique__c LIKE '%Pro-0130%' OR ProductCode LIKE '%ANUAL%' THEN 'anual'
+    ELSE 'mensal'
+  END AS Plano,
+`last`= 1 AS ultima_assinatura,
+COALESCE(n_dependentes, 0) AS n_dependentes
+FROM
+  asset_v2_step_4
+  LEFT JOIN ultimo_consumo_step_3 USING (globo_id, AssetId)
+  LEFT JOIN ultimo_30_step_5 USING (globo_id, AssetId)
+  LEFT JOIN ${ref("consumo", "derived__primeiro_play")} USING (globo_id, AssetId)
+  LEFT JOIN dependentes USING (AssetId)
+  LEFT JOIN demografia USING (globo_id)
+

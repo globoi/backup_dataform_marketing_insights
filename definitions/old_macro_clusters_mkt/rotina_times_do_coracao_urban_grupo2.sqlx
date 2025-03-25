@@ -1,0 +1,16 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=macro_clusters_mkt_rotina_times_do_coracao_urban_grupo2'],
+  name: 'rotina_times_do_coracao_urban_grupo2',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  named_user,
+  time_futebol
+FROM
+${ref("macro_clusters_mkt", "rotina_times_do_coracao_urban")} 
+WHERE indice_grupo = 2

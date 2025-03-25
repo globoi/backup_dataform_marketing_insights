@@ -1,0 +1,32 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_automatica_gnt',
+  schema: 'macro_clusters_mkt',
+  description: '',
+  tags: ["macrocluster_old",'schedule_tag=macro_clusters_mkt_mktflow_base_automatica_gnt'],
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT DISTINCT
+  'named_user' as identifier_type, globo_id
+FROM
+  ${ref("conteudo_enriched", "content")} 
+INNER JOIN 
+  ${ref("consumo", "pre_step_consumo")} 
+USING (program_id)
+INNER JOIN
+  ${ref("usuarios", "base_ativa_pagante_com_trial_new")} 
+USING (globo_id),
+UNNEST (info) as info_trial
+WHERE 
+  LOWER(channel_title) LIKE "%gnt%" 
+  AND DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 60
+  AND info_trial.assinatura_gplay = "nacional"
+  AND info_trial.mais_canais

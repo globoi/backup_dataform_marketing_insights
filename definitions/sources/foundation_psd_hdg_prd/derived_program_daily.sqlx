@@ -1,0 +1,6 @@
+config {
+    type: "declaration",
+    name: "program_daily",
+    schema: "consumo_derived",
+    database: dataform.projectConfig.vars.foundationDatabase
+}

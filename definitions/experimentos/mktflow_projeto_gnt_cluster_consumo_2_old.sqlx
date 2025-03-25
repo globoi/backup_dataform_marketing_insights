@@ -1,0 +1,44 @@
+config {
+  type: 'table',
+  tags: [],
+  name: 'mktflow_projeto_gnt_cluster_consumo_2_old',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+--CREATE OR REPLACE TABLE `gglobo-mkt-ins-hdg-prd.campanhas_mkt.mktflow_projeto_gnt_cluster_consumo` as
+
+WITH
+  -- etapa com os filtros de negócio principal
+  consumo_tier2_gnt as (
+  SELECT DISTINCT
+  globo_id
+FROM 
+  ${ref("conteudo_enriched", "content")} a
+INNER JOIN 
+  ${ref("consumo", "pre_step_consumo")} b
+USING (program_id)
+INNER JOIN
+  ${ref("usuarios", "base_ativa_pagante_com_trial")} c
+USING (globo_id)
+WHERE 
+  LOWER(a.channel_title) LIKE "%gnt%" 
+  AND DATE_DIFF(CURRENT_DATE(),DATE(timestamp), DAY) <= 120
+  AND assinatura_gplay = "nacional"
+  AND mais_canais = true
+  ORDER BY 1 ASC
+  )
+
+  SELECT b.globo_id, b.grupo
+  FROM consumo_tier2_gnt as a
+  INNER JOIN ${ref("experimentos", "projeto_gnt_cluster_consumo_relacao_grupos")} as b
+  on a.globo_id = b.globo_id
+
+

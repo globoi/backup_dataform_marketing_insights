@@ -1,0 +1,64 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_desistencia',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 
+         'schedule_tag=jornadas_mkt_mktflow_gplay_int_desistencia',         
+         "schedule_cron=0 12 * * *"]
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+
+SELECT distinct
+e.object_id as id_compra,
+e.globo_id,
+date(e.event_at) as data_agend,
+date(sd.end_cycle_at) as datacanc,
+case
+WHEN sd.currency_price like '%USD%' then 'globo-play-us'
+WHEN sd.currency_price like '%GBP%' then 'globo-play-eu'
+WHEN sd.currency_price like '%CHF%' then 'globo-play-eu'
+WHEN sd.currency_price like '%CAD%' then 'globo-play-us'
+WHEN sd.currency_price like '%DKK%' then 'globo-play-eu'
+WHEN sd.currency_price like '%NOK%' then 'globo-play-eu'
+WHEN sd.currency_price like '%SEK%' then 'globo-play-eu'
+WHEN sd.currency_price = 'EUR 8.99' then 'globo-play-pt'
+WHEN sd.currency_price = 'EUR 5.99' then 'globo-play-pt'
+WHEN sd.currency_price = 'EUR 4.49' then 'globo-play-pt'
+WHEN sd.currency_price = '13.99' then 'globo-play-us'
+WHEN sd.currency_price = 'EUR 9.99' then 'globo-play-eu'
+WHEN sd.currency_price = 'EUR 4.99' then 'globo-play-eu'
+WHEN sd.currency_price like '%AUD%' then 'globo-play-as'
+WHEN sd.currency_price like '%JPY%' then 'globo-play-as'
+WHEN cd.name in ('Estados Unidos','Canadá') then 'globo-play-us'
+WHEN cd.name = 'Portugal' then 'globo-play-pt'
+WHEN cd.name in ('Espanha','França','Itália','Alemanha','Suíça','Dinamarca','Suécia','Noruega','Bélgica',
+'Países Baixos','Irlanda','Áustria','Luxemburgo','Grécia','Finlândia','Reino Unido','Suécia') then 'globo-play-eu'
+WHEN cd.name in ('Japão','Austrália') then 'globo-play-as'
+else 'other' end as oferta_consumo
+FROM
+${ref("sales_gold", "customer_events")} e
+LEFT JOIN
+${ref("sales_gold", "subscription_details")} sd ON e.object_id = sd.id
+LEFT JOIN
+${ref("sales_gold", "partner_details")} pt ON e.object_id = pt.partner_token
+LEFT JOIN
+${ref("sales_gold", "product_details")} pd ON sd.product_id = pd.id OR pt.product_id = pd.id
+LEFT JOIN
+${ref("sales_gold", "order_details")} od ON sd.order_id = od.id
+LEFT JOIN
+${ref("sales_gold", "country_details")} cd ON od.country_id = cd.id
+WHERE
+e.event = 'request_unsubscription' and
+date(e.event_at) between current_date-40 and current_date and
+sd.end_cycle_at >= current_date and
+LOWER(pd.name) LIKE '%globoplay%' and
+(sd.subscription_type IS NULL OR LOWER(sd.subscription_type) NOT LIKE '%upgrade%globoplay%') and
+pd.is_international = true
+GROUP BY
+1,2,3,4,5
+order by 1 desc

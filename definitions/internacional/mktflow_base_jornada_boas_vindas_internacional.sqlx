@@ -1,0 +1,54 @@
+config {
+    type: 'table',
+    tags: ["internacional",
+        "schedule_tag=internacional_mktflow_base_jornada_boas_vindas_internacional",
+        "schedule_cron= 0 13 * * *"
+    ],
+    name: 'mktflow_base_jornada_boas_vindas_internacional',
+    schema: 'internacional',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "internacional",
+            owner: "martech",
+            mktcloud: "true"
+    }
+  },
+    description: '',
+    columns: {}
+}
+
+with base_jornada_boas_vindas_internacional as (
+
+select distinct ba.globo_id, data_de_conversao, 'ASIA' as regiao
+from `gglobo-mkt-ins-hdg-prd.internacional.base_ativa_internacional` as ba
+where ba.country in ('Afeganistão','Arábia Saudita','Armênia','Azerbaijão','Bahrein','Bangladesh','Brunei','Butão','Camboja','Cazaquistão','Catar','China', 
+      'Chipre','Coreia do Norte','Coreia do Sul','Egito','Emirados Árabes Unidos','Filipinas','Geórgia','Iêmen','Índia','Indonésia','Irã','Iraque','Israel','Japão',
+      'Jordânia','Kuwait','Laos','Líbano','Malásia','Maldivas','Mianmar','Mongólia','Nepal','Omã','Paquistão','Quirguistão','Rússia','Singapura','Síria',
+      'Sri Lanka', 'Tajiquistão','Tailândia','Timor-Leste','Turcomenistão','Turquia','Uzbequistão','Vietnã','Austrália','Estados Federados da Micronésia','Fiji', 
+      'Ilhas Marshall','Ilhas Salomão','Kiribati','Nauru','Nova Zelândia','Palau','Papua Nova Guiné','Samoa','Tonga','Tuvalu','Vanuatu')
+  and data_de_conversao >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+
+union all
+
+select distinct ba.globo_id, data_de_conversao, 'EUROPA' as regiao
+from `gglobo-mkt-ins-hdg-prd.internacional.base_ativa_internacional` as ba
+where ba.country in ('Albânia','Alemanha','Andorra','Áustria','Bélgica','Bielorrússia','Bósnia e Herzegovina','Bulgária','Cazaquistão','Chipre','Croácia','Dinamarca','Eslováquia','Eslovênia','Espanha','Estônia','Finlândia','França','Grécia','Hungria','Irlanda','Islândia','Itália','Letônia','Liechtenstein','Lituânia','Luxemburgo','Malta','Moldávia','Mônaco','Montenegro','Noruega','Países Baixos','Polônia','Tchéquia','Macedônia do Norte','Reino Unido','Romênia','San Marino','Sérvia','Suécia','Suíça','Turquia ','Ucrânia','Vaticano')
+  and data_de_conversao >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+
+union all
+
+select distinct ba.globo_id, data_de_conversao, 'PORTUGAL' as regiao
+from `gglobo-mkt-ins-hdg-prd.internacional.base_ativa_internacional` as ba
+where ba.country in ('Portugal')
+  and data_de_conversao >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+
+union all 
+
+select distinct ba.globo_id, data_de_conversao, 'EUA' as regiao
+from `gglobo-mkt-ins-hdg-prd.internacional.base_ativa_internacional` as ba
+where ba.country in ('Estados Unidos', 'Canadá')
+  and data_de_conversao >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+)
+select globo_id, data_de_conversao, regiao from base_jornada_boas_vindas_internacional
+

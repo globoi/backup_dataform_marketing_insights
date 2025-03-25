@@ -1,0 +1,93 @@
+config {
+  type: 'table',
+  name: 'perfil_assinante__primeiro_play',
+  schema: 'consumo',
+  tags: ['consumo_staging_3',
+        "schedule_tag=consumo_perfil_assinante__primeiro_play"
+  ],
+  description: '',
+  columns: {}
+}
+
+WITH first_play_geral AS (
+  SELECT
+    program_id as firstWatched,
+    object_id as assetid,
+    globo_id,
+    timestamp_consumo as timestamp_for_first_program,
+    programa AS first_watched_title,
+    subset AS firstWatched_subset
+  FROM  ${ref('primeiro_play_gqa', 'primeiro_play_v2')}
+),
+first_play AS (
+  SELECT
+    p.globo_id,
+    p.assetid,
+    first_watched_title,
+    timestamp_for_first_program,
+    firstWatched_subset,
+    p.timestamp,
+    p.program_id,
+    p.program_title,
+    p.program_subset
+  FROM
+    ${ref('consumo', 'pre_step_consumo')} p 
+    LEFT JOIN first_play_geral f
+    USING(assetid, globo_id)
+  WHERE
+    program_id != 8426
+    AND is_full_content
+),
+first_play_step_1 AS (
+  SELECT
+    ROW_NUMBER() OVER(
+      PARTITION BY assetid,
+      globo_id
+      ORDER BY
+        timestamp
+    ) AS first_play1,
+    globo_id,
+    assetid,
+    first_watched_title,
+    timestamp_for_first_program,
+    firstWatched_subset,
+    `timestamp`,
+    program_title,
+    program_subset
+  FROM
+    first_play
+),
+first_play_step_2 AS (
+  SELECT
+    globo_id,
+    assetid,
+    program_title AS first_play,
+    program_subset AS first_play_subset,
+    `timestamp` AS data_first_play,
+    first_watched_title,
+    firstWatched_subset,
+    timestamp_for_first_program,
+    first_play1
+  FROM
+    first_play_step_1
+  WHERE
+    first_play1 = 1
+),
+first_play_step_3 AS (
+  SELECT
+    globo_id,
+    assetid,
+    COALESCE(first_watched_title, first_play) AS first_play,
+    COALESCE(firstWatched_subset, first_play_subset) AS first_play_subset,
+    COALESCE(timestamp_for_first_program, data_first_play) AS data_first_play
+  FROM
+    first_play_step_2
+)
+
+SELECT 
+  globo_id,
+  assetid,
+  first_play,
+  first_play_subset,
+  data_first_play
+FROM first_play_step_3

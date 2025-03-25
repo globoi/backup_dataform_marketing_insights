@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  name: 'pixinguinha',
+  schema: 'jornadas_mkt',
+  tags: [],
+  description: ''
+}
+
+WITH 
+impression AS (
+  SELECT
+    globo_id,
+    SUM(hours_watched) AS soma
+  FROM ${ref("consumo_enriched", "impression")}
+  WHERE program_id IN (14881, 16887)
+  GROUP BY globo_id
+  HAVING soma >= 0.5
+)
+
+SELECT DISTINCT
+  'named_user' AS identifier_type,
+  globo_id
+FROM 
+  impression
+INNER JOIN
+  ${ref("usuarios", "base_ativa_pagante_com_trial")}
+USING
+  (globo_id)
+WHERE 
+  lower(assinatura_gplay) = "nacional"

@@ -1,0 +1,227 @@
+config {
+  type: "table",
+  name: "agrupadora_retro_2023",
+  schema: "retrospectiva_2023"
+}
+
+
+WITH
+  originais AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (LOWER(program_title) LIKE '%rio connection%'
+      OR LOWER(program_title) LIKE '%codex 632%'
+      OR (LOWER(program_title) LIKE '%a divisão%'
+        AND program_id=11626)
+      OR LOWER(program_title) LIKE '%betinho: no fio da navalha%'
+      OR LOWER(program_title) LIKE '%galvão: olha o que ele fez%'
+      OR (LOWER(program_title) LIKE '%let love%'
+        AND program_id=26072)
+      OR (LOWER(program_title) LIKE '%sobre nós dois%'
+        AND program_id=25796)
+      OR LOWER(program_title) LIKE '%eurico%'
+      OR (LOWER(program_title) LIKE '%túnel do amor%'
+        AND program_id=17394)
+      OR (LOWER(program_title) LIKE '%the taste brasil%'
+        AND program_id=11782)
+      OR LOWER(program_title) LIKE '%vestidas de amor%'
+      OR (LOWER(program_title) LIKE '%humor negro%'
+        AND program_id=25814)
+      OR LOWER(program_title) LIKE '%cadê o amarildo%'
+      OR LOWER(program_title) LIKE '%moreno%'
+      OR LOWER(program_title) LIKE '%jessie e colombo%'
+      OR LOWER(program_title) LIKE '%o repórter do poder%')),
+  trilhas_sonoras AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (LOWER(program_title) LIKE '%as five%'OR LOWER(program_title) LIKE '%a vida pela frente%'
+      OR (LOWER(program_title) LIKE '%rensga%'AND program_id=20481)
+      OR LOWER(program_title) LIKE '%vicky e a musa%'
+      OR (LOWER(program_title) LIKE '%todas as flores%'
+        AND program_id=23160))),
+  top_series AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (LOWER(program_title) LIKE '%a mulher do diabo%'
+      OR (LOWER(program_title) LIKE '%durval%'
+        AND program_id=23253)
+      OR LOWER(program_title) LIKE '%boate kiss%'
+      OR (LOWER(program_title) LIKE '%fim%'
+        AND program_id=24418)
+      OR (LOWER(program_title) LIKE '%origem%'
+        AND program_id=24199)
+      OR (LOWER(program_title) LIKE '%os outros%'
+        AND program_id=23674)
+      OR LOWER(program_title) LIKE '%quantum leap%'
+      OR (LOWER(program_title) LIKE '%the good doctor%'
+        AND program_id=10777)
+      OR LOWER(program_title) LIKE '%vale o escrito - a guerra do jogo do bicho%'
+      OR LOWER(program_title) LIKE '%vicky e a musa%'
+      OR program_title_id='xgNJTCZyL7')),
+  top_novelas AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (LOWER(program_title) LIKE '%a intrusa%'
+      OR (LOWER(program_title) LIKE '%amor e honra%'
+        AND program_id=20046)
+      OR program_title_id='K6QpjwxWKd'
+      OR (LOWER(program_title) LIKE '%elas por elas%'
+        AND program_id=25794)
+      OR LOWER(program_title) LIKE '%hercai%'
+      OR (LOWER(program_title) LIKE '%mãe%'
+        AND program_id=23350)
+      OR (LOWER(program_title) LIKE '%rebelde%'
+        AND program_id=26374)
+      OR program_title_id='sN8vbbVV2f'
+      OR program_title_id='5QppCkFCqH'
+      OR (LOWER(program_title) LIKE '%todas as flores%'
+        AND program_id=23160)
+      OR (LOWER(program_title) LIKE '%vai na fé%'
+        AND program_id=24071))),
+  top_filmes AS (
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    ((LOWER(program_title) LIKE '%bem-vinda a quixeramobim%'
+        AND program_id=24051)
+      OR program_title_id='Mjhw7jSLy2'
+      OR LOWER(program_title) LIKE '%maior que o mundo%'
+      OR (LOWER(program_title) LIKE '%mamma mia%'
+        AND program_id=17251)
+      OR (LOWER(program_title) LIKE '%o palestrante%'
+        AND program_id=23631)
+      OR LOWER(program_title) LIKE '%os suburbanos - o filme%'
+      OR LOWER(program_title) LIKE '%os três desejos da cinderela%'
+      OR program_title_id='myns5n7VsG'
+      OR program_title_id='VWpqjRNdNm'
+      OR program_title_id='1w8x6PxJKg'
+      OR LOWER(program_title) LIKE '%uma pitada de sorte%')),
+  top_mais_canais AS(
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (program_id IN (25158,
+        26262,
+        11104,
+        26188,
+        12600,
+        26260,
+        25856,
+        12601,
+        13012)
+      OR program_title_id IN ('DzVqV1jn8Q',
+        'bx6wMtrZG9')) ),
+  top_infantis AS(
+  SELECT
+    DISTINCT program_id,
+    program_title,
+    program_title_id
+  FROM
+    ${ref('conteudo_enriched', 'all_content')}
+  WHERE
+    (program_title_id IN ('TnLP8nD8Nj',
+        'WH1G8V1PJV',
+        'Cfb2ztz8rP',
+        'FzHtwSMJ6M',
+        'yYrR1XHnkb',
+        'HmkyL1phyF',
+        'BSyLDDs2KW',
+        'qvkXr75k51',
+        'LHvk7WsDkZ',
+        'QXCQ86MSqL')OR program_id=26549)),
+  base AS (
+  SELECT
+    *
+  FROM
+    originais
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    trilhas_sonoras
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    top_series
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    top_novelas
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    top_filmes
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    top_mais_canais
+  UNION DISTINCT
+  SELECT
+    *
+  FROM
+    top_infantis )
+SELECT
+  * EXCEPT(program_title_id,
+    id)
+FROM
+  base AS b
+LEFT JOIN (
+  SELECT
+    id,
+    media_kit_resource__poster
+  FROM
+   ${ref('conteudo_enriched', 'program')}) AS p
+ON
+  p.id=b.program_id
+UNION DISTINCT
+SELECT
+  NULL AS program_id,
+  title AS program_title,
+  p.file.file_url AS media_kit_resource__poster
+FROM ${ref('clean_audio_metadata', 'podcasts_most_recent')} AS p
+WHERE
+  (id='83f36646-e50c-4514-81f2-b298558cfc50'
+    OR id='66c37015-4029-4870-ab9c-5279fc55f827'
+    OR LOWER(title) LIKE '%de raspar o tacho%'
+    OR LOWER(title) LIKE '%linha direta%'
+    OR LOWER(title) LIKE '%livro da vez%'
+    OR LOWER(title) LIKE '%mussum, o podcastis%'
+    OR LOWER(title) LIKE '%o assunto%'
+    OR LOWER(title) LIKE '%orgulho e família%'
+    OR id='46287c95-7502-4dbc-84b1-8bcc3a10db31'
+    OR LOWER(title) LIKE '%rita lee: outra autobiografia - o podcast%'
+    OR LOWER(title) LIKE '%traz a pipoca%')
+ORDER BY
+  2 ASC

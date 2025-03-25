@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.foundationDatabase,
+  schema: "globoid_clean",
+  name: "globoid_user",
+  description: ""
+}

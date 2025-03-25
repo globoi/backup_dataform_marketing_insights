@@ -1,0 +1,573 @@
+config {
+    type: "table",
+    name: "RaioXAssinante",
+    schema: "usuarios",
+    tags: ["usuarios_staging_3", "schedule_tag=usuarios_raioxassinante"],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            consumo: "semanal",
+            tags: "usuarios",
+            owner: "mins",
+            horario: "10h00min"
+        }
+    },
+    description: 'Tabela semanal com consumo e clusters de engajamento dos assinantes ativos desde 2021.',
+    columns: {
+        globo_id: 'Código de identificação do usuário.',
+        semana: 'Semana que o usuário consumiu algum conteúdo.',
+        assetid: 'Código que identifica a assinatura.',
+        data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+        frequencia: 'Quantidade de dias na semana que o usuário consumiu algum conteúdo.',
+        Ao_Vivo_Tv_Globo_horas: 'Quantidade de horas assistidas na semana do ao vivo Globo TVG (program_id 9095).',
+        Ao_Vivo_Tv_Globo_qtnd_programas: 'Quantidade de programas assistidos na semana do ao vivo Globo TVG (program_id 9095). Nesse caso o valor é 0 ou 1, pois só existe 1 program_id.',
+        Ao_Vivo_Tv_Globo_freq: 'Quantidade de dias na semana que o usuário consumiu o ao vivo Globo TVG (program_id 9095).',
+        Ao_Vivo_Tv_Globo_qtnd_midias: 'Quantidade de mídias assistidas na semana do ao vivo Globo TVG (program_id 9095). Alguma mídia atrelada a esse program_id.',
+        Filmes_horas: 'Quantidade de horas de filmes assistidos na semana. Exemplo: Conteúdos do Telecine, Megapix, Universal, Studio Universal, USA e programas que contenham os subsets filmes e movies.',
+        Filmes_qtnd_programas: 'Quantidade de filmes assistidos na semana.',
+        Filmes_freq: 'Quantidades de dias que o usuário assistiu algum filme na semana.',
+        Filmes_qtnd_midias: 'Quantidade de filmes assistidos na semana.',
+        Novelas_horas: 'Quantidade de horas de novelas assistidas na semana.',
+        Novelas_qtnd_programas: 'Quantidade de novelas assistidas na semana.',
+        Novelas_freq: 'Quantidades de dias que o usuário assistiu alguma novela na semana.',
+        Novelas_qtnd_midias: 'Quantidade de mídias distintas de novelas assistidas na semana.',
+        Series_horas: 'Quantidade de horas de séries assistidas na semana.',
+        Series_qtnd_programas: 'Quantidade de séries assistidas na semana.',
+        Series_freq: 'Quantidades de dias que o usuário assistiu alguma série na semana.',
+        Series_qtnd_midias: 'Quantidade de mídias distintas de séries assistidas na semana.',
+        Esportes_horas: 'Quantidade de horas de conteúdos esportivos assistidos na semana. Exemplo: Conteúdos do Combate, Premiere, Sportv, GE ou que tenham o subset sports atrelado.',
+        Esportes_qtnd_programas: 'Quantidade de programas de conteúdos esportivos assistidos na semana.',
+        Esportes_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo esportivo na semana.',
+        Esportes_qtnd_midias: 'Quantidade de mídias distintas de conteúdos esportivos assistidos na semana.',
+        Variedades_horas: 'Quantidade de horas de conteúdos de variedades assistidos na semana. Exemplo: Conteúdos do Receitas, Multishow, Viva (que não contenha o subset novela) e programas com o subset varieties.',
+        Variedades_qtnd_programas: 'Quantidade de programas de conteúdos de variedades assistidos na semana.',
+        Variedades_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo de variedades na semana.',
+        Variedades_qtnd_midias: 'Quantidade de mídias distintas de conteúdos de variedades assistidos na semana.',
+        Jornalismo_horas: 'Quantidade de horas de conteúdos jornalísticos assistidos na semana. Exemplo: Conteúdos GloboNews, G1 ou programas que contenham o subset news.',
+        Jornalismo_qtnd_programas: 'Quantidade de programas de conteúdos jornalísticos assistidos na semana.',
+        Jornalismo_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo jornalístico na semana.',
+        Jornalismo_qtnd_midias: 'Quantidade de mídias distintas de conteúdos jornalísticos assistidos na semana.',
+        Reality_horas: 'Quantidade de horas de realities assistidos na semana. Exemplo: Programas que contenham o subset realities.',
+        Reality_qtnd_programas: 'Quantidade de programas de realities assistidos na semana.',
+        Reality_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo de reality na semana.',
+        Reality_qtnd_midias: 'Quantidade de mídias distintas de realities assistidos na semana.',
+        Outros_Conteudos_horas: 'Quantidade de horas de outros conteúdos assistidos na semana. Exemplo: Todos os outros conteúdos que não se enquadram nos clusters anteriores.',
+        Outros_Conteudos_qtnd_programas: 'Quantidade de programas de outros conteúdos assistidos na semana.',
+        Outros_Conteudos_freq: 'Quantidades de dias que o usuário assistiu algum programa de outros conteúdos na semana.',
+        Outros_Conteudos_qtnd_midias: 'Quantidade de mídias distintas de outros conteúdos assistidos na semana.',
+        total_horas: 'Total de horas assistidas pelo usuário na semana.',
+        Cluster_Conteudo_Mais_Assistido: 'Identifica o cluster do conteúdo mais assistido pelo usuário naquela semana. Exemplo: Ao Vivo Tv Globo, Esportes, Filmes, Jornalismo, Novelas, Outros Conteúdos, Reality, Series, Variedades ou Sem Consumo Suficiente (assistiu menos de 1 hora em todos os clusters).',
+        horas_dia_de_semana: 'Quantidade de horas que o usuário consumiu de Segunda a Quinta.',
+        horas_final_de_semana: 'Quantidade de horas que o usuário consumiu de Sexta a Domingo.',
+        perfil_dia_da_semana: 'Identifica se o usuário consome mais em dia da semana ou final de semana.',
+        horas_madrugada: 'Quantidade de horas que o usuário consumiu entre 00:00 e 05:59.',
+        horas_manha: 'Quantidade de horas que o usuário consumiu entre 06:00 e 11:59.',
+        horas_noite: 'Quantidade de horas que o usuário consumiu entre 18:00 e 23:59.',
+        horas_tarde: 'Quantidade de horas que o usuário consumiu entre 12:00 e 17:59.',
+        perfil_periodo_do_dia: 'Identifica qual o período que o usuário mais consume, sendo de manhã, tarde, noite ou madrugada.',
+        Cluster_Engajamento: 'Cluster de engajamento antigo, utilizado até 09/24. Onde dividíamos a base em quartis, particionado pela semana e ordenado pela quantidade total de horas na semana. Ou seja, quartil 1 = 4. Heavy Users, quartil 2 = 3. Mid-Heavy Users, quartil 3 = 2. Mid-Light Users e quartil 4 = 1. Light Users.',
+        novo_cluster_engajamento: 'Novo cluster de engajamento base no total de horas consumidas na semana. Exemplo: Se o usuário consumiu mais de 10 horas na semana, ele é considerado 4. Heavy Users, se consumiu entre 0 e 1 hora, ele é considerado 1. Light Users, se consumiu entre 1 e 5 horas, ele é considerado 2. Mid-Light Users, se consumiu entre 5 e 10 horas é considerado 3. Mid-Heavy Users e se não estiver em nenhum range desse, é considerado Sem consumo suficiente.',
+        diversidade: 'É a soma de clusters que o usuário consumiu na semana. Exemplo, se o usuário consumiu mais de 1 hr de filmes e novelas, ele terá uma diversidade de 2, mas se ele consumiu menos de 1 hora de filmes e mais de uma hora de novelas, ele terá uma diversidade de 1.',
+        Diversidade_Conteudo: 'É a soma de todos os programas assistidos pelo usuário na semana. Exemplo: Se o usuário assistiu 2 novelas e 3 filmes, ele terá uma diversidade de conteúdo de 5.'
+    }
+}
+
+  -- Base Analise
+WITH
+  Base_analise_1 AS (
+  SELECT
+    program_id,
+    globo_id,
+    assetid,
+    data_hora_compra,
+    userid,
+    mediaid,
+    is_full_content,
+    hours_watched,
+    program_title,
+    program_subset,
+    DATETIME(`timestamp`, "America/Sao_Paulo") AS timestamp,
+  FROM
+    ${ref("consumo", "pre_step_consumo")}
+  WHERE
+    is_full_content
+    AND program_id <> 8426
+    AND ( DATE(`timestamp`) >= '2021-01-01'
+      OR `timestamp` IS NULL ) ),
+  Base_analise AS (
+  SELECT
+    *,
+    LOWER( CAST(`timestamp` AS STRING FORMAT 'DY') ) AS day_week,
+    DATE_TRUNC (`timestamp`, WEEK(MONDAY)) AS semana,
+    DATE(`timestamp`) AS date
+  FROM
+    Base_analise_1 ),
+  -- Base Perfil dia
+  Base_Perfil_dia_1 AS (
+  SELECT
+    globo_id,
+    day_week,
+    semana,
+    timestamp,
+    date,
+    hours_watched
+  FROM
+    Base_analise ),
+  Base_Perfil_dia_2 AS (
+  SELECT
+    * EXCEPT(day_week),
+    CASE
+      WHEN LOWER(day_week) NOT IN ( 'sat', 'sun', 'fri' ) THEN 'horas_dia_de_semana'
+      ELSE 'horas_final_de_semana'
+  END
+    AS day_week,
+  FROM
+    Base_Perfil_dia_1 ),
+  Base_Perfil_dia_3 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      semana,
+      day_week,
+      hours_watched
+    FROM
+      Base_Perfil_dia_2 )
+  PIVOT
+    ( SUM (hours_watched) FOR day_week IN ('horas_dia_de_semana',
+        'horas_final_de_semana') ) ),
+  Base_Perfil_dia AS (
+  SELECT
+    globo_id,
+    semana,
+    COALESCE(horas_dia_de_semana, 0) AS horas_dia_de_semana,
+    COALESCE(horas_final_de_semana, 0) AS horas_final_de_semana,
+    CASE
+      WHEN horas_dia_de_semana >= horas_final_de_semana THEN 'dia_de_semana'
+      WHEN horas_dia_de_semana = horas_final_de_semana THEN 'igual'
+      ELSE 'final_de_semana'
+  END
+    AS perfil_dia_da_semana
+  FROM
+    Base_Perfil_dia_3 ),
+  --- Base PERFIL PERIODO DIA
+  Base_periodo_dia_1 AS (
+  SELECT
+    *,
+    CASE
+      WHEN EXTRACT( HOUR FROM `timestamp` ) BETWEEN 0 AND 5 THEN 'horas_madrugada'
+      WHEN EXTRACT( HOUR
+    FROM
+      `timestamp` ) BETWEEN 6
+    AND 11 THEN 'horas_manha'
+      WHEN EXTRACT( HOUR FROM `timestamp` ) BETWEEN 12 AND 17 THEN 'horas_tarde'
+      ELSE 'horas_noite'
+  END
+    AS periodo,
+  FROM
+    Base_analise ),
+  Base_periodo_dia_2 AS (
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      semana,
+      hours_watched,
+      periodo
+    FROM
+      Base_periodo_dia_1 )
+  PIVOT
+    ( SUM (hours_watched) FOR periodo IN ( 'horas_madrugada',
+        'horas_manha',
+        'horas_tarde',
+        'horas_noite' ) ) ),
+  Base_periodo_dia AS (
+  SELECT
+    globo_id,
+    semana,
+    COALESCE(horas_madrugada, 0) AS horas_madrugada,
+    COALESCE(horas_manha, 0) AS horas_manha,
+    COALESCE(horas_tarde, 0) AS horas_tarde,
+    COALESCE(horas_noite, 0) AS horas_noite
+  FROM
+    Base_periodo_dia_2),
+  inter AS (
+  SELECT
+    *,
+    CASE
+      WHEN horas_noite >= horas_madrugada AND horas_noite >= horas_tarde AND horas_noite >= horas_manha THEN 'Noite'
+      WHEN horas_tarde >= horas_madrugada
+    AND horas_tarde >= horas_manha
+    AND horas_tarde >= horas_noite THEN 'Tarde'
+      WHEN horas_manha >= horas_madrugada AND horas_manha >= horas_tarde AND horas_manha >= horas_noite THEN 'Manhã'
+      WHEN horas_madrugada >= horas_manha
+    AND horas_madrugada >= horas_tarde
+    AND horas_madrugada >= horas_noite THEN 'Madrugada'
+  END
+    AS perfil_periodo_do_dia
+  FROM
+    Base_periodo_dia),
+  -- Base Step_Intermediario_Conteudo
+  all_content AS (
+  SELECT
+    service_id,
+    id AS mediaid,
+    metadata_scheme,
+    channel_title,
+    program_title AS program_content
+  FROM
+    ${ref("conteudo_enriched", "all_content")}),
+  imp AS(
+  SELECT
+    *,
+    COUNT(DISTINCT date) OVER (PARTITION BY assetid, globo_id, semana) AS frequencia
+  FROM
+    Base_analise
+  LEFT JOIN
+    all_content
+  USING
+    (mediaid) ),
+  imp_2 AS (
+  SELECT
+    *,
+    CASE
+      WHEN (program_subset = 'novelas' OR (LOWER(channel_title) LIKE 'viva%' AND (program_subset='novelas' OR program_subset='live'))) THEN 'Novelas'
+      WHEN ((LOWER(channel_title) LIKE '%combate%'
+        AND LOWER(program_title) NOT LIKE '%teste%')
+      OR (LOWER(channel_title) LIKE '%premiere%'
+        AND LOWER(program_title) NOT LIKE '%teste%')
+      OR (LOWER(channel_title) LIKE '%sportv%'
+        AND LOWER(program_title) NOT LIKE '%teste%')
+      OR (LOWER(channel_title) LIKE 'ge%'
+        AND LOWER(program_title) NOT LIKE '%teste%')
+      OR program_subset='sports') THEN 'Esportes'
+      WHEN ((LOWER(channel_title) LIKE '%globonews%' AND LOWER(program_title) NOT LIKE '%teste%') OR program_subset ='news' OR channel_title='G1' OR LOWER(program_title) LIKE 'g1%') THEN 'Jornalismo'
+      WHEN program_subset = 'series' THEN 'Series'
+      WHEN program_subset='realities' THEN 'Reality'
+      WHEN (program_subset IN ('filmes',
+        'movies'))
+    OR LOWER(channel_title) IN ('telecine',
+      'megapix',
+      'universal',
+      'studio universal',
+      'studio universal ott',
+      'megapix ott',
+      'universal ott',
+      'usa ott') THEN 'Filmes'
+      WHEN ((service_id=6807 OR program_subset='varieties' OR channel_title='Receitas' OR LOWER(channel_title) LIKE '%multishow%' OR LOWER(channel_title) LIKE 'viva%' OR LOWER(channel_title) LIKE '%gnt%') AND LOWER(program_title) NOT LIKE '%teste%') THEN 'Variedades'
+    --  WHEN service_id = 6807 THEN 'Mais_Canais'
+      WHEN program_id = 9095 THEN 'Ao_Vivo_Tv_Globo'
+      ELSE 'Outros_Conteudos'
+  END
+    AS grupo
+  FROM
+    imp ),
+  imp_pivoted AS(
+  SELECT
+    *
+  FROM (
+    SELECT
+      assetid,
+      globo_id,
+      data_hora_compra,
+      semana,
+      frequencia,
+      hours_watched,
+      program_id,
+      `date`,
+      mediaid,
+      grupo
+    FROM
+      imp_2 )
+  PIVOT
+    ( SUM (hours_watched) AS horas,
+      COUNT(DISTINCT program_id) AS qtnd_programas,
+      COUNT(DISTINCT `date`) AS freq,
+      COUNT(DISTINCT mediaid) AS qtnd_midias FOR grupo IN ( 'Ao_Vivo_Tv_Globo',
+        'Filmes',
+        'Novelas',
+        'Series',
+        'Esportes',
+        'Variedades',
+        'Jornalismo',
+        'Outros_Conteudos',
+        'Reality' ) ) ),
+  imp_fillna AS (
+  SELECT
+    assetid,
+    globo_id,
+    data_hora_compra,
+    semana,
+    COALESCE(frequencia,0) AS frequencia,
+    COALESCE(horas_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_horas,
+    COALESCE(qtnd_programas_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_qtnd_programas,
+    COALESCE(freq_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_freq,
+    COALESCE(qtnd_midias_Ao_Vivo_Tv_Globo,0) AS Ao_Vivo_Tv_Globo_qtnd_midias,
+    COALESCE(horas_Filmes,0) AS Filmes_horas,
+    COALESCE(qtnd_programas_Filmes,0) AS Filmes_qtnd_programas,
+    COALESCE(freq_Filmes,0) AS Filmes_freq,
+    COALESCE(qtnd_midias_Filmes,0) AS Filmes_qtnd_midias,
+    COALESCE(horas_Novelas,0) AS Novelas_horas,
+    COALESCE(qtnd_programas_Novelas,0) AS Novelas_qtnd_programas,
+    COALESCE(freq_Novelas,0) AS Novelas_freq,
+    COALESCE(qtnd_midias_Novelas,0) AS Novelas_qtnd_midias,
+    COALESCE(horas_Series,0) AS Series_horas,
+    COALESCE(qtnd_programas_Series,0) AS Series_qtnd_programas,
+    COALESCE(freq_Series,0) AS Series_freq,
+    COALESCE(qtnd_midias_Series,0) AS Series_qtnd_midias,
+    COALESCE(horas_Esportes,0) AS Esportes_horas,
+    COALESCE(qtnd_programas_Esportes,0) AS Esportes_qtnd_programas,
+    COALESCE(freq_Esportes,0) AS Esportes_freq,
+    COALESCE(qtnd_midias_Esportes,0) AS Esportes_qtnd_midias,
+    COALESCE(horas_Variedades,0) AS Variedades_horas,
+    COALESCE(qtnd_programas_Variedades,0) AS Variedades_qtnd_programas,
+    COALESCE(freq_Variedades,0) AS Variedades_freq,
+    COALESCE(qtnd_midias_Variedades,0) AS Variedades_qtnd_midias,
+    COALESCE(horas_Jornalismo,0) AS Jornalismo_horas,
+    COALESCE(qtnd_programas_Jornalismo,0) AS Jornalismo_qtnd_programas,
+    COALESCE(freq_Jornalismo,0) AS Jornalismo_freq,
+    COALESCE(qtnd_midias_Jornalismo,0) AS Jornalismo_qtnd_midias,
+    COALESCE(horas_Reality,0) AS Reality_horas,
+    COALESCE(qtnd_programas_Reality,0) AS Reality_qtnd_programas,
+    COALESCE(freq_Reality,0) AS Reality_freq,
+    COALESCE(qtnd_midias_Reality,0) AS Reality_qtnd_midias,
+    COALESCE(horas_Outros_Conteudos,0) AS Outros_Conteudos_horas,
+    COALESCE(qtnd_programas_Outros_Conteudos,0) AS Outros_Conteudos_qtnd_programas,
+    COALESCE(freq_Outros_Conteudos,0) AS Outros_Conteudos_freq,
+    COALESCE(qtnd_midias_Outros_Conteudos,0) AS Outros_Conteudos_qtnd_midias
+  FROM
+    imp_pivoted ),
+  Step_Intermediario_Conteudo AS (
+  SELECT
+    assetid,
+    globo_id,
+    data_hora_compra,
+    semana,
+  IF
+    (frequencia >=8, 7, frequencia) AS frequencia,
+    Ao_Vivo_Tv_Globo_horas,
+    Ao_Vivo_Tv_Globo_qtnd_programas,
+  IF
+    (Ao_Vivo_Tv_Globo_freq >=8, 7, Ao_Vivo_Tv_Globo_freq) AS Ao_Vivo_Tv_Globo_freq,
+    Ao_Vivo_Tv_Globo_qtnd_midias,
+    Filmes_horas,
+    Filmes_qtnd_programas,
+  IF
+    (Filmes_freq >=8, 7, Filmes_freq) AS Filmes_freq,
+    Filmes_qtnd_midias,
+    Novelas_horas,
+    Novelas_qtnd_programas,
+  IF
+    (Novelas_freq >=8, 7, Novelas_freq) AS Novelas_freq,
+    Novelas_qtnd_midias,
+    Series_horas,
+    Series_qtnd_programas,
+  IF
+    (Series_freq >=8, 7, Series_freq) AS Series_freq,
+    Series_qtnd_midias,
+    Esportes_horas,
+    Esportes_qtnd_programas,
+  IF
+    (Esportes_freq >=8, 7, Esportes_freq) AS Esportes_freq,
+    Esportes_qtnd_midias,
+    Variedades_horas,
+    Variedades_qtnd_programas,
+  IF
+    (Variedades_freq >=8, 7, Variedades_freq) AS Variedades_freq,
+    Variedades_qtnd_midias,
+    Jornalismo_horas,
+    Jornalismo_qtnd_programas,
+  IF
+    (Jornalismo_freq >=8, 7, Jornalismo_freq) AS Jornalismo_freq,
+    Jornalismo_qtnd_midias,
+    Reality_horas,
+    Reality_qtnd_programas,
+  IF
+    (Reality_freq >=8, 7, Reality_freq) AS Reality_freq,
+    Reality_qtnd_midias,
+    Outros_Conteudos_horas,
+    Outros_Conteudos_qtnd_programas,
+  IF
+    (Outros_Conteudos_freq >=8, 7, Outros_Conteudos_freq) AS Outros_Conteudos_freq,
+    Outros_Conteudos_qtnd_midias,
+    (Filmes_horas + Esportes_horas + Jornalismo_horas + Reality_horas + Variedades_horas +Novelas_horas + Series_horas + Outros_Conteudos_horas + Ao_Vivo_Tv_Globo_horas) AS total_horas
+  FROM
+    imp_fillna ),
+  base AS (
+  SELECT
+    *,
+    CASE
+      WHEN Filmes_horas < 1 AND Esportes_horas < 1 AND Jornalismo_horas < 1 AND Reality_horas < 1 AND Variedades_horas < 1 AND Novelas_horas < 1 AND Series_horas < 1 AND Outros_Conteudos_horas < 1 AND Ao_Vivo_Tv_Globo_horas < 1 THEN 'Sem_Consumo_Suficiente'
+      WHEN Filmes_horas > Novelas_horas
+    AND Filmes_horas > Series_horas
+    AND Filmes_horas > Esportes_horas
+    AND Filmes_horas > Jornalismo_horas
+    AND Filmes_horas > Reality_horas
+    AND Filmes_horas > Variedades_horas
+    AND Filmes_horas > Outros_Conteudos_horas
+    AND Filmes_horas > Ao_Vivo_Tv_Globo_horas THEN 'Filmes'
+      WHEN Novelas_horas > Outros_Conteudos_horas AND Novelas_horas > Series_horas AND Novelas_horas > Esportes_horas AND Novelas_horas > Jornalismo_horas AND Novelas_horas > Reality_horas AND Novelas_horas > Variedades_horas
+    --  AND Novelas_horas > Filmes_horas
+    AND Novelas_horas > Ao_Vivo_Tv_Globo_horas THEN 'Novelas'
+      WHEN Series_horas > Outros_Conteudos_horas
+    AND Series_horas > Esportes_horas
+    AND Series_horas > Jornalismo_horas
+    AND Series_horas > Reality_horas
+    AND Series_horas > Variedades_horas
+    AND Series_horas > Ao_Vivo_Tv_Globo_horas THEN 'Series'
+      WHEN Esportes_horas > Outros_Conteudos_horas AND Esportes_horas > Ao_Vivo_Tv_Globo_horas THEN 'Esportes'
+      WHEN Jornalismo_horas > Outros_Conteudos_horas
+    AND Jornalismo_horas > Ao_Vivo_Tv_Globo_horas THEN 'Jornalismo'
+      WHEN Reality_horas > Outros_Conteudos_horas AND Reality_horas > Ao_Vivo_Tv_Globo_horas THEN 'Reality'
+      WHEN Variedades_horas > Outros_Conteudos_horas
+    AND Variedades_horas > Ao_Vivo_Tv_Globo_horas THEN 'Variedades'
+      WHEN Ao_Vivo_Tv_Globo_horas > Outros_Conteudos_horas THEN 'Ao_Vivo_Tv_Globo'
+      ELSE 'Outros_Conteudos'
+  END
+    AS Cluster_Conteudo_Mais_Assistido
+  FROM
+    Step_Intermediario_Conteudo ),
+  base_1 AS (
+  SELECT
+    *
+  FROM
+    base
+  LEFT JOIN
+    Base_Perfil_dia
+  USING
+    (globo_id,
+      semana)
+  LEFT JOIN
+    inter
+  USING
+    (globo_id,
+      semana) ),
+  base_2 AS (
+  SELECT
+    * EXCEPT(horas_dia_de_semana,
+      horas_final_de_semana),
+    COALESCE(horas_dia_de_semana, 0) AS horas_dia_de_semana,
+    COALESCE(horas_final_de_semana, 0) AS horas_final_de_semana,
+    NTILE(4) OVER (PARTITION BY semana ORDER BY total_horas DESC) AS Cluster_Engajamento,
+    CASE
+      WHEN total_horas > 10 THEN '4. Heavy Users'
+      WHEN total_horas BETWEEN 0
+    AND 1 THEN '1. Light Users'
+      WHEN total_horas BETWEEN 1 AND 5 THEN '2. Mid-Light Users'
+      WHEN total_horas BETWEEN 5
+    AND 10 THEN '3. Mid-Heavy Users'
+      ELSE 'Sem consumo suficiente'
+  END
+    AS novo_cluster_engajamento
+  FROM
+    base_1 ),
+  base_3 AS (
+  SELECT
+    * EXCEPT (Cluster_Engajamento),
+    CASE
+      WHEN Cluster_Engajamento = 1 THEN '4. Heavy Users'
+      WHEN Cluster_Engajamento = 2 THEN '3. Mid-Heavy Users'
+      WHEN Cluster_Engajamento = 3 THEN '2. Mid-Light Users'
+      WHEN Cluster_Engajamento = 4 THEN '1. Light Users'
+  END
+    AS Cluster_Engajamento,
+  IF
+    (Ao_Vivo_Tv_Globo_horas>=1,1,0) +
+  IF
+    (Filmes_horas>=1,1,0) +
+  IF
+    (Esportes_horas>=1,1,0) +
+  IF
+    (Variedades_horas>=1,1,0) +
+  IF
+    (Jornalismo_horas>=1,1,0) +
+  IF
+    (Reality_horas>=1,1,0) +
+  IF
+    (Novelas_horas>=1,1,0) +
+  IF
+    (Series_horas>=1,1,0) +
+  IF
+    (Outros_Conteudos_horas>=1,1,0) AS diversidade,
+    CASE
+      WHEN Ao_Vivo_Tv_Globo_qtnd_programas IS NOT NULL THEN Ao_Vivo_Tv_Globo_qtnd_programas
+      WHEN Esportes_qtnd_programas IS NOT NULL THEN Esportes_qtnd_programas
+      WHEN Variedades_qtnd_programas IS NOT NULL THEN Variedades_qtnd_programas
+      WHEN Jornalismo_qtnd_programas IS NOT NULL THEN Jornalismo_qtnd_programas
+      WHEN Reality_qtnd_programas IS NOT NULL THEN Reality_qtnd_programas
+      WHEN Novelas_qtnd_programas IS NOT NULL THEN Novelas_qtnd_programas
+      WHEN Outros_Conteudos_qtnd_programas IS NOT NULL THEN Outros_Conteudos_qtnd_programas
+      WHEN Series_qtnd_programas IS NOT NULL THEN Series_qtnd_programas
+      WHEN Filmes_qtnd_midias IS NOT NULL THEN Filmes_qtnd_midias
+  END
+    AS Diversidade_Conteudo
+  FROM
+    base_2 ),
+  Raiox_assinante AS (
+  SELECT
+    * EXCEPT (Diversidade_Conteudo),
+    (Ao_Vivo_Tv_Globo_qtnd_programas + Esportes_qtnd_programas+Variedades_qtnd_programas+Jornalismo_qtnd_programas+Reality_qtnd_programas + Novelas_qtnd_programas + Outros_Conteudos_qtnd_programas + Series_qtnd_programas + Filmes_qtnd_midias) AS Diversidade_Conteudo
+  FROM
+    base_3 )
+SELECT
+  globo_id,
+  semana,
+  assetid,
+  data_hora_compra,
+  frequencia,
+  Ao_Vivo_Tv_Globo_horas,
+  Ao_Vivo_Tv_Globo_qtnd_programas,
+  Ao_Vivo_Tv_Globo_freq,
+  Ao_Vivo_Tv_Globo_qtnd_midias,
+  Filmes_horas,
+  Filmes_qtnd_programas,
+  Filmes_freq,
+  Filmes_qtnd_midias,
+  Novelas_horas,
+  Novelas_qtnd_programas,
+  Novelas_freq,
+  Novelas_qtnd_midias,
+  Series_horas,
+  Series_qtnd_programas,
+  Series_freq,
+  Series_qtnd_midias,
+  Esportes_horas,
+  Esportes_qtnd_programas,
+  Esportes_freq,
+  Esportes_qtnd_midias,
+  Variedades_horas,
+  Variedades_qtnd_programas,
+  Variedades_freq,
+  Variedades_qtnd_midias,
+  Jornalismo_horas,
+  Jornalismo_qtnd_programas,
+  Jornalismo_freq,
+  Jornalismo_qtnd_midias,
+  Reality_horas,
+  Reality_qtnd_programas,
+  Reality_freq,
+  Reality_qtnd_midias,
+  Outros_Conteudos_horas,
+  Outros_Conteudos_qtnd_programas,
+  Outros_Conteudos_freq,
+  Outros_Conteudos_qtnd_midias,
+  total_horas,
+  Cluster_Conteudo_Mais_Assistido,
+  horas_dia_de_semana,
+  horas_final_de_semana,
+  perfil_dia_da_semana,
+  horas_madrugada,
+  horas_manha,
+  horas_noite,
+  horas_tarde,
+  perfil_periodo_do_dia,
+  Cluster_Engajamento,
+  novo_cluster_engajamento,
+  diversidade,
+  Diversidade_Conteudo
+FROM
+  Raiox_assinante
+ORDER BY
+  semana DESC

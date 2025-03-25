@@ -1,0 +1,193 @@
+config {
+  type: 'table',
+  name: 'mktflow_base_resumo_do_mes_email_2022',
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_R_ResumoDoMes"],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH base_ativa AS (
+  SELECT 
+    globo_id
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")} 
+  WHERE
+    assinatura_gplay = 'nacional' AND LOWER(tipo_assinante) NOT LIKE '%trial%'
+)
+
+,impression_step_1 AS (
+  SELECT 
+    globo_id,
+    DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+    program_id,
+    program_title AS Programa,
+    hours_watched,
+    program_subset
+    FROM
+      ${ref("consumo_enriched", "impression")}
+    WHERE
+      EXTRACT(YEAR FROM `timestamp`) >= 2022
+)
+
+,impression AS (
+  SELECT
+    globo_id,
+    mes,
+    program_id,
+    Programa
+  FROM 
+    impression_step_1
+  GROUP BY
+      globo_id,
+      mes,
+      program_id,
+      Programa,
+      program_subset
+  HAVING 
+      program_id NOT IN (9095, 10122) AND program_subset NOT IN ('filmes','movies')
+  QUALIFY ROW_NUMBER() OVER(PARTITION BY globo_id, mes ORDER BY SUM(hours_watched) DESC) = 1
+)
+
+,programas_assistidos AS (
+  SELECT DISTINCT 
+    * 
+  FROM  
+    impression
+  INNER JOIN 
+    base_ativa
+  USING(globo_id)
+)
+
+,resumo_mes_pivot AS (
+  SELECT 
+    * REPLACE (IF(vipao = 1, TRUE, FALSE) AS Vipao)
+  FROM
+    (
+      SELECT
+        globo_id,
+        mes,
+        badge
+      FROM
+        ${ref("jornadas_mkt", "perfis_union")}
+    ) PIVOT (
+        COUNT(DISTINCT badge) FOR badge IN (
+          'Ao_Vivaco',
+          'Apegado',
+          'Cinefilo',
+          'Ecletico',
+          'Humorista',
+          'Ligeirinho',
+          'Maratonista',
+          'Noveleiro',
+          'Reporter',
+          'Tecnologico',
+          'Viciado',
+          'Vipao'
+        )
+      )
+)
+
+,join_resumo_mes_programas AS (
+  SELECT
+    r.*,
+    p.program_id AS program_id_mais_assistido,
+    p.Programa AS programa_mais_assistido
+  FROM 
+    resumo_mes_pivot r 
+  INNER JOIN programas_assistidos p
+  USING (globo_id, mes)
+)
+
+,impression_email AS (
+  SELECT
+    globo_id,
+    DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH)) AS mes,
+    ROUND(SUM(hours_watched), 0) AS Horas_Assistidas,
+    COUNT(DISTINCT program_id) AS Programas_assistidos,
+    COUNT(DISTINCT mediaid) AS Midias_Assistidas
+  FROM ${ref("consumo_enriched", "impression")}
+  INNER JOIN base_ativa
+  USING (globo_id)
+  WHERE
+      EXTRACT(YEAR FROM `timestamp`) >= 2022
+  GROUP BY
+    globo_id,
+    DATE(TIMESTAMP_TRUNC(`timestamp`, MONTH))
+)
+
+,join_impression_email AS (
+  SELECT
+    t1.*,
+    t2.* EXCEPT (globo_id, mes)
+  FROM
+    join_resumo_mes_programas t1
+    INNER JOIN impression_email t2
+    USING(globo_id, mes)
+    INNER JOIN ${ref("usuarios", "base_ativa_pagante_com_trial")} t3
+    USING(globo_id)
+  WHERE
+    t3.assinatura_gplay = "nacional"
+    AND t3.tipo_assinante != "trial"
+)
+
+,pre_lista_email AS (
+  SELECT * REPLACE(
+    CASE
+      WHEN EXTRACT(MONTH FROM mes) = 1 THEN "Janeiro"
+      WHEN EXTRACT(MONTH FROM mes) = 2 THEN "Fevereiro"
+      WHEN EXTRACT(MONTH FROM mes) = 3 THEN "Março"
+      WHEN EXTRACT(MONTH FROM mes) = 4 THEN "Abril"
+      WHEN EXTRACT(MONTH FROM mes) = 5 THEN "Maio"
+      WHEN EXTRACT(MONTH FROM mes) = 6 THEN "Junho"
+      WHEN EXTRACT(MONTH FROM mes) = 7 THEN "Julho"
+      WHEN EXTRACT(MONTH FROM mes) = 8 THEN "Agosto"
+      WHEN EXTRACT(MONTH FROM mes) = 9 THEN "Setembro"
+      WHEN EXTRACT(MONTH FROM mes) = 10 THEN "Outubro"
+      WHEN EXTRACT(MONTH FROM mes) = 11 THEN "Novembro"
+      WHEN EXTRACT(MONTH FROM mes) = 12 THEN "Dezembro"
+      ELSE STRING(mes)
+    END AS mes
+  )
+  FROM join_impression_email
+  WHERE
+    EXTRACT(MONTH FROM mes) = EXTRACT(MONTH FROM DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
+)
+
+,ultima_comunicacao_assinante AS (
+  SELECT DISTINCT
+    Flag_Abriu_Email_30D AS new_Flag_Abriu_Email_30D,
+    Produto_Contratado AS new_Produto_Contratado,
+    globo_id
+  FROM
+    ${ref("comunicacao", "ultima_comunicacao_assinante")}
+)
+
+,base_engajados AS (
+  SELECT
+    globo_id,
+    new_Flag_Abriu_Email_30D AS Flag_Abriu_Email_30D,
+  FROM
+    ${ref("usuarios", "perfil_assinantes_ativo_reduzido")}
+  INNER JOIN
+    ultima_comunicacao_assinante
+  USING (globo_id)
+  GROUP BY
+    globo_id,
+    Produto_Contratado,
+    new_Flag_Abriu_Email_30D
+ -- HAVING
+   -- SUM(horas) >= 20
+    --AND COUNT(DISTINCT program_title) >= 4
+)
+
+SELECT DISTINCT * REPLACE (
+  CAST(Horas_Assistidas AS INT64) AS Horas_Assistidas
+)
+FROM pre_lista_email
+INNER JOIN base_engajados
+USING (globo_id)

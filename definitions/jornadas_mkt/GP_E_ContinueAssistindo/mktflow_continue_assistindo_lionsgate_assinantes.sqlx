@@ -1,0 +1,23 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=jornadas_mkt_mktflow_continue_assistindo_lionsgate_assinantes'],
+  name: 'mktflow_continue_assistindo_lionsgate_assinantes',
+  schema: 'jornadas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+select distinct userId as globo_id
+from ${ref("usuarios", "base_ativa_pagante_com_trial_new")} ba, UNNEST(info) AS info
+inner join ${ref("consumo_enriched", "impression")} imp
+on imp.userId = ba.globo_id
+where imp.date between "2023-07-01" and "2023-08-01"
+and imp.mediaid in (10559005, 10559000, 10546068, 10544989, 10544597,10552597,11444025,11390151,11405741,11197648)
+and lower(info.Produto_Contratado) not like "%lionsgate%"
+order by 1 asc

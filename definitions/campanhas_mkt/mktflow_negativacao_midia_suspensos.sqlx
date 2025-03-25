@@ -1,0 +1,84 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=campanhas_mkt_mktflow_negativacao_midia_suspensos',
+      'schedule_cron=0 10 * * *'],
+  name: 'mktflow_negativacao_midia_suspensos',
+  schema: 'campanhas_mkt',
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+--pegar os globo_ids que possuem data de suspensão em qualquer data a partir de janeiro de 2023 e que ainda permanecem com status suspenso atualmente (ou pagamento pendente)
+
+with cte1 as (SELECT
+  DISTINCT e.globo_id,
+  sd.on_hold_reason,
+  sd.on_hold_at
+FROM
+ ${ref("sales_gold", "customer_events")} e
+LEFT JOIN
+  ${ref("sales_gold", "subscription_details")} sd
+ON
+  e.object_id = sd.id
+LEFT JOIN
+  ${ref("sales_gold", "partner_details")} pt
+ON
+  e.object_id = pt.partner_token
+LEFT JOIN
+ ${ref("sales_gold", "product_details")} pd
+ON
+  sd.product_id = pd.id
+  OR pt.product_id = pd.id
+WHERE
+  e.event = 'subscription_on_hold'
+  AND LOWER(pd.name) LIKE '%globoplay%'
+  AND sd.subscription_status in ('Suspenso','Pagamento pendente')
+  AND pd.is_international = FALSE
+  AND sd.on_hold_at >= '2023-01-01'
+ORDER BY
+  3 asc),
+
+--pegar os globo_ids que possuem data de suspensão em qualquer data a partir de janeiro de 2023 e cujo motivo da suspensao tenha sido fraude ou inadimplência (obs: consequentemente o status atualmente desses globoids serão os suspenso ou cancelado)
+cte2 as (SELECT
+  DISTINCT e.globo_id,
+  sd.on_hold_reason,
+  sd.on_hold_at,
+  sd.subscription_status
+FROM
+ ${ref("sales_gold", "customer_events")} e
+LEFT JOIN
+  ${ref("sales_gold", "subscription_details")} sd
+ON
+  e.object_id = sd.id
+LEFT JOIN
+  ${ref("sales_gold", "partner_details")} pt
+ON
+  e.object_id = pt.partner_token
+LEFT JOIN
+ ${ref("sales_gold", "product_details")} pd
+ON
+  sd.product_id = pd.id
+  OR pt.product_id = pd.id
+WHERE
+  e.event = 'subscription_on_hold'
+  AND LOWER(pd.name) LIKE '%globoplay%'
+  AND sd.on_hold_reason in ('suspeitadefraude',
+    'Suspeita Fraude',
+    'Suspeita de Fraude',
+    '7 - Inativação por inadimplência',
+    'Inadimplência Saldo')
+  AND pd.is_international = FALSE
+  AND sd.on_hold_at >= '2023-01-01'
+ORDER BY
+  3 asc)
+
+--unificar
+
+SELECT globo_id FROM cte1
+UNION DISTINCT
+SELECT globo_id FROM cte2

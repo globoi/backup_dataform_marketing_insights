@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "gglobo-globoplay-int-hdg-dev",
+  schema: "Salesforce",
+  name: "d_1_base_gold",
+  description: ""
+}

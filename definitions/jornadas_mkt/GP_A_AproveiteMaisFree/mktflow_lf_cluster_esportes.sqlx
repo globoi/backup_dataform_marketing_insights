@@ -1,0 +1,49 @@
+config {
+  type: 'table',
+  name: 'mktflow_lf_cluster_esportes',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AproveiteMaisFree','schedule_tag=jornadas_mkt_mktflow_lf_cluster_esportes'],
+  description: '',
+  columns: {
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH 
+all_impression AS (
+    SELECT
+        userid AS globo_id
+    FROM
+        ${ref("consumo_enriched", "all_impression")} ai
+        INNER JOIN ${ref("usuarios", "Free users")} fu
+        ON fu.globo_id = ai.userid
+    WHERE
+        ai.program_subset = 'sports'
+        OR ai.program_id = 11702
+        AND `date` <= CURRENT_DATE()
+),
+
+tapume AS (
+    SELECT
+        DISTINCT(globo_id_sessao) AS globo_id
+    FROM
+        ${ref("jornadas_mkt", "tapume_ao_vivo_nao_assinante")} tav 
+        INNER JOIN ${ref("usuarios", "Free users")} fu
+        ON fu.globo_id = tav.globo_id_sessao
+    WHERE
+        LOWER(eventAction) IN ('tapume.premiere', 'tapume.sportv', 'tapume.spor_tv', 'tapume.combate', 'tapume.canal_off')
+        OR LOWER(eventAction) LIKE '%spor%'
+)
+
+SELECT
+    DISTINCT(globo_id)
+FROM
+    all_impression
+
+UNION DISTINCT     
+
+SELECT * FROM tapume

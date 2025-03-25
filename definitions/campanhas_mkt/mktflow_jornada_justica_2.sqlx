@@ -1,0 +1,36 @@
+config {
+  type: "table",
+  schema: 'campanhas_mkt',
+  tags: [
+    "schedule_tag=campanhas_mkt_mktflow_jornada_justica_2"
+  ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "",
+      owner: "martech"
+
+    }
+  }
+}
+with base1 as (
+SELECT
+  DISTINCT userId AS globo_id,
+  count (DISTINCT mediaid) as eps
+FROM
+  `gglobo-foundation-psd-hdg-prd.consumo_enriched.impression` a
+INNER JOIN
+  `gglobo-mkt-ins-hdg-prd.comunicacao.ultima_comunicacao_geral` b
+ON
+  a.userId = b.globo_id
+WHERE
+  program_id = 26437
+  AND tipo_cadastro = 'Assinante'
+  AND date >= '2024-04-11'
+GROUP BY
+  globo_id
+HAVING
+  count (DISTINCT mediaid) >= 4) 
+
+select globo_id
+from base1

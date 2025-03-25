@@ -1,0 +1,532 @@
+config {
+  type: "table",
+  schema: "reports",
+  tags: ["schedule_tag=reports_FinishGA4_v0",
+         'schedule_cron=0 11 * * *'
+  ]
+}
+
+-- DECLARE dt_fim DATE DEFAULT CURRENT_DATE-1;
+-- DECLARE dt_ini DATE DEFAULT dt_fim - 7;
+
+
+-- DECLARE dt_fim DATE DEFAULT CURRENT_DATE-2;
+-- DECLARE dt_ini DATE DEFAULT "2024-07-01";
+
+-- SELECT dt_ini, dt_fim;
+
+pre_operations {
+ 
+
+ 
+CREATE TEMP FUNCTION getParams(params ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>>, paramKey STRING)
+RETURNS STRING
+AS (
+  (SELECT 
+     MAX(COALESCE(
+       value.string_value,
+       CAST(value.int_value AS STRING),
+       CAST(value.float_value AS STRING),
+       CAST(value.double_value AS STRING)
+     ))
+   FROM UNNEST(params) AS ep
+   WHERE ep.key = paramKey)
+);
+
+CREATE TEMP FUNCTION getParams_2(params ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64, set_timestamp_micros INT64>>>, paramKey STRING)
+RETURNS STRING
+AS (
+  (SELECT 
+     MAX(COALESCE(
+       value.string_value,
+       CAST(value.int_value AS STRING),
+       CAST(value.float_value AS STRING),
+       CAST(value.double_value AS STRING),
+       CAST(value.set_timestamp_micros AS STRING)
+     ))
+   FROM UNNEST(params) AS ep
+   WHERE ep.key = paramKey)
+);
+}
+-- CREATE OR REPLACE TABLE `gglobo-gplay-aquisicao-hdg-prd.GoogleAnalytics4.FinishGA4_v0` AS
+
+with events as (
+  select 
+  *, 
+  concat(user_pseudo_id,getParams(event_params,'ga_session_id')) as ga_session_id,
+  from ${ref('analytics_329311935','events_*')}
+  where 1=1
+  AND _TABLE_SUFFIX NOT LIKE '%intraday%'
+  AND _TABLE_SUFFIX 
+      = FORMAT_DATE('%Y%m%d', CURRENT_DATE('America/Sao_Paulo') - 1 ) 
+        --  BETWEEN FORMAT_DATE('%Y%m%d', dt_ini ) 
+        --      AND FORMAT_DATE('%Y%m%d', dt_fim )
+),
+ 
+ 
+purchase_info as (
+  select
+    traffic_source.source AS pc_source,
+    traffic_source.medium AS pc_medium,
+    traffic_source.name AS pc_campaign,
+
+    -- Ambos
+    ---- VFX: Dados de trafego manuais segundo parametros UTM
+    collected_traffic_source.manual_campaign_id,
+    collected_traffic_source.manual_campaign_name,
+    collected_traffic_source.manual_source,
+    collected_traffic_source.manual_medium,
+    collected_traffic_source.manual_term,
+    collected_traffic_source.manual_content,
+
+    ---- VFX: dados de tráfego a nivel sessão com atrib last click
+    session_traffic_source_last_click.manual_campaign.campaign_id AS pc_slc_manual_campaign_id,
+    session_traffic_source_last_click.manual_campaign.campaign_name AS pc_slc_manual_campaign_name,
+    session_traffic_source_last_click.manual_campaign.medium AS pc_slc_manual_medium,
+    session_traffic_source_last_click.manual_campaign.term AS pc_slc_manual_term,
+    session_traffic_source_last_click.manual_campaign.content AS pc_slc_manual_content,
+    session_traffic_source_last_click.manual_campaign.source_platform AS pc_slc_manual_source_platform,
+    session_traffic_source_last_click.manual_campaign.source AS pc_slc_manual_source,
+    session_traffic_source_last_click.manual_campaign.creative_format AS pc_slc_manual_creative_format,
+    session_traffic_source_last_click.manual_campaign.marketing_tactic AS pc_slc_manual_marketing_tactic,
+    session_traffic_source_last_click.google_ads_campaign.customer_id AS pc_slc_gads_customer_id,
+    session_traffic_source_last_click.google_ads_campaign.account_name AS pc_slc_gads_account_name,
+    session_traffic_source_last_click.google_ads_campaign.campaign_id AS pc_slc_gads_campaign_id,
+    session_traffic_source_last_click.google_ads_campaign.campaign_name AS pc_slc_gads_campaign_name,
+    session_traffic_source_last_click.google_ads_campaign.ad_group_id AS pc_slc_gads_ad_group_id,
+    session_traffic_source_last_click.google_ads_campaign.ad_group_name AS pc_slc_gads_ad_group_name,
+
+    -- ids de publicidade
+    collected_traffic_source.gclid,
+    collected_traffic_source.dclid,
+    collected_traffic_source.srsltid,
+
+    -- IDs de usuário
+    user_id,
+    user_pseudo_id,
+
+    -- consent mode
+    privacy_info.ads_storage,
+    privacy_info.analytics_storage,
+
+    FORMAT_DATE('%Y-%m-%d', PARSE_DATE('%Y%m%d', event_date)) as data,
+    getParams_2(user_properties,'user_tier') AS pc_assinatura_session,
+    getParams(event_params,'user_tier_hit') AS assinatura_hit,
+    getParams(event_params,'session_engaged') AS visits,
+    getParams(event_params,'ga_session_number') AS visitNumber,
+    getParams(event_params, 'platform') AS plataforma_session,
+    getParams(event_params,'consumption_environment') AS ambiente_consumo_hit,
+    getParams_2(user_properties,'user_code') AS globoid_session,
+    getParams(event_params,'user_code_hit') AS entrance_globoid_hit,
+    getParams_2(user_properties,'user_code_provider') AS status_user_session,
+    getParams_2(user_properties,'user_code_provider') AS status_user_hit,
+    getParams_2(user_properties,'tenant_jarvis') AS oferta_consumo_session,
+    getParams(event_params,'last_referrer') AS referer_cd_session,
+    getParams(event_params,'is_pwa') AS pwa_session,
+    getParams(event_params,'experiment_name') AS experimento_session,
+    getParams(event_params,'experiment_version') AS versao_experimento_session,
+    getParams(event_params,'funnel_component') AS funil_componente_hit,
+    getParams(event_params,'funnel_label') AS funil_label_hit,
+    getParams(event_params,'funil_area') AS funil_area_hit,
+    getParams(event_params,'funnel_origin') AS funil_tp_paginaOrigem_hit,
+    getParams(event_params,'funnel_touchpoint_component') AS funil_tp_componente_hit,
+    getParams(event_params,'funnel_touchpoint_label') AS funil_tp_label_hit,
+    getParams(event_params,'funnel_touchpoint_area') AS funil_tp_area_hit,
+    getParams(event_params,'funnel_touchpoint_id_title') AS funil_tp_idTitulo_hit,
+    getParams(event_params,'home_type_user') AS home_usuario,
+    getParams(event_params,'home_type_hit') AS home_hit,
+    getParams_2(user_properties,'subscription_details') AS cesta_assinatura_hit,
+    getParams(event_params,'globo_source') AS utm_source_hit_cd,
+    getParams(event_params,'globo_medium') AS utm_medium_hit_cd,
+    getParams(event_params,'globo_campaign') AS utm_campaign_hit_cd,
+    getParams(event_params,'source') AS origem_tv_hit,
+    getParams(event_params,'products_list') as lista_produto_hit,
+    TIMESTAMP_MICROS(event_timestamp) goalTime_utc,
+    getParams(event_params,'origem_id') AS origem_id_hit,
+    getParams(event_params,'user_agent') AS userAgent,
+    getParams(event_params,'purchase_step') as stepHit,
+    getParams(event_params,'product_name') as listaProdutoSession,
+    ARRAY(SELECT STRUCT(item_id as productId) from UNNEST(items)) as products,
+    ecommerce.purchase_revenue as receitaHit,
+    ecommerce.transaction_id AS transactionId,
+    getParams(event_params,'payment_type') AS paymentpHit,
+    getParams(event_params,'user_code_hit') globo_id,
+    getParams(event_params,'period') AS periodicidade_hit,
+    concat(user_pseudo_id,getParams(event_params,'ga_session_id')) as ga_session_id,
+    REGEXP_CONTAINS(getParams(event_params,'page_location'),'(?i)finish.*globoplay') AS flag_finish_globoplay,
+    device.web_info.hostname as goal_hostname,
+    getParams(event_params,'page_location') AS goal_pagePath,
+    getParams(event_params,'page_title') AS goal_title,
+    getParams(event_params,'funnel_product')as entrance_funil_ofertas,
+    getParams(event_params,'payment_reuse') AS reutilizacao_pagamento_hit,
+    getParams(event_params,'status_assinatura') AS status_assinatura_hit,
+    getParams(event_params,'tipo_assinante') AS tipo_assinante_hit,
+    geo.country,
+    REPLACE(geo.region, 'State of ','') AS region,
+    geo.city,
+    device.operating_system AS operatingSystem,
+    device.category AS deviceCategory,
+
+    ---- VFX: outros
+    getParams(event_params,'currency') AS moeda,
+    getParams(event_params,'coupon') AS cupom,
+    getParams(event_params,'value') AS receita_event,
+    getParams(event_params,'conversion') AS conversion_event, --> ??
+    getParams(event_params,'session_engaged') AS session_engaged_event,
+    getParams(event_params,'engagement_time_msec') AS engagement_time_msec_event,
+    event_value_in_usd,
+    stream_id, --> ajudar a debugar
+    is_active_user, --> testar filtrar pra ver se aproxima do GA
+
+    ---- VFX: Ecommerce
+    ecommerce.total_item_quantity AS ecomm_total_item_quantity,
+
+    ---- VFX: items
+    ARRAY(SELECT STRUCT(item_id as productId) from UNNEST(items)) as products_id_array, --> jess
+    ARRAY_TO_STRING(ARRAY(SELECT getParams(item_params,'item_id') from UNNEST(items)),", ") products_id_array_string,
+
+    ARRAY(SELECT STRUCT(item_name as product_name) from UNNEST(items)) as product_name_array,
+    ARRAY_TO_STRING(ARRAY(SELECT getParams(item_params,'product_name') from UNNEST(items)),", ") product_name_array_string,
+
+    ARRAY(SELECT STRUCT(item_category as items_period) from UNNEST(items)) as items_period_array,
+    ARRAY_TO_STRING(ARRAY(SELECT getParams(item_params,'item_category') from UNNEST(items)),", ") items_period_array_string,
+
+    ARRAY(SELECT STRUCT(item_category2 as tipo_pacote) from UNNEST(items)) as tipo_pacote_array,
+    ARRAY_TO_STRING(ARRAY(SELECT getParams(item_params,'item_category2') from UNNEST(items)),", ") tipo_pacote_array_string,
+
+    ARRAY(SELECT getParams(item_params,'installments') from UNNEST(items)) as parcelas_items_array,
+    ARRAY_TO_STRING(ARRAY(SELECT getParams(item_params,'installments') from UNNEST(items)),", ") parcelas_items_array_string,
+
+
+
+  FROM events
+  
+  WHERE  event_name= 'purchase'
+  -- AND getParams(event_params,'purchase_step') = 'finish'
+),
+entrance_info as (
+  select *
+  from (
+    SELECT
+      TIMESTAMP_MICROS(event_timestamp) startTime_utc,
+
+      traffic_source.source as ent_source,
+      traffic_source.medium as ent_medium,
+      traffic_source.name as ent_campaign,
+
+    -- Ambos
+    ---- VFX: Dados de trafego manuais segundo parametros UTM
+    collected_traffic_source.manual_campaign_id,
+    collected_traffic_source.manual_campaign_name,
+    collected_traffic_source.manual_source,
+    collected_traffic_source.manual_medium,
+    collected_traffic_source.manual_term,
+    collected_traffic_source.manual_content,
+
+    ---- VFX: dados de tráfego a nivel sessão com atrib last click
+    session_traffic_source_last_click.manual_campaign.campaign_id AS ent_slc_manual_campaign_id,
+    session_traffic_source_last_click.manual_campaign.campaign_name AS ent_slc_manual_campaign_name,
+    session_traffic_source_last_click.manual_campaign.medium AS ent_slc_manual_medium,
+    session_traffic_source_last_click.manual_campaign.term AS ent_slc_manual_term,
+    session_traffic_source_last_click.manual_campaign.content AS ent_slc_manual_content,
+    session_traffic_source_last_click.manual_campaign.source_platform AS ent_slc_manual_source_platform,
+    session_traffic_source_last_click.manual_campaign.source AS ent_slc_manual_source,
+    session_traffic_source_last_click.manual_campaign.creative_format AS ent_slc_manual_creative_format,
+    session_traffic_source_last_click.manual_campaign.marketing_tactic AS ent_slc_manual_marketing_tactic,
+    session_traffic_source_last_click.google_ads_campaign.customer_id AS ent_slc_gads_customer_id,
+    session_traffic_source_last_click.google_ads_campaign.account_name AS ent_slc_gads_account_name,
+    session_traffic_source_last_click.google_ads_campaign.campaign_id AS ent_slc_gads_campaign_id,
+    session_traffic_source_last_click.google_ads_campaign.campaign_name AS ent_slc_gads_campaign_name,
+    session_traffic_source_last_click.google_ads_campaign.ad_group_id AS ent_slc_gads_ad_group_id,
+    session_traffic_source_last_click.google_ads_campaign.ad_group_name AS ent_slc_gads_ad_group_name,
+
+
+
+    -- ids de publicidade
+    collected_traffic_source.gclid,
+    collected_traffic_source.dclid,
+    collected_traffic_source.srsltid,
+
+    -- IDs de usuário
+    user_id,
+    user_pseudo_id,
+
+    -- consent mode
+    privacy_info.ads_storage,
+    privacy_info.analytics_storage,
+
+    stream_id,
+
+      getParams_2(user_properties,'user_tier') AS assinatura_session,
+      getParams(event_params,'user_tier_hit') AS assinatura_hit,
+      getParams(event_params,'session_engaged') AS visits,
+      getParams(event_params,'ga_session_number') AS visitNumber,
+      getParams(event_params, 'platform') AS plataforma_session,
+      getParams(event_params,'consumption_environment') AS ambiente_consumo_hit,
+      getParams_2(user_properties,'user_code') AS globoid_session,
+      getParams(event_params,'user_code_hit') AS entrance_globoid_hit,
+      getParams_2(user_properties,'user_code_provider') AS status_user_session,
+      getParams_2(user_properties,'user_code_provider') AS status_user_hit,
+      getParams_2(user_properties,'tenant_jarvis') AS oferta_consumo_session,
+      getParams(event_params,'last_referrer') AS referer_cd_session,
+      getParams(event_params,'is_pwa') AS pwa_session,
+      getParams(event_params,'experiment_name') AS experimento_session,
+      getParams(event_params,'experiment_version') AS versao_experimento_session,
+      getParams(event_params,'funnel_component') AS funil_componente_hit,
+      getParams(event_params,'funnel_label') AS funil_label_hit,
+      getParams(event_params,'funil_area') AS funil_area_hit,
+      getParams(event_params,'funnel_origin') AS funil_tp_paginaOrigem_hit,
+      getParams(event_params,'funnel_touchpoint_component') AS funil_tp_componente_hit,
+      getParams(event_params,'funnel_touchpoint_label') AS funil_tp_label_hit,
+      getParams(event_params,'funnel_touchpoint_area') AS funil_tp_area_hit,
+      getParams(event_params,'funnel_touchpoint_id_title') AS funil_tp_idTitulo_hit,
+      getParams(event_params,'home_type_user') AS home_usuario,
+      getParams(event_params,'home_type_hit') AS home_hit,
+      getParams_2(user_properties,'subscription_details') AS cesta_assinatura_hit,
+      getParams(event_params,'globo_source') AS utm_source_hit_cd,
+      getParams(event_params,'globo_medium') AS utm_medium_hit_cd,
+      getParams(event_params,'globo_campaign') AS utm_campaign_hit_cd,
+      getParams(event_params,'source') AS origem_tv_hit,
+      TIMESTAMP_MICROS(event_timestamp) as start_time,
+      device.web_info.hostname as entrance_hostname,
+      getParams(event_params,'user_code_hit') globo_id,
+      concat(user_pseudo_id,getParams(event_params,'ga_session_id')) as ga_session_id,
+      getParams(event_params,'page_location') AS entrance_pagePath,
+      getParams(event_params,'page_title') AS entrance_title,
+      getParams(event_params,'page_referrer') AS entrance_referer,
+      getParams(event_params,'payment_reuse') AS reutilizacao_pagamento_hit,
+      getParams(event_params,'status_assinatura') AS status_assinatura_hit,
+      getParams(event_params,'tipo_assinante') AS tipo_assinante_hit,
+      ROW_NUMBER() OVER(
+        PARTITION BY (SELECT concat(user_pseudo_id,getParams(event_params,'ga_session_id')))
+      ORDER BY event_timestamp asc ) AS row_num
+    FROM
+      events
+      WHERE getParams(event_params,'user_code_hit') is not null)
+  where row_num=1
+),
+totals_info AS (
+  SELECT
+   COUNT(*) AS hits,
+   SUM(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS pageviews,
+   getParams(event_params,'user_code_hit') globo_id,
+   concat(user_pseudo_id,getParams(event_params,'ga_session_id')) as ga_session_id,
+  FROM events
+  group by 3,4
+)
+ 
+,base as (
+select
+  pc.data,
+  startTime_utc,
+  -- goalTime_utc,
+  TIMESTAMP_DIFF(goalTime_utc,startTime_utc, SECOND) as segundos_ate_compra,
+  
+-- Dados de tráfego
+  -- coalesce(ent.ent_source, pc.pc_source) AS source,
+  -- coalesce(ent.ent_medium, pc.pc_medium) AS medium,
+  -- coalesce(ent.ent_campaign, pc.pc_campaign) AS campaign,
+
+ 
+-- Metadados do usuário
+  -- pc.operatingSystem,
+  -- pc.deviceCategory,
+  -- coalesce(ent.plataforma_session, pc.plataforma_session) AS plataforma_session,
+  coalesce(ent.ambiente_consumo_hit, pc.ambiente_consumo_hit) AS clsc_ambiente_consumo_hit,
+  pc.globo_id AS globoid,
+  -- coalesce(ent.globoid_session, pc.globoid_session) AS globoid_session,
+  ent.globoid_session as ent_globoid_session,
+  pc.globoid_session as pc_globoid_session,
+  -- coalesce(ent.entrance_globoid_hit, pc.entrance_globoid_hit) AS entrance_globoid_hit,
+  -- coalesce(ent.status_user_session, pc.status_user_session) AS status_user_session,
+  -- coalesce(ent.status_user_hit, pc.status_user_hit) AS status_user_hit,
+ 
+-- Dados da conversão
+  -- pc.flag_finish_globoplay,
+  pc.stepHit as step_hit,
+  pc.listaProdutoSession as lista_produto_session,
+  -- pc.lista_produto_hit,
+  products as id_produto_hit,
+  pc.receitaHit as receita_hit,
+  pc.transactionId as id_transacao_hit,
+  -- coalesce(ent.reutilizacao_pagamento_hit, pc.reutilizacao_pagamento_hit) AS reutilizacao_pagamento_hit,
+  -- coalesce(ent.status_assinatura_hit, pc.status_assinatura_hit) AS status_assinatura_hit,
+  -- coalesce(ent.tipo_assinante_hit, pc.tipo_assinante_hit) AS tipo_assinante_hit,
+  pc.paymentpHit as pagamento_hit,
+  -- pc.origem_id_hit,
+  -- coalesce(ent.oferta_consumo_session, pc.oferta_consumo_session) AS oferta_consumo_session,
+  -- pc.periodicidade_hit,
+  -- coalesce(ent.assinatura_session, pc.pc_assinatura_session) AS assinatura_session,
+  -- coalesce(ent.assinatura_hit, pc.assinatura_hit) AS pc_assinatura_hit,
+ 
+-- Dados da LP
+  ent.entrance_pagePath,
+  ent.entrance_hostname,
+  ent.entrance_title,
+  -- pc.entrance_funil_ofertas, --> ???
+  ent.entrance_referer,
+ 
+-- Dados da página de conclusão de meta
+  -- pc.goal_hostname,
+  -- pc.goal_pagePath,
+  -- pc.goal_title,
+ 
+-- Dados da navegação
+  -- coalesce(ent.visits, pc.visits) AS visits,
+  tls.hits,
+  tls.pageviews,
+  -- coalesce(ent.visitNumber, pc.visitNumber) AS visitNumber,
+ 
+-- Dados geográficos
+  -- pc.country,
+  -- pc.region,
+  -- pc.city,
+ 
+-- Outros
+  pc.userAgent as user_agent_session,
+  -- coalesce(ent.referer_cd_session, pc.referer_cd_session) AS referer_cd_session,
+  -- coalesce(ent.pwa_session, pc.pwa_session) AS pwa_session,
+  -- coalesce(ent.experimento_session, pc.experimento_session) AS experimento_session,
+  -- coalesce(ent.versao_experimento_session, pc.versao_experimento_session) AS versao_experimento_session,
+  -- coalesce(ent.funil_componente_hit, pc.funil_componente_hit) AS funil_componente_hit,
+  -- coalesce(ent.funil_label_hit, pc.funil_label_hit) AS funil_label_hit,
+  -- coalesce(ent.funil_area_hit, pc.funil_area_hit) AS funil_area_hit,
+  -- coalesce(ent.funil_tp_paginaOrigem_hit, pc.funil_tp_paginaOrigem_hit) AS funil_tp_paginaOrigem_hit,
+  -- coalesce(ent.funil_tp_componente_hit, pc.funil_tp_componente_hit) AS funil_tp_componente_hit,
+  -- coalesce(ent.funil_tp_label_hit, pc.funil_tp_label_hit) AS funil_tp_label_hit,
+  -- coalesce(ent.funil_tp_area_hit, pc.funil_tp_area_hit) AS funil_tp_area_hit,
+  -- coalesce(ent.funil_tp_idTitulo_hit, pc.funil_tp_idTitulo_hit) AS funil_tp_idTitulo_hit,
+  -- coalesce(ent.home_usuario, pc.home_usuario) AS home_usuario,
+  -- coalesce(ent.home_hit, pc.home_hit) AS home_hit,
+  -- coalesce(ent.cesta_assinatura_hit, pc.cesta_assinatura_hit) AS cesta_assinatura_hit,
+  -- coalesce(ent.utm_source_hit_cd, pc.utm_source_hit_cd) AS utm_source_hit_cd,
+  -- coalesce(ent.utm_medium_hit_cd, pc.utm_medium_hit_cd) AS utm_medium_hit_cd,
+  -- coalesce(ent.utm_campaign_hit_cd, pc.utm_campaign_hit_cd) AS utm_campaign_hit_cd,
+  -- coalesce(ent.origem_tv_hit, pc.origem_tv_hit) AS origem_tv_hit,
+
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+  -- Ambos -> entrance
+  ---- VFX: Dados de trafego manuais segundo parametros UTM
+  ent.manual_campaign_id as ent_manual_campaign_id,
+  ent.manual_campaign_name as ent_manual_campaign_name,
+  ent.manual_source as ent_manual_source,
+  ent.manual_medium as ent_manual_medium,
+  ent.manual_term as ent_manual_term,
+  ent.manual_content as ent_manual_content,
+
+  -- abrindo source medium de entrance e purchase
+  ent.ent_source as ent_source,
+  ent.ent_medium as ent_medium,
+
+
+  -- ids de publicidade
+  ent.gclid AS ent_gclid,
+  ent.dclid AS ent_dclid,
+  ent.srsltid AS ent_srsltid,
+
+  -- IDs de usuário
+  ent.user_id AS ent_user_id,
+  ent.user_pseudo_id AS ent_user_pseudo_id,
+
+  -- consent mode
+  ent.ads_storage AS ent_ads_storage,
+  ent.analytics_storage AS ent_analytics_storage,
+
+
+
+  -- Ambos -> pc
+  ---- VFX: Dados de trafego manuais segundo parametros UTM
+  pc.manual_campaign_id as pc_manual_campaign_id,
+  pc.manual_campaign_name as pc_manual_campaign_name,
+  pc.manual_source as pc_manual_source,
+  pc.manual_medium as pc_manual_medium,
+  pc.manual_term as pc_manual_term,
+  pc.manual_content as pc_manual_content,
+
+  -- abrindo source medium de entrance e purchase
+  -- pc.pc_source as pc_source,
+  -- pc.pc_medium as pc_medium,
+
+
+  -- ids de publicidade
+  pc.gclid AS pc_gclid,
+  pc.dclid AS pc_dclid,
+  pc.srsltid AS pc_srsltid,
+
+  -- IDs de usuário
+  pc.user_id AS pc_user_id,
+  pc.user_pseudo_id AS pc_user_pseudo_id,
+
+  -- consent mode
+  pc.ads_storage AS pc_ads_storage,
+  pc.analytics_storage AS pc_analytics_storage,
+
+
+  pc.* EXCEPT(data),
+  ent.stream_id AS ent_stream_id,
+  pc.stream_id AS pc_stream_id,
+
+
+  -------- NOVAS COLUNAS DE TRAFEGO
+  -- pc_slc_manual_campaign_id,
+  -- pc_slc_manual_campaign_name,
+  -- pc_slc_manual_medium,
+  -- pc_slc_manual_term,
+  -- pc_slc_manual_content,
+  -- pc_slc_manual_source_platform,
+  -- pc_slc_manual_source,
+  -- pc_slc_manual_creative_format,
+  -- pc_slc_manual_marketing_tactic,
+  -- pc_slc_gads_customer_id,
+  -- pc_slc_gads_account_name,
+  -- pc_slc_gads_campaign_id,
+  -- pc_slc_gads_campaign_name,
+  -- pc_slc_gads_ad_group_id,
+  -- pc_slc_gads_ad_group_name,
+  ent_slc_manual_campaign_id,
+  ent_slc_manual_campaign_name,
+  ent_slc_manual_medium,
+  ent_slc_manual_term,
+  ent_slc_manual_content,
+  ent_slc_manual_source_platform,
+  ent_slc_manual_source,
+  ent_slc_manual_creative_format,
+  ent_slc_manual_marketing_tactic,
+  ent_slc_gads_customer_id,
+  ent_slc_gads_account_name,
+  ent_slc_gads_campaign_id,
+  ent_slc_gads_campaign_name,
+  ent_slc_gads_ad_group_id,
+  ent_slc_gads_ad_group_name,
+
+from purchase_info pc
+  left join entrance_info as ent
+  on ent.globo_id = pc.globo_id and ent.ga_session_id = pc.ga_session_id
+ 
+  left join totals_info as tls
+  on tls.globo_id = pc.globo_id and tls.ga_session_id = pc.ga_session_id
+-- where pc.globo_id is not null
+)
+
+
+SELECT 
+
+COALESCE(IF(pc_slc_gads_campaign_name IS NOT NULL, 'google', pc_slc_manual_source), '(not set)') AS pc_slc_source_treated,
+COALESCE(IF(pc_slc_gads_campaign_name IS NOT NULL, 'cpc', pc_slc_manual_medium), '(not set)') AS pc_slc_medium_treated,
+
+COALESCE(
+  CONCAT(
+    IF(pc_slc_gads_campaign_name IS NOT NULL, 'google', pc_slc_manual_source),
+    ' / ',
+    IF(pc_slc_gads_campaign_name IS NOT NULL, 'cpc', pc_slc_manual_medium)
+  ), '(not set)'
+)as pc_slc_source_medium_treated,
+
+COALESCE(pc_slc_gads_campaign_name, pc_slc_manual_campaign_name) as pc_slc_campaign_name_treated,
+COALESCE(pc_slc_gads_ad_group_name, pc_slc_manual_content) as pc_slc_content_treated,
+
+*
+
+FROM base

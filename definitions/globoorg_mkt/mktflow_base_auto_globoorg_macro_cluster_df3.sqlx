@@ -1,0 +1,183 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=globoorg_mkt_mktflow_base_auto_globoorg_macro_cluster_df3', 'schedule_cron=15 8 * * 6'],
+    name: 'mktflow_base_auto_globoorg_macro_cluster_df3',
+    schema: 'globoorg_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "globoorg_mkt"
+        }
+    }
+}
+
+WITH
+  Cluster_Esporte AS (
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/volei/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/surfe/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/olimpiadas/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/combate/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/motor/formula-1/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/eu-atleta/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%interativos.ge.globo.com/podcasts/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.globo_esporte.pgt_*`
+    ${ref("globo_esporte", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%ge.globo.com/outros-esportes/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.o_globo.pgt_*`
+    ${ref("o_globo", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%oglobo.globo.com/esportes/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2
+  UNION DISTINCT
+  SELECT
+    userid
+  FROM
+    -- `valiant-circuit-129220.outros.pgt_*`
+    ${ref("outros", "pgt_*")}
+  WHERE
+    _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY))
+    AND FORMAT_DATE("%Y%m%d", DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))
+    AND provider = 'cadun'
+    AND userid IS NOT NULL
+    AND object LIKE '%autoesporte.globo.com/%'
+  GROUP BY
+    userid
+  HAVING
+    COUNT(userid) >= 2 )
+SELECT
+  'ESPORTE' AS CLUSTER,
+  userid AS globo_id
+FROM
+  Cluster_Esporte r

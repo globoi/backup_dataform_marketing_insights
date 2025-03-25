@@ -1,0 +1,42 @@
+config {
+    type: "table",
+    schema: 'receitas_mkt',
+    tags: ["receitas_mkt",
+        "schedule_tag=receitas_mkt_jornada_boas_vindas_receitas",
+        'schedule_cron=* 10 * * *'
+    ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "receitas_mkt",
+            owner: "martech",
+            mktcloud: 'true'
+        }
+    }
+}
+
+SELECT
+  *
+FROM (
+  WITH
+    acesso AS (
+    SELECT
+      globoId AS globo_id
+    FROM
+      `gglobo-prodservdig-hdg-prd.foundation_receitas.foundation_receitas_sessions_v3` w,
+      UNNEST (w.hits) h
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+      AND h.provider = "cadun"
+      AND globoId IS NOT NULL )
+  SELECT
+    globo_id,
+    COUNT(*) AS quantidade
+  FROM
+    acesso
+  GROUP BY
+    globo_id
+  HAVING
+    COUNT(*) = 1
+  ORDER BY
+    quantidade ASC)

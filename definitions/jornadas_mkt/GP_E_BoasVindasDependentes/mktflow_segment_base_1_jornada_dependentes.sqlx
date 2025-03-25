@@ -1,0 +1,26 @@
+config {
+  type: 'table',
+  name: 'mktflow_segment_base_1_jornada_dependentes',
+  schema: 'jornadas_mkt',
+  tags: ["GP_E_BoasVindasDependentes",'schedule_tag=jornadas_mkt_mktflow_segment_base_1_jornada_dependentes'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+  CURRENT_DATE() AS dt_proc,
+  globo_id_dependente AS globo_id,
+  DATETIME(data_criacao_dependente) AS data_criacao_dependente,
+  possui_disney,
+  possui_telecine,
+  possui_premiere,
+  possui_combate,
+  possui_mais_canais,
+  COALESCE(consumiu_7_dias, false) AS consumiu_7_dias,
+  IF(dias_ultimo_consumo <= 7 AND qtd_programas_consumidos >= 4, TRUE, FALSE) AS diversificou
+FROM 
+  ${ref('jornadas_mkt','base_1_jornada_dependentes')}

@@ -1,0 +1,80 @@
+config {
+  type: 'table',
+  name: 'base_conversao_deezer_enriquecida',
+  tags: [''],
+  schema: 'conversao_deezer',
+  description: '',
+}
+
+SELECT
+  assi.globoid,
+  CASE
+    WHEN assi.data_de_compra LIKE "%de abr%" THEN REGEXP_REPLACE(assi.data_de_compra, " de abr. de ", "/04/")
+    WHEN assi.data_de_compra LIKE "%de mai%" THEN REGEXP_REPLACE(assi.data_de_compra, " de mai. de ", "/05/")
+    ELSE assi.data_de_compra
+  END AS data_de_compra,
+  assi.origem,
+  base_deezer_202104.musiclover,
+  base_deezer_202104.bigbrotherbrasil,
+  base_deezer_202104.propensoschurn,
+  ult.tipo_assinante,
+  ult.sistema,
+  ult.dt_assinatura_comeco,
+  ult.canal_compra,
+  ult.produto,
+  ult.tempo_de_base_agrupado,
+  ult.gender,
+  ult.age,
+  ult.produto_contratado,
+  ult.telefone,
+  ult.perfil_email,
+  ult.perfil_uso_push,
+  bbb21.share_semanas_bbb,
+  bbb21.semanas_cluster_bbb,
+  bbb21.ordem_risco_churn,
+  bbb21.cluster_share_bbb_total,
+  bbb21.share_total_bbb,
+  bbb21.cluster_bbb_acumulado,
+  bbb21.semanas_total,
+  bbb21.horas_total,
+  bbb21.cancelouvol2021,
+  bbb21.cancelouvol2020,
+  bbb21.assinou_2021,
+  conv.campanha_e_deezer_1_send_date,
+  conv.campanha_e_deezer_1_open_date,
+  conv.campanha_e_deezer_1_click_date,
+  conv.campanha_e_deezer_1_repique_send_date,
+  conv.campanha_e_deezer_1_repique_open_date,
+  conv.campanha_e_deezer_1_repique_click_date,
+  whats.globoid AS whats_globo_id,
+  sms.globoid AS sms_globo_id,
+  CASE
+    WHEN whats.globoid IS NULL THEN FALSE ELSE TRUE
+  END AS recebeu_whats,
+  CASE
+    WHEN sms.globoid IS NULL THEN FALSE ELSE TRUE
+  END AS recebeu_sms,
+  CASE
+    WHEN conv.campanha_e_deezer_1_send_date IS NULL AND conv.campanha_e_deezer_1_repique_send_date IS NULL THEN FALSE ELSE TRUE
+  END AS recebeu_email,
+  CASE
+    WHEN conv.campanha_e_deezer_1_open_date IS NULL AND conv.campanha_e_deezer_1_repique_open_date IS NULL THEN FALSE ELSE TRUE
+  END AS abriu_email,
+  CASE
+    WHEN conv.campanha_e_deezer_1_click_date IS NULL AND conv.campanha_e_deezer_1_repique_click_date IS NULL THEN FALSE ELSE TRUE
+  END AS clicou_email
+FROM
+  ${ref("raw", "20210419 - Assinantes Deezer")} assi
+  LEFT JOIN ${ref("raw", "base_deezer_202104")} base_deezer_202104
+  USING(globoid)
+  LEFT JOIN ${ref("comunicacao", "ultima_comunicacao_assinante")} ult
+  ON(assi.globoid = ult.globo_id)
+  LEFT JOIN ${ref("bbb_21", "raiox_bbb21_propensao_churn")} bbb21 
+  ON(bbb21.globo_id = assi.globoid)
+  LEFT JOIN ${ref("conversao_deezer", "abertura_de_email_1_da_deezer_historico")} conv
+  ON(assi.globoid = conv.globo_id)
+  LEFT JOIN ${ref("raw", "20210516 - Disparo Deezer Whatsapp")} whats
+  USING(globoid)
+  LEFT JOIN ${ref("raw", "20210415 - Base disparo deezer SMS")} sms
+  USING(globoid)
+

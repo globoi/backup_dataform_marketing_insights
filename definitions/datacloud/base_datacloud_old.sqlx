@@ -1,0 +1,102 @@
+config {
+    type: "table",
+    name: "base_datacloud_old",
+    schema: 'datacloud'
+}
+
+WITH
+  datacloud AS (
+  SELECT
+    * EXCEPT( nome_do_produto,
+      id_asset,
+      g1,
+      gshow,
+      ge,
+      home,
+      receitas),
+    IFNULL(g1,FALSE) AS acessou_g1_30d,
+    IFNULL(gshow,FALSE) AS acessou_gshow_30d,
+    IFNULL(ge,FALSE) AS acessou_ge_30d,
+    IFNULL(home,FALSE) AS acessou_home_30d,
+    IFNULL(receitas,FALSE) AS acessou_receitas_30d
+  FROM
+    ${ref('datacloud', 'base_todos_os_globo_ids')}
+  LEFT JOIN (
+    SELECT
+      globo_id,
+      i.id_asset AS asset_id
+    FROM
+      ${ref('usuarios', 'base_ativa_pagante_com_trial_new')} AS b,
+      UNNEST(b.info) AS i )
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS g1
+    FROM
+      ${ref('foundation_g1', 'foundation_g1_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS gshow
+    FROM
+      ${ref('foundation_gshow', 'foundation_gshow_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS ge
+    FROM
+      ${ref('foundation_ge', 'foundation_ge_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS home
+    FROM
+      ${ref('foundation_home', 'foundation_home_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id)
+  LEFT JOIN (
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS receitas
+    FROM
+      ${ref('foundation_receitas', 'foundation_receitas_sessions')}
+    WHERE
+      DATA >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 30 DAY)
+      AND sessionId IS NOT NULL)
+  USING
+    (globo_id))
+SELECT
+  DISTINCT * EXCEPT(time_coracao),
+  IFNULL(time_coracao,'Sem time cadastrado') AS time_coracao
+FROM
+  datacloud
+LEFT JOIN (
+  SELECT
+    DISTINCT globoid AS globo_id,
+    time_aferido AS time_coracao
+  FROM
+    ${ref("Cartola", "TimeCoracao_Cart18_20_GE")}
+  ORDER BY
+    2 ASC )
+USING
+  (globo_id)

@@ -1,0 +1,26 @@
+config {
+  type: "incremental",  
+  schema: "usuarios",
+  name: "base_1_jornada_dependentes_incremental",
+  tags: ["GP_E_BoasVindasDependentes",
+        "schedule_tag=usuarios_base_1_jornada_dependentes_incremental"        
+  ],
+  bigquery: {
+    partitionBy: "dt_proc"
+  },
+  uniqueKey: ["globo_id", "dt_proc"]
+}
+
+SELECT
+  dt_proc,
+  globo_id,
+  data_criacao_dependente,
+  possui_disney,
+  possui_telecine,
+  possui_premiere,
+  possui_combate,
+  possui_mais_canais,
+  consumiu_7_dias,
+  diversificou,
+FROM ${ref('jornadas_mkt','mktflow_segment_base_1_jornada_dependentes')}
+

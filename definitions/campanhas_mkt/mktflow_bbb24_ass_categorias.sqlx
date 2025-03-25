@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  schema: 'campanhas_mkt',
+  tags: [
+    "schedule_tag=campanhas_mkt_mktflow_bbb24_ass_categorias"
+  ],
+  bigquery: {
+    labels: {
+      schedule: "diario",
+      tags: "bbb_24",
+      owner: "martech"
+
+    }
+  }
+}
+with assinantesbbb as (
+select distinct globo_id,
+sum (qtd_midias_episode) as qtd_ep
+from ${ref("bbb_24", "raiox_bbb_24_assinantes")} 
+group by 1
+ORDER BY 2 asc)
+SELECT
+  DISTINCT globo_id,
+  CASE
+    WHEN qtd_ep BETWEEN 1 AND 3 THEN 'light user'
+    WHEN qtd_ep BETWEEN 4 AND 7 THEN 'mid user'
+    WHEN qtd_ep >= 8 THEN 'heavy user'
+    ELSE 'outro'
+  END AS categoria,
+FROM
+  assinantesbbb
+

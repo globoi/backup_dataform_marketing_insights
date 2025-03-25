@@ -1,0 +1,28 @@
+config {
+  type: "table",
+  name: "mktflow_lista_conteudos_quiz",
+  schema: "retrospectiva_2024",
+  bigquery: {
+    labels: {
+      schedule: "",
+      tags: "",
+      owner: "martech" ,
+      horario: "",
+      urban: "",
+      mktcloud: "true"
+    }
+  },
+  description: 'Tabela com a lista de conteúdos para serem misturados no quiz da retro',
+  columns: {
+    id:'codigo de identificação do conteudo', 
+    title:'nome do conteudo', 
+    url_poster:'url do poster do conteudo'
+  },
+}
+
+select distinct 
+    id, 
+    title, 
+    media_kit_resource__poster as url_poster
+from ${ref('conteudo_enriched', 'program')}
+where id in (11104, 23674, 12106, 25161, 3854, 26874, 25158, 9962, 19603, 20481, 19137, 12121, 26848, 27883, 26433, 9491, 26374, 26281, 27104, 12807, 10777, 20496, 12082, 26374, 27425) 

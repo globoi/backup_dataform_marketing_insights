@@ -1,0 +1,58 @@
+config {
+  type: 'table',
+  name: 'metaCompleta',
+  tags: ['bbb_22'],
+  schema: 'bbb_22',
+}
+
+WITH base AS (
+  SELECT * EXCEPT(Cluster_BBB_Acumulado),
+  CASE
+    WHEN Cluster_BBB_Acumulado = 'sem_bbb' THEN 'Sem BBB'
+    WHEN Cluster_BBB_Acumulado IN ('Fora_Cluster',
+                                  '0.NoLive',
+                                  '1.LightUser',
+                                  '2.Mid-LightUser',
+                                  '3.Mid-HeavyUser',
+                                  'sem_bbb',
+                                  '4.HeavyUser')
+                                  THEN Cluster_BBB_Acumulado
+    END AS Cluster_BBB_Acumulado
+  FROM  ${ref("bbb_22","conta_acompanhamento")}
+),
+meta AS (
+  SELECT * EXCEPT(Cluster_BBB_Acumulado,
+                  assinou_2022,
+                  Cluster_Share_BBB_Total),
+  CASE
+    WHEN Cluster_Share_BBB_Total IS NULL THEN 'Sem BBB'
+    ELSE Cluster_BBB_Acumulado
+  END AS Cluster_BBB_Acumulado,
+  CASE
+    WHEN Cluster_Share_BBB_Total IS NULL THEN False
+    ELSE assinou_2022
+  END AS assinou_2022,
+  CASE 
+    WHEN Cluster_BBB_Acumulado = 'Sem BBB' THEN 'Sem BBB'
+    ELSE Cluster_Share_BBB_Total
+  END AS Cluster_Share_BBB_Total,
+  FROM ${ref("bbb_22","Meta_cancelamento_vol_bbb22")} 
+),
+base_join_meta AS (
+  SELECT * EXCEPT(efetivo,agendado,desistencia_real,desistencia_total),
+  COALESCE(efetivo, 0) AS efetivo,
+  COALESCE(agendado, 0) AS agendado,
+  COALESCE(desistencia_real, 0) AS desistencia_real,
+  COALESCE(desistencia_total, 0) AS desistencia_total
+  FROM base 
+  LEFT JOIN ${ref("bbb_22","base_desistencia")} 
+  USING(assinou_2022,Cluster_Share_BBB_Total,Cluster_BBB_Acumulado)
+  LEFT JOIN meta
+  USING(assinou_2022,Cluster_Share_BBB_Total,Cluster_BBB_Acumulado)
+)
+
+SELECT *,
+       ROUND(efetivo/Meta_2022,3) AS meta_efetivo,
+       ROUND((efetivo + agendado)/Meta_2022 ,3) AS meta_efetivo_agendado
+FROM base_join_meta
+

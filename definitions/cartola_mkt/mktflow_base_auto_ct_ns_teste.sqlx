@@ -1,0 +1,27 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_auto_ct_ns_teste', 'schedule_cron=0 12 */15 * *'],
+    name: 'mktflow_base_auto_ct_ns_teste',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT
+  DISTINCT globo_id
+FROM
+  -- `gglobo-cartola-hdg-prd.dfs.cartola_classico_users`
+  ${ref("dfs", "cartola_classico_users")}
+WHERE
+  temporada = 2022
+  AND pro_em IS NULL
+  AND ( DATE(criacao_dt) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+    OR DATE(recriacao_dt) = DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) )

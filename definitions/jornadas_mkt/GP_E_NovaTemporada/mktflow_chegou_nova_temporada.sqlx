@@ -1,0 +1,281 @@
+config {
+  type: 'table',
+  name: 'mktflow_chegou_nova_temporada',
+  schema: 'jornadas_mkt',
+  tags: ['GP_E_NovaTemporada','schedule_tag=jornadas_mkt_mktflow_chegou_nova_temporada'],
+  description: ''
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH novos_programas_1 AS (SELECT 
+  * EXCEPT(program_title, program_id, season),
+  CASE
+    WHEN program_id = 10122 THEN title
+    ELSE program_title
+  END AS program_title,
+  CASE
+    WHEN program_id = 10122 THEN id
+    ELSE program_id
+  END AS program_id,
+  CASE
+    WHEN season IS NULL THEN 1
+    ELSE season
+  END AS season,
+FROM 
+  ${ref("conteudo_enriched", "content")} 
+WHERE
+  LOWER(program_url_for_consumption) LIKE '%globoplay%'
+  AND LOWER(program_subset) IN ('series', 'novelas', 'varieties', 'kids', 'humor', 'movies', 'musica', 'disclosure')
+  AND published_at IS NOT NULL
+  AND LOWER(status) = 'published'
+
+QUALIFY
+  row_number () OVER (
+    PARTITION BY program_id, season
+    ORDER BY published_at ASC
+  ) = 1
+),
+novos_programas_2 AS (
+  SELECT
+    program_id,
+    program_title,
+    DATE(published_at) AS published_at,
+    status,
+    url_for_consumption,
+    program_description AS sinopse_programa,
+    program_subset,
+    season,
+    episode,
+    id,
+    1 AS rank,
+    awards,
+    guest_ids,
+    layered_poster_path,
+    playlist,
+    poster,
+    CASE
+      WHEN season > 1 THEN 'Nova temporada' 
+      ELSE 'Lancamento'
+    END AS nova_temporada,
+    DATE_DIFF(CURRENT_DATE(), DATE(published_at), DAY) AS dias_lancamento
+  FROM novos_programas_1
+  WHERE
+    published_at >= '2018-01-01 12:00:00'
+  ),
+
+novos_programas_3 AS (
+  SELECT
+    np.program_id,
+    np.program_title,
+    COALESCE(np.url_for_consumption, pr.url_for_consumption) AS url_for_consumption,
+    np.program_subset as subset,
+    pr.media_kit_resource__background_tv,
+    np.sinopse_programa,
+    pr.media_kit_resource__poster AS media_kit_resource_poster,
+    pr.media_kit_resource__on_air_mobile,
+    CURRENT_DATE() as dt_proc
+  FROM 
+    novos_programas_2 AS np
+  INNER JOIN 
+     ${ref("conteudo_enriched", "program")} AS pr 
+    ON pr.id = np.program_id
+  WHERE
+    dias_lancamento <= 60
+    AND nova_temporada = 'Lancamento' 
+
+  ORDER BY program_id
+),
+novos_programas_4 AS (
+  SELECT
+    program_id,
+    program_title,
+    TRUE AS pn
+  FROM
+    novos_programas_3
+),
+
+
+novo_alerta_series_0 AS (
+  SELECT
+    *
+  FROM    
+    ${ref("conteudo_enriched", "content")} 
+  WHERE
+    LOWER(program_url_for_consumption) LIKE '%globoplay%'
+    AND LOWER(status) <> 'unpublished'
+    AND service_id <> 6807
+    AND LOWER(program_subset) LIKE '%serie%'
+    AND season IS NOT NULL
+    AND published_at IS NOT NULL
+    AND scheduled_publication_in IS NOT NULL
+),
+
+novo_alerta_series_1 AS (
+  SELECT
+    *,
+    row_number () OVER (
+      PARTITION BY program_id, season
+      ORDER BY published_at ASC
+    ) AS rank,
+    row_number () OVER (
+      PARTITION BY program_id, season
+      ORDER BY scheduled_publication_in ASC
+    ) AS rank_2
+  FROM 
+    novo_alerta_series_0
+ 
+  QUALIFY
+    rank = 1 AND rank_2 = 1
+),
+novo_alerta_series_2 AS (
+  SELECT
+    program_id,
+    program_title,
+    DATE(published_at) AS published_at,
+    status,
+    scheduled_publication_in,
+    season,
+    episode,
+    na.id,
+    rank,
+    awards,
+    guest_ids,
+    layered_poster_path,
+    playlist,
+    poster
+    rank_2,
+    program_title_id,
+    genre_names,
+    CASE
+      WHEN season > 1 THEN 'Nova temporada' 
+      ELSE '1ª temporada'
+    END AS nova_temporada,
+    pr.media_kit_resource__on_air_mobile,
+    pr.description,
+    pr.url_for_consumption,
+    DATE_DIFF(CURRENT_DATE(), DATE(published_at), DAY) AS data_ontem,
+    DATE_DIFF(CURRENT_DATE(), DATE(scheduled_publication_in), DAY) AS data_ontem_2,
+  FROM
+    novo_alerta_series_1 AS na
+  INNER JOIN 
+    ${ref("conteudo_enriched", "program")} AS pr 
+    ON pr.id = na.program_id
+  WHERE
+    published_at >= '2018-01-01 12:00:00'
+    AND scheduled_publication_in >= '2018-01-01 12:00:00'
+),
+novo_alerta_series_3 AS (
+  SELECT 
+    *
+  FROM 
+    novo_alerta_series_2
+  WHERE
+    nova_temporada = "Nova temporada"
+    AND data_ontem_2 BETWEEN 0 AND 4  
+    AND data_ontem BETWEEN 0 AND 4
+),
+novo_alerta_series_4 AS(
+  SELECT 
+    program_id,
+    ARRAY_AGG(DISTINCT season) AS seasons,
+    ARRAY_LENGTH(ARRAY_AGG(DISTINCT season)) AS quantidade,
+    IF(ARRAY_LENGTH(ARRAY_AGG(DISTINCT season)) = 1, CAST(NULL AS INTEGER), MAX(season)) AS max,
+    IF(ARRAY_LENGTH(ARRAY_AGG(DISTINCT season)) = 1, CAST(NULL AS INTEGER), MIN(season)) AS min
+  FROM
+    novo_alerta_series_0
+  GROUP BY
+    program_id
+),
+novo_alerta_series_5 AS(
+  SELECT
+    * EXCEPT(seasons),
+    TO_JSON_STRING(seasons) AS seasons
+  FROM
+    novo_alerta_series_3
+  INNER JOIN novo_alerta_series_4 USING(program_id)
+),
+
+chegou_n_temp_1 AS (
+SELECT
+  globo_id,
+  program_id,
+  season,
+  terminou_temporada,
+  max(season) OVER (
+    PARTITION BY globo_id,program_id
+  ) AS maior_temp
+FROM
+  ${ref("consumo", "series_history")} 
+),
+chegou_n_temp_2 AS (
+  SELECT
+    globo_id, program_id, maior_temp,
+    MAX(season) AS max_of_season
+  FROM
+    chegou_n_temp_1
+  WHERE
+    terminou_temporada
+  GROUP BY
+    globo_id, program_id, maior_temp
+),
+chegou_n_temp_3 AS (
+  SELECT
+    ct.globo_id,
+    ct.program_id,
+    ct.maior_temp,
+    ct.max_of_season,
+    na.program_title,
+    na.season,
+    na.seasons,
+    na.media_kit_resource__on_air_mobile,
+    na.description,
+    na.url_for_consumption,
+    na.quantidade,
+    na.min,
+    na.max,
+    na.season - ct.max_of_season AS manter
+  FROM
+    chegou_n_temp_2 AS ct
+  INNER JOIN novo_alerta_series_5 AS na USING(program_id)
+  WHERE
+    na.season - ct.max_of_season >= 1
+    AND na.season > ct.maior_temp
+),
+chegou_n_temp_4 AS (
+  SELECT
+    globo_id,
+    ct.program_title AS title,
+    seasons AS novas_temporadas,
+    media_kit_resource__on_air_mobile,
+    description,
+    url_for_consumption,
+    quantidade,
+    min,
+    max,
+    np.pn
+  FROM
+    chegou_n_temp_3 AS ct
+  LEFT JOIN
+    novos_programas_4 AS np USING(program_id)
+  WHERE
+    pn IS NULL
+)
+
+
+SELECT
+  CURRENT_DATE() as dt_proc,
+  globo_id,
+  title,
+  novas_temporadas,
+  media_kit_resource__on_air_mobile,
+  description,
+  url_for_consumption,
+  quantidade,
+  min,
+  max
+FROM
+  chegou_n_temp_4

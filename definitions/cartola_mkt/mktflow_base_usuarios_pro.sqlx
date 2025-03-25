@@ -1,0 +1,24 @@
+config {
+    type: 'table',
+    tags: ['schedule_tag=cartola_mkt_mktflow_base_usuarios_pro', 'schedule_cron=0 10 * * *'],
+    name: 'mktflow_base_usuarios_pro',
+    schema: 'cartola_mkt',
+    description: '',
+    columns: {},
+
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "cartola_mkt"
+        }
+    }
+}
+
+SELECT distinct
+  globo_id
+FROM
+  ${ref("report_staging", "report_temporada")} --`gglobo-cartola-hdg-prd.report_staging.report_temporada`
+WHERE
+  temporada >= 2025
+and pro_em is not null

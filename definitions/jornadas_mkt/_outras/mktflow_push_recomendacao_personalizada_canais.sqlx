@@ -1,0 +1,153 @@
+config {
+  type: "table",
+  name: "mktflow_push_recomendacao_personalizada_canais",
+  schema: "jornadas_mkt",
+  tags: []
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH genero_todas_combinacoes AS (
+  SELECT * 
+  FROM ${ref("jornadas_mkt", "genero_todas_combinacoes")}
+),
+
+assinante_t2 AS (
+  SELECT 
+    globo_id, 
+    Produto_Contratado
+  FROM
+    ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  WHERE assinatura_gplay = 'nacional' 
+  AND mais_canais
+    
+),
+impression_data AS (
+  SELECT * EXCEPT(userid, globo_id),
+  userid AS globo_id,
+    CASE 
+      WHEN DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) <= date THEN 5
+      WHEN DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) <= date THEN 2
+      ELSE 1
+    END AS peso
+  FROM ${ref("consumo_enriched", "impression")}
+  WHERE DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY) <= date
+),
+e1_genero_por_usuario AS (
+  SELECT DISTINCT globo_id, genero, SUM(hours_watched) AS horas
+  FROM impression_data
+  INNER JOIN assinante_t2
+  USING(globo_id)
+  INNER JOIN genero_todas_combinacoes
+  USING(program_id)
+  WHERE program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+  AND NOT is_live
+  AND program_subset NOT IN ('disclosure', 'live', 'lutas')
+  AND hours_watched >= 0.25
+  AND genero IS NOT NULL
+  AND genero != 'Erótico'
+  GROUP BY globo_id, genero
+  HAVING horas >= 0.1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY horas DESC) = 1),
+
+  content_canais AS (
+    SELECT DISTINCT program_id,
+    FROM ${ref("conteudo_enriched", "content")}
+    WHERE service_id = 6807
+    AND status = 'published'
+    AND NOT adult
+    AND program_subset != 'movies'
+    AND kind != 'live'
+    AND program_id IN (12936,16203,14399,11104,12807,17352,14357,10690,11529,11190,12490,13877,17339,12934,11186,16854)    
+  ),
+  e2_rank_conteudos_por_genero_step1 AS (
+    SELECT program_id,
+            genero,
+            COUNT(DISTINCT userid) as cont_distintos,
+    FROM ${ref("consumo_enriched", "impression")}
+    INNER JOIN genero_todas_combinacoes
+    USING(program_id)
+    INNER JOIN content_canais
+    USING(program_id)
+    WHERE DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY) <= date
+    AND program_id NOT IN (12082, 16280, 16281, 14907, 16284)
+    AND genero IS NOT NULL
+    AND genero != 'Erótico'
+    GROUP BY program_id, genero
+  ),
+  e2_rank_conteudos_por_genero AS (
+    SELECT * EXCEPT(cont_distintos),
+         ROW_NUMBER() OVER (PARTITION BY genero ORDER BY cont_distintos DESC) AS E2_rank_conteudo
+    FROM e2_rank_conteudos_por_genero_step1
+  ),
+  e3_conteudos_consumidos AS (
+    SELECT DISTINCT globo_id, program_id
+    FROM ${ref("consumo_enriched", "impression")}
+    INNER JOIN assinante_t2 
+    USING(globo_id)
+    INNER JOIN content_canais
+    USING(program_id)
+    WHERE hours_watched >= 0.25
+  ),
+  remover_globo_ids AS (
+    SELECT DISTINCT userid as globo_id
+    FROM ${ref("consumo_enriched", "impression")} imp
+    INNER JOIN content_canais
+    USING(program_id)
+    INNER JOIN assinante_t2
+    ON(imp.userid = assinante_t2.globo_id)
+    WHERE DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY) <= date
+
+  ), 
+  program_content AS (
+    SELECT DISTINCT program_id,
+                    title_url_for_consumption,
+                    program_title,
+                    program_title_id
+    FROM ${ref("conteudo_enriched", "content")}
+    WHERE status = 'published'
+    AND title_url_for_consumption IS NOT NULL
+    AND program_title IS NOT NULL 
+  ),
+  content_info AS (
+    SELECT DISTINCT program_id,
+                    program_content.program_title_id AS title_id,
+                    program_content.program_title,
+                    title_url_for_consumption
+    FROM content_canais
+    INNER JOIN program_content
+    USING(program_id)
+    LEFT JOIN  ${ref("raw", "Blocklist_de_Conteudos")} AS block
+    USING(program_id)
+    WHERE block.program_id IS NULL
+  ) 
+
+SELECT * ,
+        ROW_NUMBER() OVER (PARTITION BY globo_id ORDER BY E2_rank_conteudo ASC) AS rank_final,
+        1 as E1_rank_genero
+FROM e1_genero_por_usuario
+LEFT JOIN e2_rank_conteudos_por_genero
+USING(genero)
+LEFT JOIN remover_globo_ids
+USING(globo_id)
+LEFT JOIN e3_conteudos_consumidos
+USING(globo_id,program_id)
+INNER JOIN content_info
+USING(program_id)
+WHERE remover_globo_ids.globo_id IS NULL 
+AND e3_conteudos_consumidos.globo_id IS NULL
+AND e3_conteudos_consumidos.program_id IS NULL
+AND genero IS NOT NULL
+AND genero != 'Erótico'
+QUALIFY rank_final = 1
+
+
+
+
+
+
+
+

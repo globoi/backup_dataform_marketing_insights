@@ -1,0 +1,40 @@
+config {
+  type: "table",
+  name: "mktflow_logados_free_v2",
+  schema: "jornadas_mkt",
+  tags: ["mktflow_logados_free_v2", 'schedule_tag=jornadas_mkt_mktflow_logados_free_v2']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH first_play AS (
+  SELECT
+  f.globo_id,
+  imp.program_id,
+  TRUE AS ativo
+  FROM ${ref("usuarios", "Free users")} f
+  LEFT JOIN 
+  (SELECT userid, program_id, timestamp
+  FROM ${ref("consumo_enriched", "all_impression")}
+  UNION ALL
+  SELECT userid, program_id, timestamp
+  FROM ${ref("consumo_enriched", "partial_content_impression")}) imp
+  ON f.globo_id = imp.userid AND program_id != 8426
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY userid ORDER BY timestamp) = 1
+)
+
+SELECT
+  CURRENT_DATE() AS dt_proc,
+  globo_id,
+  CASE
+    WHEN GP_internacional_ind = 'globo-play-us' THEN 'US'
+    WHEN GP_internacional_ind = 'globo-play-pt' THEN 'PT'
+    WHEN GP_internacional_ind = 'globo-play-eu' THEN 'EU'
+    ELSE 'Nacional'
+  END AS GP_internacional_ind,
+  IF(ativo IS NULL, False, ativo) AS ativo
+FROM ${ref("usuarios", "free_users_all")}
+LEFT JOIN first_play USING (globo_id)

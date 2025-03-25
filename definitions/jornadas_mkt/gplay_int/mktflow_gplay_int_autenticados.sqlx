@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  name: 'mktflow_gplay_int_autenticados',
+  schema: 'jornadas_mkt',
+  tags: ["gplay_int", 
+         'schedule_tag=jornadas_mkt_mktflow_gplay_int_autenticados',
+         "schedule_cron=0 12 * * *"
+         ]
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT
+distinct
+date(cast(concat(substr(_table_suffix,1,4),'-',substr(_table_suffix,5,2),'-',substr(_table_suffix,7,2)) as timestamp)) as dia,
+globo_id as userid
+FROM ${ref("globoid_public", "account_*")} as a
+WHERE (a.idp_id LIKE '%sling%' or a.idp_id LIKE '%dish%')
+and a._TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY))

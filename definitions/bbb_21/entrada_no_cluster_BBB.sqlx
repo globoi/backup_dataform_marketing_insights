@@ -1,0 +1,18 @@
+config {
+  type: 'table',
+  tags: ['bbb_21'],
+  name: 'entrada_no_cluster_BBB',
+  schema: 'bbb_21',
+  description: '',
+  columns: {}
+}
+
+SELECT
+    globo_id,
+    MIN(semana) as min_of_semana
+FROM
+    ${ref("bbb_21", "RaioXBBB21_historico")}
+WHERE
+    semana < TIMESTAMP("2021-05-09 09:00:00", "America/Sao_Paulo")
+GROUP BY
+    globo_id

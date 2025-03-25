@@ -1,0 +1,20 @@
+config {
+  type: 'table',
+  name: 'lf_temp_series',
+  schema: 'jornadas_mkt',
+  tags: ['GP_A_AvisaQueTaBombando','schedule_tag=jornadas_mkt_lf_temp_series'],
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+    userid AS globo_id,
+    SUM(CAST(program_subset = 'series' AS INT64)) AS series_play,
+    COUNT(*) AS Plays
+FROM
+    ${ref("consumo_enriched","impression")} imp
+    INNER JOIN ${ref("usuarios", "Free users")} AS fu
+    ON fu.globo_id = imp.userid
+GROUP BY 1
+HAVING(series_play/Plays) >= 0.50

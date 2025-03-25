@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "pesquisas",
+  name: "Lista_de_coletores_pesquisa_assinantes_30_dias",
+  description: ""
+}

@@ -1,0 +1,245 @@
+config {
+    type: "table",
+    schema: "premiere_mkt",
+    name: "sms_message_tracking",
+    tags: ["premiere_mkt",
+        "schedule_tag=premiere_mkt_sms_message_tracking",
+        "schedule_cron=0 10 * * *",
+        "schedule_retry=3"
+    ],
+    bigquery: {
+
+        labels: {
+            tier: "clean",
+            source: "mktcloud",
+            schedule: "diario",
+            horario: "10h00min",
+            tags: "premiere_mkt",
+            dag: "premiere_mkt_sms_message_tracking"
+        }
+    },
+    description: 'Tabela que contém informações de rastreamento de mensagens enviadas por SMS do Marketing Cloud Mobile Connect. Essa visualização de dados permite a visualização do histórico de envio e recebimento de SMS.',
+    columns: {
+        message_tracking: "ID único para rastreamento de informações relacionadas à mensagem enviada",
+        eid: "Número de identificação da empresa para o remetente",
+        mid: "ID do membro",
+        mobile_hash: "Número de celular do usuário hasheado",
+        message_id: "ID da mensagem móvel",
+        keyword_id: "Identificador único para a palavra-chave",
+        code_id: "Identificador único para o código SMS",
+        conversation_state_id: "Identificador único que correlaciona mensagens originadas por celular (MO) e mensagens terminadas por celular (MT) como uma única conversa",
+        campaign_id: "A campanha de SMS vinculada ao registro",
+        sent: "Se a mensagem foi enviada (1 = verdadeiro, 0 = falso)",
+        delivered: "Se a mensagem foi entregue (1 = verdadeiro, 0 = falso)",
+        undelivered: "Se a mensagem foi entregue com sucesso ou não (1 = verdadeiro, 0 = falso)",
+        outbound: "Se a mensagem foi de saída (1 = verdadeiro, 0 = falso)",
+        inbound: "Se a mensagem foi de entrada (1 = verdadeiro, 0 = falso)",
+        create_date_time: "A data e hora em que o registro de rastreamento foi criado",
+        modified_date_time: "A data e hora (no Horário Padrão Central) em que o registro de rastreamento foi modificado",
+        action_date_time: "A data e hora real em que um evento de entrega ou não entrega foi recebido pelo Marketing Cloud.",
+        message_text: "O texto da mensagem",
+        is_test: "Se a mensagem foi uma mensagem de teste",
+        mobile_message_recurrence_id: "O ID do cronograma de recorrência para a mensagem. Pode ser usado para solucionar problemas de envio.",
+        response_to_mobile_message_tracking_id: "O ID de rastreamento da resposta à mensagem",
+        is_valid: "Se a mensagem é válida",
+        invalidation_code: "Código de invalidação para a mensagem",
+        send_id: "O número de ID do envio para o envio de SMS",
+        send_split_id: "Se a mensagem foi dividida, o ID da divisão",
+        send_segment_id: "O ID do segmento vinculado à mensagem",
+        send_job_id: "O ID do trabalho para o envio de SMS",
+        send_group_id: "O ID do grupo para o envio de SMS",
+        send_person_id: "O ID da pessoa de envio para o envio de SMS",
+        subscriber_id: "O ID do usuário afetado. Este número representa o ID único para cada registro de usuário",
+        subscriber_key: "A chave do usuário afetado",
+        sms_standard_status_code_id: "Código de status de entrega SFMC",
+        description: "Descrição detalhada do código de status",
+        name: "O nome da sua mensagem",
+        short_code: "O código curto ou longo usado para enviar sua mensagem",
+        shared_keyword: "A palavra-chave usada em sua mensagem",
+        ordinal: "Representa as partes em uma mensagem multipartes. Representado em ordem ascendente a partir de 0.",
+        fromname: "Nome do remetente com o qual uma mensagem individual foi implantada. Comprimento máximo: 11 caracteres",
+        jb_activity_id: "Identificador único para a atividade da jornada da qual a mensagem foi implantada",
+        jb_definition_id: "Identificador único para a jornada de onde uma mensagem foi implantada",
+        sms_job_id: "Identificador exclusivo para cada job de SMS acionada no Mobile_Connect.",
+        sms_batch_id: "Identifica um lote associado a um envio de SMS.",
+        ano_envio: "Ano do envio do sms"
+    }
+}
+
+WITH
+  cte AS (
+  SELECT
+    DISTINCT _message_tracking_ AS message_tracking,
+    eid,
+    mid,
+    mobile_hash,
+    message_id,
+    keyword_id,
+    code_id,
+    conversation_id,
+    conversation_state_id,
+    campaign_id,
+    sent,
+    delivered,
+    undelivered,
+    outbound,
+    CASE
+      WHEN inbound='' THEN NULL
+      ELSE inbound
+  END
+    AS inbound,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",create_date_time) AS create_date_time,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",modified_date_time) AS modified_date_time,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",action_date_time) AS action_date_time,
+    message_text,
+    is_test,
+    CASE
+      WHEN mobile_message_recurrence_id ='' THEN NULL
+      ELSE mobile_message_recurrence_id
+  END
+    AS mobile_message_recurrence_id,
+    response_to_mobile_message_tracking_id,
+    is_valid,
+    invalidation_code,
+    send_id,
+    send_split_id,
+    send_segment_id,
+    send_job_id,
+    send_group_id,
+    send_person_id,
+    subscriber_id,
+    subscriber_key,
+    sms_standard_status_code_id,
+    description,
+    name,
+    short_code,
+    shared_keyword,
+    ordinal,
+    fromname,
+    jb_activity_id,
+    jb_definition_id,
+    sms_job_id,
+    sms_batch_id
+  FROM
+    ${ref('raw', 'PREMIERE_sms_message_tracking_historico_raw')}),
+  cte2 AS (
+  SELECT
+    * EXCEPT(mobile_message_recurrence_id),
+    CAST(mobile_message_recurrence_id AS integer) AS mobile_message_recurrence_id,
+    DATE(DATE_TRUNC(action_date_time, YEAR)) AS ano_envio
+  FROM
+    cte),
+  cte3 AS (
+  SELECT
+    message_tracking,
+    eid,
+    mid,
+    mobile_hash,
+    message_id,
+    keyword_id,
+    code_id,
+    conversation_id,
+    conversation_state_id,
+    campaign_id,
+    sent,
+    delivered,
+    undelivered,
+    outbound,
+    inbound,
+    create_date_time,
+    modified_date_time,
+    action_date_time,
+    message_text,
+    is_test,
+    mobile_message_recurrence_id,
+    response_to_mobile_message_tracking_id,
+    is_valid,
+    invalidation_code,
+    send_id,
+    send_split_id,
+    send_segment_id,
+    send_job_id,
+    send_group_id,
+    send_person_id,
+    subscriber_id,
+    subscriber_key,
+    sms_standard_status_code_id,
+    description,
+    name,
+    short_code,
+    shared_keyword,
+    ordinal,
+    fromname,
+    jb_activity_id,
+    jb_definition_id,
+    sms_job_id,
+    sms_batch_id,
+    ano_envio
+  FROM
+    cte2),
+  cte4 AS (
+  SELECT
+    DISTINCT _message_tracking_ AS message_tracking,
+    eid,
+    mid,
+    mobile_hash,
+    message_id,
+    keyword_id,
+    code_id,
+    conversation_id,
+    CAST(conversation_state_id AS string) AS conversation_state_id,
+    campaign_id,
+    sent,
+    delivered,
+    undelivered,
+    outbound,
+    CASE
+      WHEN inbound='' THEN NULL
+      ELSE inbound
+  END
+    AS inbound,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",create_date_time) AS create_date_time,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",modified_date_time) AS modified_date_time,
+    SAFE.PARSE_DATETIME("%Y-%m-%d %H:%M:%E*S",action_date_time) AS action_date_time,
+    message_text,
+    is_test,
+    mobile_message_recurrence_id,
+    response_to_mobile_message_tracking_id,
+    is_valid,
+    invalidation_code,
+    send_id,
+    send_split_id,
+    send_segment_id,
+    send_job_id,
+    send_group_id,
+    send_person_id,
+    subscriber_id,
+    subscriber_key,
+    sms_standard_status_code_id,
+    description,
+    name,
+    short_code,
+    shared_keyword,
+    ordinal,
+    fromname,
+    jb_activity_id,
+    jb_definition_id,
+    sms_job_id,
+    sms_batch_id
+  FROM
+    ${ref('raw', 'PREMIERE_sms_message_tracking_raw')}),
+  cte5 AS (
+  SELECT
+    *,
+    DATE(DATE_TRUNC(action_date_time, YEAR)) AS ano_envio
+  FROM
+    cte4)
+SELECT
+  *
+FROM
+  cte3
+UNION DISTINCT
+SELECT
+  *
+FROM
+  cte5

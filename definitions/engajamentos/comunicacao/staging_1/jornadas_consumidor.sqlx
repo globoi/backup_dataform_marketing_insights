@@ -1,0 +1,54 @@
+config {
+  type: "table",
+  name: "jornadas_consumidor",
+  schema: "comunicacao",
+  tags: ["comunicacao_staging_1",'schedule_tag=comunicacao_jornadas_consumidor'],
+}
+
+WITH base_1 AS (
+SELECT 
+  GLOBO_ID,
+  CAST(send_date AS DATE) as data_disparo,
+  was_delivered,
+  was_opened,
+  was_clicked,
+  was_unsubscribed,
+  email_send_id,
+  JourneyName,
+  ActivityOrEmailName,
+  journey_type,
+  COALESCE(JourneyName,ActivityOrEmailName) as nome_jornada,
+  COALESCE(journey_type, 'disparo_pontual') as tipo_jornada,
+  CASE
+    WHEN was_delivered THEN 1 ELSE 0 
+  END AS entregues,
+  CASE
+    WHEN was_opened THEN 1 ELSE 0 
+  END AS aberturas,
+  CASE
+    WHEN was_clicked THEN 1 ELSE 0 
+  END AS cliques,
+  CASE
+    WHEN was_unsubscribed THEN 1 ELSE 0 
+  END AS descadastros
+FROM 
+  ${ref("mkt_enriched", "email_send")} 
+WHERE send_date > '2019-06-01'
+
+),
+base AS (
+ SELECT
+        data_disparo,
+        nome_jornada,
+        tipo_jornada,
+        COUNT(DISTINCT email_send_id) AS envios,
+        COUNT(DISTINCT GLOBO_ID) AS usuarios_unicos,
+        SUM(entregues) AS entregues,
+        SUM(aberturas) AS aberturas,
+        SUM(cliques) AS cliques, 
+        SUM(descadastros) AS descadastros
+  FROM base_1
+GROUP BY data_disparo, nome_jornada, tipo_jornada
+)
+
+SELECT * FROM base

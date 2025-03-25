@@ -1,0 +1,31 @@
+config {
+    type: 'table',
+    name: 'historico_olimpiadas_2021',
+    schema: 'olimpiadas_2024',
+    description: 'Tabela com os usuários que assistiram as Olimpíadas de 2021.',
+    columns: {
+        globo_id: "Código que identifica o usuário.",
+        assistiu_olimp_2021: "Identifica se o usuário assistiu as Olimpíadas de 2021."
+
+    },
+}
+
+SELECT
+  DISTINCT sim.globoid.id_globoid AS globo_id,
+  TRUE AS assistiu_olimp_2021
+FROM
+  `gglobo-pp-globoplay-hdg-prd.pesquisa.vw_olimpiadas_video` AS sim
+WHERE
+  DATE_TRUNC(date,YEAR)='2021-01-01'
+  AND sim.globoid.id_globoid IS NOT NULL
+  AND LENGTH(sim.globoid.id_globoid) - LENGTH(REPLACE(sim.globoid.id_globoid,'-','')) = 4
+UNION DISTINCT
+SELECT
+  DISTINCT sim.globoid.id_globoid AS globo_id,
+  TRUE AS assistiu_olimp_2021
+FROM
+  `gglobo-pp-globoplay-hdg-prd.pesquisa.vw_simulcast_olimpiadas` AS sim
+WHERE
+  DATE_TRUNC(DATA,YEAR)='2021-01-01'
+  AND sim.globoid.id_globoid IS NOT NULL
+  AND LENGTH(sim.globoid.id_globoid) - LENGTH(REPLACE(sim.globoid.id_globoid,'-','')) = 4

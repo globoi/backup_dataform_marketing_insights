@@ -1,0 +1,26 @@
+config {
+  type: "table",  
+  schema: 'jornadas_mkt',
+  name: 'mktflow_base_midia_inatividade',
+  tags: ['base_midia_inatividade', 'schedule_tag=jornadas_mkt_mktflow_base_midia_inatividade'],
+  description: '',
+  columns: {
+
+  }
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+SELECT DISTINCT 
+  CURRENT_DATE() AS dt_proc,
+  globo_id,
+  id_asset
+FROM
+${ref("usuarios", "perfil_assinantes_ativo_reduzido")}
+WHERE 
+  DATE_DIFF(CURRENT_DATE(), DATE(data_ultimo_consumo), DAY) >= 30
+  AND inativo IS TRUE
+  AND (first_play IS NOT NULL OR first_play != "")

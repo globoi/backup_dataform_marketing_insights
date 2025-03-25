@@ -1,0 +1,71 @@
+config {
+  type: "table",
+  name: "Lista_trilho_rec_alt_top_series",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_Lista_trilho_rec_alt_top_series'],
+}
+
+WITH program_reduc AS (
+  SELECT
+    DISTINCT id AS program_id,
+    media_kit_resource__poster
+  FROM
+    ${ref("conteudo_enriched", "program")}
+  WHERE
+    media_kit_resource__poster IS NOT NULL
+),
+filtros_conteudos AS (
+  SELECT
+    *
+  FROM
+    ${ref("conteudo_enriched", "content")}
+  WHERE
+    program_description IS NOT NULL
+    AND title_url_for_consumption IS NOT NULL
+    AND status = 'published'
+),
+filtros_conteudos_join AS (
+  SELECT
+  DISTINCT
+    program_id,
+    program_title_id AS title_id,
+    program_title,
+    title_url_for_consumption,
+    CONCAT(title_url_for_consumption, '?actionType=addTitleToMyList') AS url_add_minha_lista,
+    media_kit_resource__poster,
+    program_description
+  FROM
+    filtros_conteudos
+    INNER JOIN program_reduc USING(program_id)
+),
+df_filtro_conteudos AS (
+  SELECT
+    *
+  FROM
+    ${ref("jornadas_mkt", "Pre_lista_trilho_rec_alt_series")}
+    INNER JOIN filtros_conteudos_join USING(program_id)
+),
+df_final AS (
+  SELECT
+    *
+  FROM
+    df_filtro_conteudos a
+    LEFT JOIN ${ref("jornadas_mkt", "E2_conteudos_consumidos_usuarios")} b 
+    USING(globo_id, program_id)
+  WHERE
+    b.globo_id IS NULL
+    AND b.program_id IS NULL
+),
+df_final_2 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY E1_rank_conteudos ASC)
+    AS rank_final
+  FROM
+    df_final
+  QUALIFY rank_final <= 5
+)
+SELECT
+  *
+FROM
+  df_final_2

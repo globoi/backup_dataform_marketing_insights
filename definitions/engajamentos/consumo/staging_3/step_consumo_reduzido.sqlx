@@ -1,0 +1,21 @@
+config {
+  type: 'table',
+  name: 'step_consumo_reduzido',
+  schema: 'consumo',
+  tags: ['consumo_staging_3',
+        "schedule_tag=consumo_step_consumo_reduzido"]
+
+}
+
+SELECT
+  p.globo_id,
+  p.assetid,
+  p.first_play,
+  p.first_play_subset,
+  p.data_first_play,
+  u.ultimo_consumo,
+  u.ultimo_consumo_subset,
+  u.data_ultimo_consumo
+FROM
+  ${ref("consumo", "perfil_assinante__primeiro_play")} p
+  LEFT JOIN ${ref("consumo", "ultimo_consumo")} u USING (globo_id, assetid)

@@ -1,0 +1,6 @@
+config {
+  type: "declaration",
+  schema: "bbb_23",
+  name: "GShow_Consumo_BBB_23_Historico",
+  description: ""
+}

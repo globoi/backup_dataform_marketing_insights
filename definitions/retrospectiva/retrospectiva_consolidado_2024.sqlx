@@ -1,0 +1,288 @@
+config {
+    type: 'table',
+    name: 'retrospectiva_consolidado_2024',
+    schema: 'retrospectiva',
+    description: 'retrospectiva consolidado em 2024',
+    columns: {}
+}
+
+-- CONSOLIDADO RETROSPECTIVA 2024 
+
+WITH consolidado AS ( 
+
+
+SELECT 
+  COALESCE(t1.globoid, t2.globoid, t3.globoid, t4.globoid, t5.globoid, t6.globoid) AS globoid, 
+  t1.* EXCEPT(globoid), 
+  t2.* EXCEPT(globoid), 
+  t3.* EXCEPT(globoid), 
+  t4.* EXCEPT(globoid), 
+  t5.* EXCEPT(globoid), 
+  t6.* EXCEPT(globoid) 
+FROM  
+ -- `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_ge_2024`  AS t1 
+     ${ref("retrospectiva", "retrospectiva_ge_2024")}  AS t1 
+FULL OUTER JOIN 
+--  `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_g1_2024` AS t2 
+     ${ref("retrospectiva", "retrospectiva_g1_2024")}  AS t2
+ON 
+  t1.globoid = t2.globoid 
+FULL OUTER JOIN 
+--  `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_gshow_2024` AS t3 
+     ${ref("retrospectiva", "retrospectiva_gshow_2024")}  AS t3
+ON 
+  COALESCE(t1.globoid, t2.globoid) = t3.globoid 
+FULL OUTER JOIN 
+--  `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_receitas_2024` AS t4 
+    ${ref("retrospectiva", "retrospectiva_receitas_2024")}  AS t4
+ON 
+  COALESCE(t1.globoid, t2.globoid, t3.globoid) = t4.globoid 
+FULL OUTER JOIN 
+--  `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_home_2024` AS t5
+    ${ref("retrospectiva", "retrospectiva_home_2024")}  AS t5
+ON 
+  COALESCE(t1.globoid, t2.globoid, t3.globoid, t4.globoid) = t5.globoid 
+FULL OUTER JOIN 
+--  `gglobo-mkt-ins-hdg-prd.Retrospectiva.retrospectiva_cartola_2024` AS t6
+    ${ref("retrospectiva", "retrospectiva_cartola_2024")}  AS t6
+ON 
+  COALESCE(t1.globoid, t2.globoid, t3.globoid, t4.globoid, t5.globoid) = t6.globoid 
+), 
+
+dados_tratados_semtotal as ( 
+SELECT 
+globoid 
+  , SHA1(globoid) AS globoid_hash
+  , IF(ge_consumo IS NULL,0,ge_consumo) AS ge_consumo 
+  , ge_editoria 
+  , ge_editorias 
+  , CASE  WHEN ge_editoria = "Outros" THEN "Home ge" 
+          WHEN ge_editoria = "Raiz Blogs" THEN "Blogs" 
+          WHEN ge_editoria LIKE "%Times |%" THEN REGEXP_REPLACE(ge_editoria, r'Times \| ', '') 
+    ELSE ge_editoria END AS ge_editoria_f 
+  , ge_dia_semana 
+  , ge_periodo 
+  , IF(g1_consumo IS NULL,0,g1_consumo) AS g1_consumo 
+  , g1_editoria 
+  , g1_editorias 
+  , CASE WHEN g1_editoria = "Outros" OR  
+        g1_editoria = "Home Principal g1" OR  
+        g1_editoria = "Outros - Busca" OR  
+        g1_editoria = "Outros - Tudo sobre" THEN "Home g1" 
+         WHEN g1_editoria LIKE "%Editorias - %" THEN REGEXP_REPLACE(g1_editoria, r'Editorias - ', '') 
+    ELSE g1_editoria END AS g1_editoria_f 
+  , g1_dia_semana 
+  , g1_periodo 
+  , IF(gshow_consumo IS NULL,0,gshow_consumo) AS gshow_consumo 
+  , gshow_editoria 
+  , gshow_editorias 
+  , CASE  WHEN gshow_editoria = "Outros" THEN "Home gshow"     
+          WHEN gshow_editoria = "Home GShow" THEN "Home gshow"         
+          WHEN gshow_editoria = "Home" THEN "Home gshow" 
+          WHEN gshow_editoria = "Personagens" THEN "Personagens das Novelas" 
+          WHEN gshow_editoria = "Resumo da Semana" THEN "Resumo da Semana de Novelas" 
+          WHEN gshow_editoria = "Vídeos dos Capítulos" THEN "Vídeos dos Capítulos das Novelas" 
+          WHEN gshow_editoria = "Producao GloboPlay | Todas as Flores" THEN "Todas as flores" 
+          WHEN gshow_editorias LIKE "Realities-BBB-%BBB" THEN gshow_editoria 
+          WHEN gshow_editorias LIKE "Realities-BBB-Outros" THEN "BBB" 
+          WHEN gshow_editorias LIKE "Realities-BBB%" THEN CONCAT(gshow_editoria," BBB") 
+          WHEN gshow_editorias LIKE "Realities-Estrela da Casa-Outros" THEN "Estrela da Casa" 
+          WHEN gshow_editorias LIKE "Realities-Estrela da Casa%" THEN CONCAT(gshow_editoria," Estrela da Casa") 
+          WHEN gshow_editorias LIKE "Realities-The Voice +-Outros" THEN "The Voice +" 
+          WHEN gshow_editorias LIKE "Realities-The Voice +%" THEN CONCAT(gshow_editoria," The Voice +") 
+          WHEN gshow_editorias LIKE "Realities-The Voice Brasil-Outros" THEN "The Voice Brasil" 
+          WHEN gshow_editorias LIKE "Realities-The Voice Brasil%" THEN CONCAT(gshow_editoria," The Voice Brasil") 
+  ELSE gshow_editoria END AS gshow_editoria_f 
+  , gshow_dia_semana
+  , gshow_periodo
+  , IF(receitas_consumo IS NULL,0,receitas_consumo) AS receitas_consumo 
+  , receitas_editoria 
+  , receitas_editorias 
+  , CASE  WHEN receitas_editoria = "Outros" THEN "Home receitas"             
+          WHEN receitas_editoria = "Home" THEN "Home receitas" 
+          WHEN receitas_editoria = "Ep" THEN "Home receitas" 
+          WHEN receitas_editoria LIKE "Programas Locais |%" THEN "Home receitas" 
+          WHEN receitas_editoria = "Globo Repórter" THEN "Home receitas" 
+          WHEN receitas_editoria = "Tudo Sobre" THEN "Home receitas" 
+          WHEN receitas_editoria = "Domingao do Faustao" THEN "Home receitas" 
+          WHEN receitas_editoria = "Novelas - Malhação" THEN "Home receitas" 
+          WHEN receitas_editoria = "The Voice Brasil" THEN "Home receitas" 
+          WHEN receitas_editoria = "Caldeirão do Hulk" THEN "Home receitas" 
+          WHEN receitas_editoria = "Novelas - Cheias de Charme" THEN "Home receitas" 
+  ELSE receitas_editoria END AS receitas_editoria_f 
+  , receitas_dia_semana 
+  , receitas_periodo 
+  , IF(home_consumo IS NULL,0,home_consumo) AS home_consumo 
+  , home_dia_semana 
+  , home_periodo 
+  , IF(cartola_rodada_escalada IS NULL,0,cartola_rodada_escalada) AS cartola_rodada_escalada 
+  , cartola_dia_semana 
+  , cartola_periodo 
+FROM consolidado 
+GROUP BY ALL 
+),
+
+dados_tratados AS (
+SELECT *
+, SUM(ge_consumo + g1_consumo + gshow_consumo + receitas_consumo + home_consumo + cartola_rodada_escalada) AS consumo_escalacoes_total
+FROM dados_tratados_semtotal
+GROUP BY ALL
+),
+
+consumos AS ( -- criação de array produtos pelas informações de editoria, consumo, dia da semana e periodo para criar ranking
+  SELECT
+    globoid
+    -- ge_consumo,
+    -- g1_consumo,
+    -- gshow_consumo,
+    -- receitas_consumo,
+    -- home_consumo,
+    -- Cria uma lista de valores das colunas
+    , SUM(ge_consumo + g1_consumo + gshow_consumo + receitas_consumo + home_consumo) AS consumo_total
+    , ARRAY<STRUCT<produto string,consumo int64,editoria string, dia_semana string, periodo string>>[
+      ('ge', ge_consumo, ge_editoria_f, ge_dia_semana, ge_periodo),
+      ('g1', g1_consumo, g1_editoria_f, g1_dia_semana, g1_periodo),
+      ('gshow', gshow_consumo, gshow_editoria_f, gshow_dia_semana, gshow_periodo),
+      ('receitas', receitas_consumo, receitas_editoria_f, receitas_dia_semana, receitas_periodo),
+      ('globo.com', home_consumo, null, home_dia_semana, home_periodo),
+      ('cartola', cartola_rodada_escalada, null, cartola_dia_semana, cartola_periodo )
+    ] AS colunas_consumo
+  FROM dados_tratados
+  GROUP BY all
+),
+
+ranking AS (
+SELECT globoid -- concatenando as editorias e produtos para o top5
+  , consumo_total
+  , dia_semana_mais_consumido
+  , periodo_mais_consumido
+  , primeiroProduto
+  , segundoProduto
+  , terceiroProduto
+  , CASE WHEN primeiroProduto = "ge" THEN CONCAT(primeiraEditoria," no ", primeiroProduto)
+         WHEN primeiroProduto = "g1" THEN CONCAT(primeiraEditoria," no ", primeiroProduto)
+         WHEN primeiroProduto = "gshow" THEN CONCAT(primeiraEditoria," no ", primeiroProduto)
+         WHEN primeiroProduto = "receitas" THEN CONCAT(primeiraEditoria," no ", primeiroProduto)
+         WHEN primeiroProduto = "globo.com" THEN "Matérias na globo.com"
+         WHEN primeiroProduto = "cartola" THEN "Escalações no Cartola"
+    END AS Top1
+  , CASE WHEN segundoProduto = "ge" THEN CONCAT(segundaEditoria," no ", segundoProduto)
+         WHEN segundoProduto = "g1" THEN CONCAT(segundaEditoria," no ", segundoProduto)
+         WHEN segundoProduto = "gshow" THEN CONCAT(segundaEditoria," no ", segundoProduto)
+         WHEN segundoProduto = "receitas" THEN CONCAT(segundaEditoria," no ", segundoProduto)
+         WHEN segundoProduto = "globo.com" THEN "Matérias na globo.com"
+         WHEN segundoProduto = "cartola" THEN "Escalações no Cartola"
+    END AS Top2
+  , CASE WHEN terceiroProduto = "ge" THEN CONCAT(terceiraEditoria," no ", terceiroProduto)
+         WHEN terceiroProduto = "g1" THEN CONCAT(terceiraEditoria," no ", terceiroProduto)
+         WHEN terceiroProduto = "gshow" THEN CONCAT(terceiraEditoria," no ", terceiroProduto)
+         WHEN terceiroProduto = "receitas" THEN CONCAT(terceiraEditoria," no ", terceiroProduto)
+         WHEN terceiroProduto = "globo.com" THEN "Matérias na globo.com"
+         WHEN terceiroProduto = "cartola" THEN "Escalações no Cartola"
+    END AS Top3
+  , CASE WHEN quartoProduto = "ge" THEN CONCAT(quartaEditoria," no ", quartoProduto)
+         WHEN quartoProduto = "g1" THEN CONCAT(quartaEditoria," no ", quartoProduto)
+         WHEN quartoProduto = "gshow" THEN CONCAT(quartaEditoria," no ", quartoProduto)
+         WHEN quartoProduto = "receitas" THEN CONCAT(quartaEditoria," no ", quartoProduto)
+         WHEN quartoProduto = "globo.com" THEN "Matérias na globo.com"
+         WHEN quartoProduto = "cartola" THEN "Escalações no Cartola"
+    END AS Top4
+  , CASE WHEN quintoProduto = "ge" THEN CONCAT(quintaEditoria," no ", quintoProduto)
+         WHEN quintoProduto = "g1" THEN CONCAT(quintaEditoria," no ", quintoProduto)
+         WHEN quintoProduto = "gshow" THEN CONCAT(quintaEditoria," no ", quintoProduto)
+         WHEN quintoProduto = "Receitas.com" THEN CONCAT(quintaEditoria," no ", quintoProduto)
+         WHEN quintoProduto = "globo.com" THEN "Matérias na globo.com"
+         WHEN quintoProduto = "cartola" THEN "Escalações no Cartola"
+    END AS Top5
+FROM(
+SELECT globoid -- consolida em uma linha as informações por globoid
+  ,  MAX(consumo_total) AS consumo_total
+  ,  MAX(dia_semana_mais_consumido) AS dia_semana_mais_consumido
+  ,  MAX(periodo_mais_consumido) AS periodo_mais_consumido
+  ,  MAX(primeiroProduto) AS primeiroProduto
+  ,  MAX(primeiraEditoria) AS primeiraEditoria
+  ,  MAX(segundoProduto) AS segundoProduto
+  ,  MAX(segundaEditoria) AS segundaEditoria
+  ,  MAX(terceiroProduto) AS terceiroProduto
+  ,  MAX(terceiraEditoria) AS terceiraEditoria
+  ,  MAX(quartoProduto) AS quartoProduto
+  ,  MAX(quartaEditoria) AS quartaEditoria
+  ,  MAX(quintoProduto) AS quintoProduto
+  ,  MAX(quintaEditoria) AS quintaEditoria
+FROM(
+SELECT globoid -- ordem dos produtos e editorias mais consumidas
+--  , produto
+--  , consumo
+--  , editoria
+--  , dia_semana
+--  , periodo
+--  , rn
+  , consumo_total
+  , CASE WHEN rn = 1 AND consumo != 0 THEN dia_semana ELSE null END AS dia_semana_mais_consumido
+  , CASE WHEN rn = 1 AND consumo != 0 THEN periodo ELSE null END AS periodo_mais_consumido
+  , CASE WHEN rn = 1 AND consumo != 0 THEN produto ELSE null END AS primeiroProduto
+  , CASE WHEN rn = 1 AND consumo != 0 THEN editoria ELSE null END AS primeiraEditoria
+  , CASE WHEN rn = 2 AND consumo != 0 THEN produto ELSE null END AS segundoProduto
+  , CASE WHEN rn = 2 AND consumo != 0 THEN editoria ELSE null END AS segundaEditoria
+  , CASE WHEN rn = 3 AND consumo != 0 THEN produto ELSE null END AS terceiroProduto
+  , CASE WHEN rn = 3 AND consumo != 0 THEN editoria ELSE null END AS terceiraEditoria
+  , CASE WHEN rn = 4 AND consumo != 0 THEN produto ELSE null END AS quartoProduto
+  , CASE WHEN rn = 4 AND consumo != 0 THEN editoria ELSE null END AS quartaEditoria
+  , CASE WHEN rn = 5 AND consumo != 0 THEN produto ELSE null END AS quintoProduto
+  , CASE WHEN rn = 5 AND consumo != 0 THEN editoria ELSE null END AS quintaEditoria
+FROM (
+  SELECT globoid -- cria o ranking de consumo por produtos 
+    , produto
+    , editoria
+    , dia_semana
+    , periodo
+    , consumo
+    , consumo_total
+    , ROW_NUMBER() OVER (PARTITION BY globoid ORDER BY consumo DESC) AS rn  -- Atribui um número de linha baseado na ordem
+  FROM consumos, UNNEST(colunas_consumo) AS h
+)
+ORDER BY globoid, rn ASC)
+GROUP BY globoid))
+
+
+SELECT a.* -- juntar dados separados por produtos e dados raqueados consolidados dos produtos, classificar usuários, ajustar home nas top materias
+  , b.* EXCEPT (globoid, Top1, Top2, Top3, Top4, Top5)
+  , CASE WHEN Top1 = "Home ge no ge" THEN "Home do ge"
+         WHEN Top1 = "Home g1 no g1" THEN "Home do g1"
+         WHEN Top1 = "Home gshow no gshow" THEN "Home do gshow"
+         WHEN Top1 = "Home receitas no receitas" THEN "Home do receitas"
+  ELSE Top1 END AS Top1
+  , CASE WHEN Top2 = "Home ge no ge" THEN "Home do ge"
+         WHEN Top2 = "Home g1 no g1" THEN "Home do g1"
+         WHEN Top2 = "Home gshow no gshow" THEN "Home do gshow"
+         WHEN Top2 = "Home receitas no receitas" THEN "Home do receitas"
+  ELSE Top2 END AS Top2
+  , CASE WHEN Top3 = "Home ge no ge" THEN "Home do ge"
+         WHEN Top3 = "Home g1 no g1" THEN "Home do g1"
+         WHEN Top3 = "Home gshow no gshow" THEN "Home do gshow"
+         WHEN Top3 = "Home receitas no receitas" THEN "Home do receitas"
+  ELSE Top3 END AS Top3
+  , CASE WHEN Top4 = "Home ge no ge" THEN "Home do ge"
+         WHEN Top4 = "Home g1 no g1" THEN "Home do g1"
+         WHEN Top4 = "Home gshow no gshow" THEN "Home do gshow"
+         WHEN Top4 = "Home receitas no receitas" THEN "Home do receitas"
+  ELSE Top4 END AS Top4
+  , CASE WHEN Top5 = "Home ge no ge" THEN "Home do ge"
+         WHEN Top5 = "Home g1 no g1" THEN "Home do g1"
+         WHEN Top5 = "Home gshow no gshow" THEN "Home do gshow"
+         WHEN Top5 = "Home receitas no receitas" THEN "Home do receitas"
+  ELSE Top5 END AS Top5
+  , CASE WHEN SUM(ge_consumo + cartola_rodada_escalada) >= SUM(gshow_consumo + receitas_consumo) 
+              AND SUM(ge_consumo + cartola_rodada_escalada) >= SUM(g1_consumo + home_consumo) THEN "Torcedor"
+         WHEN SUM(gshow_consumo + receitas_consumo) >= SUM(ge_consumo + cartola_rodada_escalada) 
+              AND SUM(gshow_consumo + receitas_consumo) >= SUM(g1_consumo + home_consumo) THEN "Antenado" 
+         WHEN SUM(g1_consumo + home_consumo) >= SUM(ge_consumo + cartola_rodada_escalada) 
+              AND SUM(g1_consumo + home_consumo) >= SUM(gshow_consumo + receitas_consumo) THEN "Informado" 
+  END AS classificacao
+
+FROM dados_tratados AS a LEFT JOIN ranking AS b ON a.globoid = b.globoid
+GROUP BY ALL
+
+--SELECT * FROM consumos
+
+

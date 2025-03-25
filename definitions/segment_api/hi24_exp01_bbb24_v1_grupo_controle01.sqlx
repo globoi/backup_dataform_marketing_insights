@@ -1,0 +1,30 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_hi24_exp01_bbb24_v1_grupo_controle01'],
+  name: 'hi24_exp01_bbb24_v1_grupo_controle01',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+-- Terceira etapa
+-- Tabela que separa os usuarios do grupo 0
+-- tem que rodar DEPOIS da rotina hi24_exp01_bbb24_v1_usuarios_da_semana
+
+-- CREATE OR REPLACE TABLE ${ref("segment_api", "hi_novelas_base_teste1")} AS
+-- gglobo-mkt-ins-hdg-prd.segment_api.hi_novelas_base_teste1
+
+WITH
+base AS (
+SELECT
+  globo_id as user_id
+  FROM ${ref("experimentos", "hi24_exp01_bbb24_v1_usuarios_da_semana_inc_v2")} 
+  WHERE 
+    grupo_n = 0
+)
+
+SELECT
+  user_id
+FROM base inner join ${ref("usuarios", "base_ativa_pagante_com_trial_new")} as b on base.user_id=b.globo_id
+  --  UNION ALL SELECT '08c4d5b3-53b6-4736-ada3-5d84d6b67d2b' AS user_id

@@ -1,0 +1,31 @@
+config {
+    type: "table",
+    schema: "jornadas_mkt",
+    tags: ["jornadas_mkt", 'schedule_tag=jornadas_mkt_mktflow_midiakit_conteudos_globoplay_poster_v2',
+        'schedule_cron=30 10 * * *'
+    ],
+    bigquery: {
+        labels: {
+            mktcloud: "true",
+            schedule: "diario",
+            tags: "jornadas_mkt",
+            owner: "martech"
+        }
+    }
+
+}
+
+SELECT
+ CAST(id AS STRING) AS id
+,
+  title,
+  subset,
+  media_kit_resource__on_air_mobile,
+  media_kit_resource__poster,
+  title_id,
+  CURRENT_DATE AS dt_proc
+FROM
+  ${ref('conteudo_enriched', 'program')}
+WHERE
+  url_for_consumption LIKE '%globoplay%'
+  AND media_kit_resource__poster IS NOT NULL

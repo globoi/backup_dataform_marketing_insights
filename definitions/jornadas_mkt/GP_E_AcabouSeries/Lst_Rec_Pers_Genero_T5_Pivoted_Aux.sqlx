@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  name: "Lst_Rec_Pers_Genero_T5_Pivoted_Aux",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_AcabouSeries",'schedule_tag=jornadas_mkt_Lst_Rec_Pers_Genero_T5_Pivoted_Aux']
+}
+
+SELECT
+  DISTINCT
+  program_title,
+  title_url_for_consumption,
+  url_add_minha_lista,
+  media_kit_resource__poster,
+  program_id,
+  title_id,
+  program_description
+FROM
+  ${ref("jornadas_mkt", "Trilho_Rec_Pers_por_Genero_T5")} 

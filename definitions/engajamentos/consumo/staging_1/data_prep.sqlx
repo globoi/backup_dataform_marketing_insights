@@ -1,0 +1,53 @@
+config {
+  type: 'table',
+  name: 'data_prep',
+  schema: 'consumo',
+  description: '',
+  columns: {
+  }
+}
+
+WITH
+program AS (
+    SELECT
+        id AS program_id,
+        url_for_consumption
+    FROM 
+        ${ref("conteudo_enriched","program")}
+    WHERE
+        url_for_consumption IS NOT NULL
+),
+
+impression AS (
+    SELECT
+        userid,
+        timestamp,
+        hours_watched,
+        COALESCE(PARA_program_id, program_id) AS program_id,
+        program_title,
+        program_subset,
+        PARA_program_id,
+        url_for_consumption
+    FROM
+        ${ref("consumo_enriched","impression")} imp
+        LEFT JOIN ${ref("raw", "Conteudos a Substituir")} cont
+        ON imp.program_id = cont.DE_program_id
+        INNER JOIN program
+        USING(program_id)
+    WHERE
+        DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY) <= date
+        AND program_subset IN ('movies', 'series', 'novelas')
+    QUALIFY
+        ROW_NUMBER() OVER(PARTITION BY userid, program_id ORDER BY timestamp DESC) = 1
+),
+
+data_prep AS (
+    SELECT
+        *,
+        LEAD(program_id) OVER(PARTITION BY userid ORDER BY timestamp ASC) AS proximo_program_id,
+        LEAD(program_title) OVER(PARTITION BY userid ORDER BY timestamp ASC) AS proximo_program_title,
+        LEAD(url_for_consumption) OVER(PARTITION BY userid ORDER BY timestamp ASC) AS proximo_url_for_consumption
+    FROM
+        impression
+)
+SELECT * FROM data_prep

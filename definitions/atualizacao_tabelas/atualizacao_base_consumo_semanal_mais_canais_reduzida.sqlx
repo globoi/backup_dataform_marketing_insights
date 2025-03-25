@@ -1,0 +1,17 @@
+config {
+  type: 'table',
+  name: 'atualizacao_base_consumo_semanal_mais_canais_reduzida',
+  schema: 'atualizacao_tabelas',
+  tags: ['atualizacao_tabelas',
+         'atualizacao_tabelas_2',
+         'schedule_tag=atualizacao_tabelas_atualizacao_base_consumo_semanal_mais_canais_reduzida',
+          "schedule_cron=0 10,13 * * *"],
+  description: '',
+  columns: {
+  }
+}
+
+SELECT
+  MAX(Data_Semana) AS max_data_semana
+FROM
+  ${ref('usuarios', 'base_consumo_semanal_mais_canais_reduzida')}

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: 'gglobo-mkt-ins-hdg-prd',
+  schema: "raw",
+  name: "sms_historico_2021_2023",
+  description: "Tabela que contém o histórico de envio de SMS - Gplay."
+}

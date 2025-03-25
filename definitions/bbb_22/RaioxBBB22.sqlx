@@ -1,0 +1,759 @@
+config {
+  type: 'table',
+  name: 'RaioxBBB22',
+  schema: 'bbb_22',
+  tags: ['bbb_22'],
+  description: '',
+  columns: {
+    globo_id: '',
+    semana: '',
+    id_asset: '',
+    dt_assinatura_comeco: '',
+    Frequencia_total: '',
+    BaseAtiva: '',
+    episode_horas: '',
+    episode_qtnd_midias: '',
+    episode_freq: '',
+    excerpt_horas: '',
+    excerpt_qtnd_midias: '',
+    excerpt_freq: '',
+    extra_horas: '',
+    extra_qtnd_midias: '',
+    extra_freq: '',
+    live_horas: '',
+    live_qtnd_midias: '',
+    live_freq: '',
+    teaser_horas: '',
+    teaser_qtnd_midias: '',
+    teaser_freq: '',
+    soma_horas: '',
+    Ao_vivo_globo_horas: '',
+    Ao_vivo_globo_qtnd_programas: '',
+    Ao_vivo_globo_freq: '',
+    Ao_vivo_globo_qtnd_midias: '',
+    Filmes_horas: '',
+    Filmes_qtnd_programas: '',
+    Filmes_freq: '',
+    Filmes_qtnd_midias: '',
+    Mais_Canais_horas: '',
+    Mais_Canais_qtnd_programas: '',
+    Mais_Canais_freq: '',
+    Mais_Canais_qtnd_midias: '',
+    Novela_horas: '',
+    Novela_qtnd_programas: '',
+    Novela_freq: '',
+    Novela_qtnd_midias: '',
+    Series_horas: '',
+    Series_qtnd_programas: '',
+    Series_freq: '',
+    Series_qtnd_midias: '',
+    outros_conteudos_horas: '',
+    outros_conteudos_qtnd_programas: '',
+    outros_conteudos_freq: '',
+    outros_conteudos_qtnd_midias: '',
+    assinou_2021: '',
+    assinou_2022: '',
+    Cluster_bbb: '',
+    consumiu_bbb20: '',
+    consumiu_bbb21: '',
+    CancelouVol2020: '',
+    CancelouVol2021: '',
+    CancelouVol2022: '',
+    Share_BBB: '',
+    Cluster_Share_BBB: '',
+    perfil_consumo: '',
+    Fora_da_Casa: '',
+    A_Eliminacao: '',
+    BBB22_Exclusivo_Gshow: '',
+    Bate_Papo_BBB: '',
+    Click_BBB: '',
+    Status_Opt_In: ''
+  }
+}
+
+WITH base_2020 AS(
+  SELECT
+    globo_id,
+    TRUE AS consumiu_bbb20
+  FROM
+    ${ref("bbb_20", "status_Erick_historico")}
+),
+cancelamento_20 AS (
+  SELECT
+    globo_id,
+    dt_hr_cancelamento_final_ciclo,
+    TRUE AS CancelouVol2020
+  FROM
+    ${ref("usuarios", "base_cancelamento")}
+  WHERE
+    LOWER(AssetName) LIKE '%globoplay%'
+    AND EXTRACT(
+      YEAR
+      FROM
+        dt_hr_cancelamento_final_ciclo
+    ) = 2020
+),
+base_2020_join AS (
+  SELECT
+    *
+  FROM
+    base_2020
+    LEFT JOIN cancelamento_20 USING (globo_id)
+),
+base_2020_dist AS(
+  SELECT
+    DISTINCT *
+  FROM
+    base_2020_join
+),
+cancelamento_21 AS (
+  SELECT
+    globo_id,
+    dt_hr_cancelamento_final_ciclo,
+    TRUE AS CancelouVol2021
+  FROM
+    ${ref("usuarios", "base_cancelamento")}
+  WHERE
+    LOWER(AssetName) LIKE '%globoplay%'
+    AND EXTRACT(
+      YEAR
+      FROM
+        dt_hr_cancelamento_final_ciclo
+    ) = 2021
+),
+cancelamento_22 AS (
+  SELECT
+    globo_id,
+    dt_hr_cancelamento_final_ciclo,
+    TRUE AS CancelouVol2022
+  FROM
+    ${ref("usuarios", "base_cancelamento")}
+  WHERE
+    LOWER(AssetName) LIKE '%globoplay%'
+    AND EXTRACT(
+      YEAR
+      FROM
+        dt_hr_cancelamento_final_ciclo
+    ) = 2022
+),
+base_2021 AS (
+  SELECT
+    DISTINCT(globo_id),
+    TRUE AS consumiu_bbb21
+  from
+    ${ref("bbb_21", "RaioXBBB21_historico")}
+),
+base_ativa AS (
+  SELECT
+    DISTINCT globo_id,
+    id_asset,
+    dt_assinatura_comeco,
+    dt_proc,
+    tipo_assinante,
+    assinatura_gplay,
+  FROM
+    ${ref("usuarios", "base_ativa_incremental_old")}
+),
+base_ativa2 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    dt_assinatura_comeco,
+    dt_proc,
+    tipo_assinante,
+    assinatura_gplay,
+    MAX(dt_proc) OVER(PARTITION BY id_asset, globo_id) AS BaseAtiva
+  FROM
+    base_ativa
+  WHERE
+    CAST(dt_proc AS DATE) >= '2022-01-17'
+    AND LOWER(tipo_assinante) NOT LIKE '%trial%'
+    AND assinatura_gplay = 'nacional'
+),
+base_ativa3 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    BaseAtiva,
+    dt_assinatura_comeco,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id,
+      id_asset,
+      BaseAtiva,
+      dt_assinatura_comeco
+      ORDER BY
+        globo_id,
+        id_asset,
+        BaseAtiva,
+        dt_assinatura_comeco
+    ) AS rm,
+    dt_proc,
+    tipo_assinante,
+    assinatura_gplay
+  FROM
+    base_ativa2 QUALIFY rm = 1
+),
+base_ativa4 AS (
+  SELECT
+    *
+  EXCEPT(dt_assinatura_comeco),
+    MIN(dt_assinatura_comeco) OVER(PARTITION BY globo_id) AS dt_assinatura_comeco
+  FROM
+    base_ativa3
+),
+cnt AS(
+  SELECT
+    id AS mediaid,
+    kind,
+    service_id
+  FROM
+    ${ref("conteudo_enriched", "all_content")}
+),
+all_impression AS (
+  SELECT
+    program_id,
+    DATE(timestamp, "America/Sao_Paulo") AS timestamp,
+    mediaid,
+    globo_id,
+    hours_watched,
+    date,
+    DATE_TRUNC (timestamp, WEEK(MONDAY)) AS semana
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  WHERE
+    program_id IN (
+      12082,
+      16280,
+      16281,
+      14907,
+      16284,
+      13492
+    )
+    AND DATE(timestamp, "America/Sao_Paulo") >= '2022-01-17'
+    AND `date` >= '2022-01-17'
+    AND EXTRACT(
+      YEAR
+      FROM
+        timestamp
+    ) = 2022
+),
+all_impjoin AS (
+  SELECT
+    *
+  FROM
+    all_impression a
+    INNER JOIN cnt USING (mediaid)
+    INNER JOIN base_ativa4 b4 USING (globo_id)
+),
+all_impjoin2 AS (
+  SELECT
+    *,
+    COUNT(DISTINCT date) OVER(PARTITION BY id_asset, globo_id, semana) AS Frequencia_total
+  FROM
+    all_impjoin
+),
+base1 AS (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        id_asset,
+        globo_id,
+        dt_assinatura_comeco,
+        semana,
+        Frequencia_total,
+        BaseAtiva,
+        hours_watched,
+        mediaid,
+        date,
+        kind
+      FROM
+        all_impjoin2
+    ) PIVOT (
+      SUM(IFNULL(hours_watched, 0)) horas,
+      COUNT(DISTINCT mediaid) qtnd_midias,
+      COUNT(DISTINCT date) freq FOR kind IN (
+        'teaser',
+        'live',
+        'extra',
+        'excerpt',
+        'episode'
+      )
+    )
+),
+base2 AS (
+  SELECT
+    id_asset,
+    globo_id,
+    dt_assinatura_comeco,
+    semana,
+    Frequencia_total,
+    BaseAtiva,
+    COALESCE(horas_teaser, 0) AS teaser_horas,
+    qtnd_midias_teaser AS teaser_qtnd_midias,
+    freq_teaser AS teaser_freq,
+    COALESCE(horas_live, 0) AS live_horas,
+    qtnd_midias_live AS live_qtnd_midias,
+    freq_live AS live_freq,
+    COALESCE(horas_extra, 0) AS extra_horas,
+    qtnd_midias_extra AS extra_qtnd_midias,
+    freq_extra AS extra_freq,
+    COALESCE(horas_excerpt, 0) AS excerpt_horas,
+    qtnd_midias_excerpt AS excerpt_qtnd_midias,
+    freq_excerpt AS excerpt_freq,
+    COALESCE(horas_episode, 0) AS episode_horas,
+    qtnd_midias_episode AS episode_qtnd_midias,
+    freq_episode AS episode_freq
+  FROM
+    base1
+),
+base3 AS (
+  SELECT
+    *,
+    SUM(
+      episode_horas + excerpt_horas + extra_horas + live_horas + teaser_horas
+    ) OVER(PARTITION BY globo_id, id_asset) AS soma_horas
+  FROM
+    base2
+),
+base4 AS (
+  SELECT
+    *
+  FROM
+    base3
+  WHERE
+    soma_horas >= 0.25
+),
+impression1 AS (
+  SELECT
+    globo_id,
+    mediaid,
+    program_id,
+    hours_watched,
+    DATE_TRUNC(`timestamp`, WEEK(MONDAY)) AS semana,
+    program_subset,
+    EXTRACT(
+      DATE
+      FROM
+        `timestamp`
+    ) AS `date`,
+    DATE(`timestamp`, "America/Sao_Paulo") AS `timestamp`
+  FROM
+    ${ref('consumo_enriched', 'impression')}
+  WHERE
+    `timestamp` BETWEEN "2022-01-17"
+    AND "2022-05-02"
+    AND `date` BETWEEN "2022-01-17"
+    AND "2022-05-03"
+    AND program_id NOT IN (8426, 12082, 16280, 16281, 14907, 16284)
+),
+impression_join AS (
+  SELECT
+    *
+  EXCEPT(mediaid),
+    i.mediaid,
+    CASE
+      WHEN service_id = 6807 THEN 'Mais_Canais'
+      WHEN program_subset = 'novelas' THEN 'Novela'
+      WHEN program_subset = 'series' THEN 'Series'
+      WHEN program_id = 10122 THEN 'Filmes'
+      WHEN program_id = 9095 THEN 'Ao_vivo_globo'
+      ELSE 'outros_conteudos'
+    END AS grupo
+  FROM
+    impression1 i
+    LEFT JOIN cnt USING (mediaid)
+),
+base5 AS (
+  SELECT
+    DISTINCT id_asset,
+    globo_id,
+    dt_assinatura_comeco
+  FROM
+    base4
+),
+ai AS (
+  SELECT
+    *
+  FROM
+    base5 b
+    LEFT JOIN impression_join i USING(globo_id)
+),
+base_ai_pivot AS (
+  SELECT
+    *
+  FROM
+    (
+      SELECT
+        id_asset,
+        globo_id,
+        dt_assinatura_comeco,
+        semana,
+        hours_watched,
+        program_id,
+        `date`,
+        mediaid,
+        grupo
+      FROM
+        ai
+    ) PIVOT(
+      SUM(IFNULL(hours_watched, 0)) horas,
+      COUNT(DISTINCT program_id) qtnd_programas,
+      COUNT(DISTINCT `date`) freq,
+      COUNT(DISTINCT mediaid) qtnd_midias FOR grupo IN (
+        'Mais_Canais',
+        'Novela',
+        'Series',
+        'Filmes',
+        'Ao_vivo_globo',
+        'outros_conteudos'
+      )
+    )
+),
+base_ai_2 AS (
+  SELECT
+    *
+  EXCEPT(
+      freq_Ao_vivo_globo,
+      freq_Filmes,
+      freq_Mais_Canais,
+      freq_Novela,
+      freq_Series,
+      freq_outros_conteudos
+    ),
+    IF(freq_Ao_vivo_globo >= 8, 7, freq_Ao_vivo_globo) AS freq_Ao_vivo_globo,
+    IF(freq_Filmes >= 8, 7, freq_Filmes) AS freq_Filmes,
+    IF(freq_Mais_Canais >= 8, 7, freq_Mais_Canais) AS freq_Mais_Canais,
+    IF(freq_Novela >= 8, 7, freq_Novela) AS freq_Novela,
+    IF(freq_Series >= 8, 7, freq_Series) AS freq_Series,
+    IF(
+      freq_outros_conteudos >= 8,
+      7,
+      freq_outros_conteudos
+    ) AS freq_outros_conteudos
+  FROM
+    base_ai_pivot
+),
+base_ai_3 AS (
+  SELECT
+    *
+  FROM
+    base4
+    LEFT JOIN base_ai_2 USING (id_asset, globo_id, dt_assinatura_comeco, semana)
+),
+base_ai_4 AS (
+  SELECT
+    *
+  EXCEPT(
+      horas_Filmes,
+      qtnd_programas_Filmes,
+      freq_Filmes,
+      qtnd_midias_Filmes,
+      horas_Mais_Canais,
+      qtnd_programas_Mais_Canais,
+      freq_Mais_Canais,
+      qtnd_midias_Mais_Canais,
+      horas_Novela,
+      qtnd_programas_Novela,
+      freq_Novela,
+      qtnd_midias_Novela,
+      horas_Series,
+      qtnd_programas_Series,
+      freq_Series,
+      qtnd_midias_Series,
+      horas_outros_conteudos,
+      qtnd_programas_outros_conteudos,
+      freq_outros_conteudos,
+      qtnd_midias_outros_conteudos,
+      horas_Ao_vivo_globo,
+      qtnd_programas_Ao_vivo_globo,
+      freq_Ao_vivo_globo,
+      qtnd_midias_Ao_vivo_globo
+    ),
+    COALESCE(horas_Filmes, 0) AS Filmes_horas,
+    COALESCE(qtnd_programas_Filmes, 0) AS Filmes_qtnd_programas,
+    COALESCE(freq_Filmes, 0) AS Filmes_freq,
+    COALESCE(qtnd_midias_Filmes, 0) AS Filmes_qtnd_midias,
+    COALESCE(horas_Mais_Canais, 0) AS Mais_Canais_horas,
+    COALESCE(qtnd_programas_Mais_Canais, 0) AS Mais_Canais_qtnd_programas,
+    COALESCE(freq_Mais_Canais, 0) AS Mais_Canais_freq,
+    COALESCE(qtnd_midias_Mais_Canais, 0) AS Mais_Canais_qtnd_midias,
+    COALESCE(horas_Novela, 0) AS Novela_horas,
+    COALESCE(qtnd_programas_Novela, 0) AS Novela_qtnd_programas,
+    COALESCE(freq_Novela, 0) AS Novela_freq,
+    COALESCE(qtnd_midias_Novela, 0) AS Novela_qtnd_midias,
+    COALESCE(horas_Series, 0) AS Series_horas,
+    COALESCE(qtnd_programas_Series, 0) AS Series_qtnd_programas,
+    COALESCE(freq_Series, 0) AS Series_freq,
+    COALESCE(qtnd_midias_Series, 0) AS Series_qtnd_midias,
+    COALESCE(horas_outros_conteudos, 0) AS outros_conteudos_horas,
+    COALESCE(qtnd_programas_outros_conteudos, 0) AS outros_conteudos_qtnd_programas,
+    COALESCE(freq_outros_conteudos, 0) AS outros_conteudos_freq,
+    COALESCE(qtnd_midias_outros_conteudos, 0) AS outros_conteudos_qtnd_midias,
+    COALESCE(horas_Ao_vivo_globo, 0) AS Ao_vivo_globo_horas,
+    COALESCE(qtnd_programas_Ao_vivo_globo, 0) AS Ao_vivo_globo_qtnd_programas,
+    COALESCE(freq_Ao_vivo_globo, 0) AS Ao_vivo_globo_freq,
+    COALESCE(qtnd_midias_Ao_vivo_globo, 0) AS Ao_vivo_globo_qtnd_midias
+  FROM
+    base_ai_3
+),
+base_ai_5 AS (
+  SELECT
+    *,
+    IF(
+      EXTRACT(
+        YEAR
+        FROM
+          dt_assinatura_comeco
+      ) = 2021,
+      true,
+      false
+    ) AS assinou_2021,
+    IF(
+      EXTRACT(
+        YEAR
+        FROM
+          dt_assinatura_comeco
+      ) = 2022,
+      true,
+      false
+    ) AS assinou_2022,
+    CASE
+      WHEN live_horas >= 10 THEN '4. Heavy User'
+      WHEN live_horas BETWEEN 0.05
+      AND 1 THEN '1. Light User'
+      WHEN live_horas BETWEEN 1
+      AND 5 THEN '2. Mid-Light User'
+      WHEN live_horas BETWEEN 5
+      AND 10 THEN '3. Mid-Heavy User'
+      ELSE '0. No Live'
+    END AS Cluster_bbb
+  FROM
+    base_ai_4
+),
+base_ai_6 AS (
+  SELECT
+    *
+  FROM
+    base_ai_5
+    LEFT JOIN base_2020_dist USING (globo_id)
+    LEFT JOIN cancelamento_21 USING (globo_id)
+    LEFT JOIN base_2021 USING (globo_id)
+    LEFT JOIN cancelamento_22 USING (globo_id)
+),
+base_ai_7 AS (
+  SELECT
+    *,
+    (
+      soma_horas /(
+        Mais_Canais_horas + Novela_horas + Series_horas + outros_conteudos_horas + Filmes_horas + soma_horas
+      )
+    ) AS Share_BBB
+  FROM
+    base_ai_6
+),
+base_ai_8 AS (
+  SELECT
+    *
+  EXCEPT(consumiu_bbb21),
+    CASE
+      WHEN Share_BBB <= 0.5 THEN '00%-50%'
+      WHEN Share_BBB <= 0.8 THEN '51%-80%'
+      ELSE '81%-100%'
+    END AS Cluster_Share_BBB,
+    IFNULL(consumiu_bbb21, FALSE) AS consumiu_bbb21
+  FROM
+    base_ai_7
+),
+base_ai_9 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY globo_id, semana) AS rn
+  FROM
+    base_ai_8 QUALIFY rn = 1
+),
+base_ai_10 AS (
+  SELECT
+    globo_id,
+    id_asset,
+    dt_assinatura_comeco,
+    semana,
+    Frequencia_total,
+    BaseAtiva,
+    episode_horas,
+    episode_qtnd_midias,
+    episode_freq,
+    excerpt_horas,
+    excerpt_qtnd_midias,
+    excerpt_freq,
+    extra_horas,
+    extra_qtnd_midias,
+    extra_freq,
+    live_horas,
+    live_qtnd_midias,
+    live_freq,
+    teaser_horas,
+    teaser_qtnd_midias,
+    teaser_freq,
+    soma_horas,
+    Ao_vivo_globo_horas,
+    Ao_vivo_globo_qtnd_programas,
+    Ao_vivo_globo_freq,
+    Ao_vivo_globo_qtnd_midias,
+    Filmes_horas,
+    Filmes_qtnd_programas,
+    Filmes_freq,
+    Filmes_qtnd_midias,
+    Mais_Canais_horas,
+    Mais_Canais_qtnd_programas,
+    Mais_Canais_freq,
+    Mais_Canais_qtnd_midias,
+    Novela_horas,
+    Novela_qtnd_programas,
+    Novela_freq,
+    Novela_qtnd_midias,
+    Series_horas,
+    Series_qtnd_programas,
+    Series_freq,
+    Series_qtnd_midias,
+    outros_conteudos_horas,
+    outros_conteudos_qtnd_programas,
+    outros_conteudos_freq,
+    outros_conteudos_qtnd_midias,
+    assinou_2021,
+    assinou_2022,
+    Cluster_bbb,
+    COALESCE(consumiu_bbb20, False) AS consumiu_bbb20,
+    COALESCE(consumiu_bbb21, False) AS consumiu_bbb21,
+    COALESCE(CancelouVol2020, False) AS CancelouVol2020,
+    COALESCE(CancelouVol2021, False) AS CancelouVol2021,
+    COALESCE(CancelouVol2022, False) AS CancelouVol2022,
+    Share_BBB,
+    Cluster_Share_BBB
+  FROM
+    base_ai_9
+),
+base_outros AS (
+  SELECT
+    program_id,
+    globo_id,
+    DATE(timestamp, "America/Sao_Paulo") AS timestamp,
+    DATE_TRUNC (timestamp, WEEK(MONDAY)) AS semana
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  WHERE
+    DATE(timestamp, "America/Sao_Paulo") >= '2022-01-17'
+    AND `date` >= '2022-01-17'
+    AND EXTRACT(
+      YEAR
+      FROM
+        `timestamp`
+    ) = 2022
+),
+base_outros2 AS (
+  SELECT
+    globo_id,
+    semana,
+    ARRAY_AGG(DISTINCT program_id) AS assistidos
+  FROM
+    base_outros
+  GROUP BY
+    globo_id,
+    semana
+),
+base_outros3 AS (
+  SELECT
+    globo_id,
+    semana,
+    IF(
+      CONTAINS_SUBSTR(assistidos, '16281'),
+      TRUE,
+      FALSE
+    ) AS Fora_da_Casa,
+    IF(
+      CONTAINS_SUBSTR(assistidos, '13492'),
+      TRUE,
+      FALSE
+    ) AS A_Eliminacao,
+    IF(
+      CONTAINS_SUBSTR(assistidos, '14907'),
+      TRUE,
+      FALSE
+    ) AS BBB22_Exclusivo_Gshow,
+    IF(
+      CONTAINS_SUBSTR(assistidos, '16280'),
+      TRUE,
+      FALSE
+    ) AS Bate_Papo_BBB,
+    IF(
+      CONTAINS_SUBSTR(assistidos, '16284'),
+      TRUE,
+      FALSE
+    ) AS Click_BBB
+  FROM
+    base_outros2
+),
+base_perfil AS (
+  SELECT
+    *,
+    CASE
+      WHEN Filmes_horas > Novela_horas
+      AND Filmes_horas > Series_horas
+      AND Filmes_horas > Mais_Canais_horas
+      AND Filmes_horas > outros_conteudos_horas
+      AND Filmes_horas > Ao_vivo_globo_horas THEN 'Filmes'
+      WHEN Novela_horas > outros_conteudos_horas
+      AND Novela_horas > Series_horas
+      AND Novela_horas > Mais_Canais_horas
+      AND Novela_horas > Ao_vivo_globo_horas THEN 'Novelas'
+      WHEN Series_horas > outros_conteudos_horas
+      AND Series_horas > Mais_Canais_horas
+      AND Series_horas > Ao_vivo_globo_horas THEN 'Series'
+      WHEN Mais_Canais_horas > outros_conteudos_horas
+      AND Mais_Canais_horas > Ao_vivo_globo_horas THEN 'Mais Canais'
+      WHEN Ao_vivo_globo_horas > outros_conteudos_horas THEN 'Ao_Vivo_Globo'
+      ELSE 'Outros Conteudos'
+    END AS perfil_consumo
+  FROM
+    base_ai_10
+),
+optin_whats AS (
+  SELECT
+    globo_id,
+    Status_Opt_In
+  FROM
+    ${ref("comunicacao", "base_opt_in_whatsapp")}
+),
+base_perfil2 AS (
+  SELECT
+    *
+  EXCEPT
+    (globo_id, semana, Status_Opt_In),
+    b1.globo_id,
+    b1.semana,
+    IFNULL(Status_Opt_In, FALSE) AS Status_Opt_In
+  FROM
+    base_perfil b1
+    LEFT JOIN base_outros3 b2 USING(globo_id, semana)
+    LEFT JOIN optin_whats b3 USING(globo_id)
+),
+base_perfil3 AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(
+      PARTITION BY globo_id,
+      semana
+      ORDER BY
+        globo_id,
+        semana
+    ) AS rm,
+  FROM
+    base_perfil2 QUALIFY rm = 1
+)
+SELECT
+  *
+EXCEPT
+  (rm)
+FROM
+  base_perfil3

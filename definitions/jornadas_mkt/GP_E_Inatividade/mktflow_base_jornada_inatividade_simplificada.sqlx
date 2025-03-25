@@ -1,0 +1,43 @@
+config {
+  type: "table",
+  name: "mktflow_base_jornada_inatividade_simplificada",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_Inatividade",'schedule_tag=jornadas_mkt_mktflow_base_jornada_inatividade_simplificada']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+WITH gid1 AS (
+  SELECT DISTINCT globo_id,
+         dt_assinatura_comeco,
+         tempo_de_base_agrupado,
+         data_ultimo_consumo,
+         date_diff(current_date(), CAST(data_ultimo_consumo AS DATE), DAY) as date_diff_ultimo_consumo
+  FROM ${ref("usuarios", "perfil_assinantes_ativo_reduzido")} 
+  INNER JOIN (
+      SELECT globo_id,
+            MAX(dt_assinatura_comeco) AS dt_assinatura_comeco,
+            MAX(data_ultimo_consumo) AS data_ultimo_consumo
+      FROM ${ref("usuarios", "perfil_assinantes_ativo_reduzido")} 
+      GROUP BY globo_id
+  )
+    USING(globo_id,
+          dt_assinatura_comeco,
+          data_ultimo_consumo)
+)
+SELECT globo_id,
+        dt_assinatura_comeco AS data_assinatura_comeco,
+        tempo_de_base_agrupado AS cluster_tempo_de_base,
+        CASE
+          WHEN date_diff_ultimo_consumo <= 30 THEN '3. Entre 16 e 30 Dias'
+          WHEN date_diff_ultimo_consumo <= 45 THEN '4. Entre 31 e 45 Dias'
+          WHEN date_diff_ultimo_consumo <= 60 THEN '5. Entre 46 e 60 Dias'
+          WHEN date_diff_ultimo_consumo > 60 THEN '6. Mais de 60 Dias'
+          ELSE 'Erro'
+        END AS Cluster_ultimo_consumo,
+        CAST(data_ultimo_consumo AS DATE) AS data_ultimo_consumo,
+FROM gid1 
+WHERE date_diff_ultimo_consumo > 15
+

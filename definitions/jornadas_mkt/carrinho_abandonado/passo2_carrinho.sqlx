@@ -1,0 +1,20 @@
+config {
+    type: "incremental",
+    name: "passo2_carrinho",
+    schema: "jornadas_mkt",
+    tags: ["jornadas_mkt", 'schedule_tag=jornadas_mkt_passo2_carrinho',
+        'schedule_cron=0 */1 * * *'
+    ],
+    bigquery: {
+        labels: {
+            mktcloud: "",
+            tags: "jornadas_mkt",
+            owner: "martech"
+        }
+    }
+}
+
+select * 
+from `gglobo-mkt-ins-hdg-prd.jornadas_mkt.carrinho_ultimos_30min_temp`
+where lower(context) = 'abandoned'
+    AND channel = 'WEB'

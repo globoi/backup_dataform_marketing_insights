@@ -1,0 +1,24 @@
+config {
+ 
+  type: 'table',
+  tags: ['schedule_tag=cartola_mkt_mktflow_base_automatica_carrinho_abandonado_v2','schedule_cron=00 14 * * *'],
+  name: 'mktflow_base_automatica_carrinho_abandona_v2',
+  schema: 'cartola_mkt',
+  description: '',
+  columns: {
+  },
+  
+  bigquery: {
+    labels: {mktcloud: "true",
+      schedule: "diario",
+      tags: "cartola_mkt"
+    }
+  }
+}
+SELECT DISTINCT globo_id, date (event_at) as Data
+FROM ${ref("checkout_gold", "checkout_events")} as a --`gglobo-vendas-hdg-prd.checkout_gold.checkout_events` a
+inner join ${ref("catalog_gold", "product_services")} as b--`gglobo-vendas-hdg-prd.catalog_gold.product_services` b
+on a.portfolio_details.name = b.product_name
+where lower (cart_status) = 'abandoned'
+and purchase_channel is not null
+and lower (portfolio_details.name) like "%cartola%"

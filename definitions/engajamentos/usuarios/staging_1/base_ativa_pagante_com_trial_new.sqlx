@@ -1,0 +1,829 @@
+config {
+    type: "table",
+    name: "base_ativa_pagante_com_trial_new",
+    schema: "usuarios",
+    tags: ["usuarios_staging_1",
+        "schedule_tag=usuarios_base_ativa_pagante_com_trial_new"
+    ],
+    dependencies: ['base_ativa_assert'],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "usuarios",
+            owner: "mins",
+            horario: "08h30min",
+            origem: "sales_gold"
+        }
+    },
+    description: 'Tabela de usuários pagantes/cupom com trial.',
+    columns: {
+        globo_id: 'Código de identificação do usuário.',
+        tipo_assinante: 'Identifica se o usuário é titular ou dependente.',
+        info: {
+            description: "Array com as informações da assinatura.",
+            columns: {
+                id_asset: 'Código que identifica a assinatura.',
+                data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+                dt_assinatura_comeco: 'Identifica a data mínima de assinatura do usuário.',
+                activation_at: 'Data da ativação da assinatura (GMT-3).',
+                unsubscribe_at: 'Data de cancelamento (GMT-3).',
+                scheduled_unsubscribe_at: 'Data de agendamento do cancelamento.',
+                end_cycle_at: 'Data de final do ciclo da assinatura.',
+                canal_compra: 'Canal de Assinatura (Web, Inapp Google, Inapp Apple, Inapp Roku e etc).',
+                Produto_Contratado: 'Identifica o produto contratado pelo usuário (Ex: Globoplay Básico, Globoplay Básico e Premiere).',
+                produto: 'Identifica a periodicidade da cobrança do produto adquirido.(Ex: Anual, bianual ou mensal).',
+                origem: 'Identifica a origem da assinatura do usuário.(Ex: Venda direta, Trial, Upgrade.)',
+                assinatura_gplay: 'Identifica se a assinatura é nacional ou internacional.',
+                subscription_type: 'Forma como a assinatura foi adquirida.',
+                subscription_status: 'Último status da assinatura (Ativo, Cancelado, Suspenso, Em Upgrade, Em Downgrade, Em ativação, Pagamento Pendente, Em Upgrade Agendado, Em cancelamento, Em Crossgrade Agendado).',
+                status: 'Valor que descreve o status do cliente.',
+                origin_id: 'Identificador da origem da compra do usuário.',
+                origin_name: 'Nome da origem da compra do usuário.',
+                tempo_de_base: 'Tempo de base (em dias) do usuário.',
+                tempo_de_base_agrupado: 'Identifica o tempo de base agrupado do usuario.(Ex: 1. Até 1 mês)',
+                mais_canais: 'Identifica se o usuário possui o Globoplay Premium no pacote de assinatura.',
+                gplay_basico: 'Identifica se o usuário possui o Globoplay Básico no pacote de assinatura.',
+                gplay_padrao: 'Identifica se o usuário possui o Globoplay Padrão sem anúncios no pacote de assinatura.',
+                gplay_padrao_ads: 'Identifica se o usuário possui o Globoplay Padrão com anúncios no pacote de assinatura.',
+                combo: 'Identifica se o usuário possui combo. Ex: Globoplay Básico e Premiere.'
+            }
+        },
+        telecine: 'Identifica se o usuário possui o produto Telecine.',
+        cartola: 'Identifica se o usuário possui o produto Cartola.',
+        deezer: 'Identifica se o usuário possui o produto Deezer Premium.',
+        discovery: 'Identifica se o usuário possui o produto Discovery+.',
+        disney: 'Identifica se o usuário possui o produto Disney.',
+        flatv: 'Identifica se o usuário possui o produto FlaTV+.',
+        lionsgate: 'Identifica se o usuário possui o produto LIONSGATE+.',
+        premiere: 'Identifica se o usuário possui o produto Premiere.',
+        star: 'Identifica se o usuário possui o produto Star+.',
+        combate: 'Identifica se o usuário possui o produto Combate.',
+        flag_claro_wholesale: 'Identifica se o usuário é Claro Wholesale.'
+    }
+}
+
+
+
+WITH
+  base AS(
+    --CLIENTES PAGANTES
+  SELECT
+    DISTINCT globo_id,
+    id AS id_asset,
+    'titular' AS tipo_assinante,
+    mais_canais,
+    gplay_basico,
+    gplay_padrao,
+    gplay_padrao_ads,
+    combo,
+    data_hora_compra,
+    activation_at,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at,
+    canal_compra,
+    flag_claro_wholesale,
+    Produto_Contratado,
+    dt_assinatura_comeco,
+    produto,
+    origem,
+    assinatura_gplay,
+    subscription_type,
+    subscription_status,
+    status,
+    origin_id,
+    origin_name,
+    tempo_de_base
+  FROM (
+      --BASE ATIVA PAGANTE D2C
+    SELECT
+      DISTINCT ss.globo_id,
+      pd.name,
+      sd.id,
+      ss.state,
+      pd.code,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+        ELSE FALSE
+    END
+      AS mais_canais,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%básico%' THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_basico,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay padrão%' AND (LOWER(pd.name) NOT LIKE '%com anúncios') AND (STRPOS(pd.name, 'Anúncios')=0) THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao,
+      CASE
+        WHEN STRPOS(pd.name, 'Anúncios')!=0 THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao_ads,
+      CASE
+        WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+        ELSE FALSE
+    END
+      AS combo,
+      TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+      sd.activation_at,
+      sd.unsubscribe_at,
+      sd.scheduled_unsubscribe_at,
+      sd.end_cycle_at,
+      sd.purchase_channel AS canal_compra,
+      CASE
+        WHEN LOWER(pd.channel) LIKE '%whole%' THEN TRUE
+        ELSE FALSE
+    END
+      AS flag_claro_wholesale,
+      pd.name AS Produto_Contratado,
+      DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+      sd.billing_frequency AS produto,
+      CASE
+        WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+        WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+        WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+        WHEN sd.periodo_trial > 0 THEN 'Trial'
+        ELSE sd.subscription_type
+    END
+      AS origem,
+      CASE
+        WHEN pd.is_international = FALSE THEN 'nacional'
+        ELSE 'internacional'
+    END
+      AS assinatura_gplay,
+      sd.subscription_type,
+      sd.subscription_status,
+      ss.state AS status,
+      sd.origin_id,
+      sd.origin_name,
+      DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+    FROM
+       ${ref('sales_gold', 'subscription_state')} ss
+    JOIN
+       ${ref('sales_gold', 'subscription_details')} sd
+    ON
+      ss.object_id = sd.id
+    JOIN
+        ${ref('sales_gold', 'product_details')} pd
+    ON
+      sd.product_id = pd.id
+    WHERE
+      DATE(ss.state_date) = CURRENT_DATE-1
+      AND ss.state = 'active'
+      AND LOWER(pd.name) LIKE '%globoplay%'
+    GROUP BY
+      ALL
+    UNION ALL
+      --BASE ATIVADA CLARO WHOLESALE
+    SELECT
+      DISTINCT ss.globo_id,
+      pd.name,
+      sd.id,
+      ss.state,
+      pd.code,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+        ELSE FALSE
+    END
+      AS mais_canais,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%básico%' THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_basico,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay padrão%' AND (LOWER(pd.name) NOT LIKE '%com anúncios') AND (STRPOS(pd.name, 'Anúncios')=0) THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao,
+      CASE
+        WHEN STRPOS(pd.name, 'Anúncios')!=0 THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao_ads,
+      CASE
+        WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+        ELSE FALSE
+    END
+      AS combo,
+      TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+      sd.activation_at,
+      sd.unsubscribe_at,
+      sd.scheduled_unsubscribe_at,
+      sd.end_cycle_at,
+      sd.purchase_channel AS canal_compra,
+      CASE
+        WHEN LOWER(pd.channel) LIKE '%whole%' THEN TRUE
+        ELSE FALSE
+    END
+      AS flag_claro_wholesale,
+      pd.name AS Produto_Contratado,
+      DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+      sd.billing_frequency AS produto,
+      CASE
+        WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+        WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+        WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+        WHEN sd.periodo_trial > 0 THEN 'Trial'
+        ELSE sd.subscription_type
+    END
+      AS origem,
+      CASE
+        WHEN pd.is_international = FALSE THEN 'nacional'
+        ELSE 'internacional'
+    END
+      AS assinatura_gplay,
+      sd.subscription_type,
+      sd.subscription_status,
+      ss.state AS status,
+      sd.origin_id,
+      sd.origin_name,
+      DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+    FROM
+      ${ref('sales_gold', 'subscription_state_cws')} ss
+    JOIN
+     ${ref('sales_gold', 'subscription_details')} sd
+    ON
+      ss.object_id = sd.id
+    JOIN
+    ${ref('sales_gold', 'product_details')} pd
+    ON
+      sd.product_id = pd.id
+    WHERE
+      DATE(ss.state_date) = CURRENT_DATE - 1
+      AND ss.state = 'active_partner_inbound'
+      AND LOWER(pd.name) LIKE '%globoplay%'
+    GROUP BY
+      ALL
+    UNION ALL
+      --BASE ATIVADA B2B2C (EXCETO CLARO WHOLESALE)
+    SELECT
+      DISTINCT ss.globo_id,
+      pd.name,
+      sd.id,
+      ss.state,
+      pd.code,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+        ELSE FALSE
+    END
+      AS mais_canais,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%básico%' THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_basico,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay padrão%' AND (LOWER(pd.name) NOT LIKE '%com anúncios') AND (STRPOS(pd.name, 'Anúncios')=0) THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao,
+      CASE
+        WHEN STRPOS(pd.name, 'Anúncios')!=0 THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao_ads,
+      CASE
+        WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+        ELSE FALSE
+    END
+      AS combo,
+      TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+      sd.activation_at,
+      sd.unsubscribe_at,
+      sd.scheduled_unsubscribe_at,
+      sd.end_cycle_at,
+      sd.purchase_channel AS canal_compra,
+      CASE
+        WHEN LOWER(pd.channel) LIKE '%whole%' THEN TRUE
+        ELSE FALSE
+    END
+      AS flag_claro_wholesale,
+      pd.name AS Produto_Contratado,
+      DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+      sd.billing_frequency AS produto,
+      CASE
+        WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+        WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+        WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+        WHEN sd.periodo_trial > 0 THEN 'Trial'
+        ELSE sd.subscription_type
+    END
+      AS origem,
+      CASE
+        WHEN pd.is_international = FALSE THEN 'nacional'
+        ELSE 'internacional'
+    END
+      AS assinatura_gplay,
+      sd.subscription_type,
+      sd.subscription_status,
+      ss.state AS status,
+      sd.origin_id,
+      sd.origin_name,
+      DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+    FROM
+     ${ref('sales_gold', 'subscription_state')} ss
+    JOIN
+       ${ref('sales_gold', 'subscription_details')} sd
+    ON
+      ss.object_id = sd.id
+    JOIN
+     ${ref('sales_gold', 'product_details')} pd
+    ON
+      sd.product_id = pd.id
+    WHERE
+      DATE(ss.state_date) = CURRENT_DATE-1
+      AND ss.state = 'active_partner_inbound'
+      AND LOWER(pd.name) LIKE '%globoplay%'
+      AND LOWER(sd.purchase_channel) NOT LIKE '%wholesale%'
+      AND pd.is_international = FALSE
+    GROUP BY
+      ALL
+      )
+  UNION ALL
+    --************************************************************************************************************
+    --BASE CUPONS E CORTESIA
+  SELECT
+    DISTINCT globo_id,
+    id AS id_asset,
+    'titular' AS tipo_assinante,
+    mais_canais,
+    gplay_basico,
+    gplay_padrao,
+    gplay_padrao_ads,
+    combo,
+    data_hora_compra,
+    activation_at,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at,
+    canal_compra,
+    flag_claro_wholesale,
+    Produto_Contratado,
+    dt_assinatura_comeco,
+    produto,
+    origem,
+    assinatura_gplay,
+    subscription_type,
+    subscription_status,
+    status,
+    origin_id,
+    origin_name,
+    tempo_de_base
+  FROM (
+      --Cupom ativo
+    SELECT
+      DISTINCT ss.globo_id,
+      pd.name,
+      sd.id,
+      ss.state,
+      pd.code,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay premium%' AND (LOWER(pd.name) NOT LIKE 'globoplay padrão' AND LOWER(pd.name) NOT LIKE 'globoplay básico') THEN TRUE
+        ELSE FALSE
+    END
+      AS mais_canais,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%básico%' THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_basico,
+      CASE
+        WHEN LOWER(pd.name) LIKE '%globoplay padrão%' AND (LOWER(pd.name) NOT LIKE '%com anúncios') AND (STRPOS(pd.name, 'Anúncios')=0) THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao,
+      CASE
+        WHEN STRPOS(pd.name, 'Anúncios')!=0 THEN TRUE
+        ELSE FALSE
+    END
+      AS gplay_padrao_ads,
+      CASE
+        WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+        ELSE FALSE
+    END
+      AS combo,
+      TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+      sd.activation_at,
+      sd.unsubscribe_at,
+      sd.scheduled_unsubscribe_at,
+      sd.end_cycle_at,
+      sd.purchase_channel AS canal_compra,
+      CASE
+        WHEN LOWER(pd.channel) LIKE '%whole%' THEN TRUE
+        ELSE FALSE
+    END
+      AS flag_claro_wholesale,
+      pd.name AS Produto_Contratado,
+      DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+      sd.billing_frequency AS produto,
+      CASE
+        WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+        WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+        WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+        WHEN sd.periodo_trial > 0 THEN 'Trial'
+        ELSE sd.subscription_type
+    END
+      AS origem,
+      CASE
+        WHEN pd.is_international = FALSE THEN 'nacional'
+        ELSE 'internacional'
+    END
+      AS assinatura_gplay,
+      sd.subscription_type,
+      sd.subscription_status,
+      ss.state AS status,
+      sd.origin_id,
+      sd.origin_name,
+      DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+    FROM
+       ${ref('sales_gold', 'subscription_state')} ss
+    JOIN
+       ${ref('sales_gold', 'subscription_details')} sd
+    ON
+      ss.object_id = sd.id
+    JOIN
+    ${ref('sales_gold', 'product_details')} pd
+    ON
+      sd.product_id = pd.id
+    WHERE
+      DATE(ss.state_date) = CURRENT_DATE-1
+      AND ss.state = 'active_coupon'
+      AND LOWER(pd.name) LIKE '%globoplay%'
+      AND pd.is_international = FALSE
+    GROUP BY
+      ALL)
+  UNION ALL
+    --Cortesias Backoffice
+  SELECT
+    DISTINCT cd.globo_id,
+    sd.id AS id_asset,
+    'titular' AS tipo_assinante,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%globoplay premium%' AND (LOWER(sd.product_name) NOT LIKE 'globoplay padrão' AND LOWER(sd.product_name) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%básico%' THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_basico,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%globoplay padrão%' AND (LOWER(sd.product_name) NOT LIKE '%com anúncios') AND (STRPOS(sd.product_name, 'Anúncios')=0) THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_padrao,
+    CASE
+      WHEN STRPOS(sd.product_name, 'Anúncios')!=0 THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_padrao_ads,
+    CASE
+      WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+      ELSE FALSE
+  END
+    AS combo,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    sd.activation_at,
+    sd.unsubscribe_at,
+    sd.scheduled_unsubscribe_at,
+    sd.end_cycle_at,
+    sd.purchase_channel AS canal_compra,
+    CAST(NULL AS boolean) AS flag_claro_wholesale,
+    sd.product_name AS Produto_Contratado,
+    DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+    sd.billing_frequency AS produto,
+    CASE
+      WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+      WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+      WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+      WHEN sd.periodo_trial > 0 THEN 'Trial'
+      ELSE sd.subscription_type
+  END
+    AS origem,
+    CAST(NULL AS string) AS assinatura_gplay,
+    sd.subscription_type,
+    sd.subscription_status,
+    CAST(NULL AS string) AS status,
+    sd.origin_id,
+    sd.origin_name,
+    DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+  FROM
+   ${ref('sales_gold', 'subscription_details')} sd
+  LEFT JOIN
+       ${ref('sales_gold', 'customer_details')} cd
+  ON
+    sd.customer_id = cd.id
+    AND (sd.subscription_status = 'Ativo'
+      OR sd.subscription_status = 'Em Cancelamento')
+    AND sd.purchase_channel = 'Backoffice'
+    AND LOWER(sd.product_name) LIKE '%globoplay%'
+  GROUP BY
+    ALL
+  UNION ALL
+    --Ação funcionários
+  SELECT
+    DISTINCT cd.globo_id,
+    sd.id AS id_asset,
+    'titular' AS tipo_assinante,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%globoplay premium%' AND (LOWER(sd.product_name) NOT LIKE 'globoplay padrão' AND LOWER(sd.product_name) NOT LIKE 'globoplay básico') THEN TRUE
+      ELSE FALSE
+  END
+    AS mais_canais,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%básico%' THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_basico,
+    CASE
+      WHEN LOWER(sd.product_name) LIKE '%globoplay padrão%' AND (LOWER(sd.product_name) NOT LIKE '%com anúncios') AND (STRPOS(sd.product_name, 'Anúncios')=0) THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_padrao,
+    CASE
+      WHEN STRPOS(sd.product_name, 'Anúncios')!=0 THEN TRUE
+      ELSE FALSE
+  END
+    AS gplay_padrao_ads,
+    CASE
+      WHEN (LOWER(product_type_at_subscription) IN ('combo', 'bundle') OR LOWER(product_type) IN ('combo', 'bundle') OR LOWER(caracteristica_produto) IN ('combo', 'bundle')) THEN TRUE
+      ELSE FALSE
+  END
+    AS combo,
+    TIMESTAMP(sd.subscription_at) AS data_hora_compra,
+    sd.activation_at,
+    sd.unsubscribe_at,
+    sd.scheduled_unsubscribe_at,
+    sd.end_cycle_at,
+    sd.purchase_channel AS canal_compra,
+    CAST(NULL AS boolean) AS flag_claro_wholesale,
+    sd.product_name AS Produto_Contratado,
+    DATE( COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ) ) AS dt_assinatura_comeco,
+    sd.billing_frequency AS produto,
+    CASE
+      WHEN (sd.periodo_trial <= 0 OR sd.periodo_trial IS NULL) THEN 'Venda direta'
+      WHEN LOWER(sd.subscription_type) LIKE '%upgrade%' THEN 'Upgrade'
+      WHEN LOWER(sd.subscription_type) LIKE '%downgrade%' THEN 'Downgrade'
+      WHEN sd.periodo_trial > 0 THEN 'Trial'
+      ELSE sd.subscription_type
+  END
+    AS origem,
+    CAST(NULL AS string) AS assinatura_gplay,
+    sd.subscription_type,
+    sd.subscription_status,
+    CAST(NULL AS string) AS status,
+    sd.origin_id,
+    sd.origin_name,
+    DATE_DIFF( CURRENT_DATE(), COALESCE( MIN(sd.subscription_at), CAST(sd.activation_at AS DATE) ), DAY ) AS tempo_de_base
+  FROM
+   ${ref('sales_gold', 'subscription_details')} sd
+  LEFT JOIN
+        ${ref('sales_gold', 'customer_details')} cd
+  ON
+    sd.customer_id = cd.id
+    AND (sd.subscription_status = 'Ativo'
+      OR sd.subscription_status = 'Em Cancelamento')
+    AND LOWER(sd.origin_name) LIKE '%ação%funcionários%'
+    AND LOWER(sd.product_name) LIKE '%globoplay%'
+  GROUP BY
+    ALL ),
+  tempo_de_base_agp AS (
+  SELECT
+    *,
+    CASE
+      WHEN tempo_de_base <= 30 THEN '1. Até 1 mês'
+      WHEN tempo_de_base <= 60 THEN '2. Entre 1 e 2 Meses'
+      WHEN tempo_de_base <= 90 THEN '3. Entre 2 e 3 Meses'
+      WHEN tempo_de_base <= 180 THEN '4. Entre 3 e 6 Meses'
+      WHEN tempo_de_base <= 360 THEN '5. Entre 6 e 12 Meses'
+      WHEN tempo_de_base <= 720 THEN '6. Entre 12 e 24 Meses'
+      ELSE '7. Mais de 24 Meses'
+  END
+    AS tempo_de_base_agrupado
+  FROM
+    base
+  WHERE
+    globo_id IS NOT NULL
+),
+  step_final AS (
+  SELECT
+    globo_id,
+    id_asset,
+    tipo_assinante,
+    data_hora_compra,
+    dt_assinatura_comeco,
+    activation_at,
+    unsubscribe_at,
+    scheduled_unsubscribe_at,
+    end_cycle_at,
+    canal_compra,
+    flag_claro_wholesale,
+    Produto_Contratado,
+    produto,
+    origem,
+    assinatura_gplay,
+    subscription_type,
+    subscription_status,
+    status,
+    origin_id,
+    origin_name,
+    tempo_de_base,
+    tempo_de_base_agrupado,
+    mais_canais,
+    gplay_basico,
+    gplay_padrao,
+    gplay_padrao_ads,
+    combo,
+    IFNULL(telecine, FALSE) AS telecine,
+    IFNULL(cartola, FALSE) AS cartola,
+    IFNULL(deezer, FALSE) AS deezer,
+    IFNULL(discovery, FALSE) AS discovery,
+    IFNULL(disney, FALSE) AS disney,
+    IFNULL(flatv, FALSE) AS flatv,
+    IFNULL(lionsgate, FALSE) AS lionsgate,
+    IFNULL(premiere, FALSE) AS premiere,
+    IFNULL(star, FALSE) AS star,
+    IFNULL(combate, FALSE) AS combate
+  FROM
+    tempo_de_base_agp AS t
+  LEFT JOIN (
+    SELECT
+      globo_id,
+      MAX(telecine) AS telecine,
+      MAX(cartola) AS cartola,
+      MAX(deezer) AS deezer,
+      MAX(discovery) AS discovery,
+      MAX(disney) AS disney,
+      MAX(flatv) AS flatv,
+      MAX(lionsgate) AS lionsgate,
+      MAX(premiere) AS premiere,
+      MAX(star) AS star,
+      MAX(combate) AS combate
+    FROM (
+      SELECT
+        cd.globo_id,
+        sd.id,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%telecine%' THEN TRUE
+          ELSE FALSE
+      END
+        AS telecine,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%cartola%' THEN TRUE
+          ELSE FALSE
+      END
+        AS cartola,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%deezer%' THEN TRUE
+          ELSE FALSE
+      END
+        AS deezer,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%discovery%' THEN TRUE
+          ELSE FALSE
+      END
+        AS discovery,
+        CASE
+          WHEN LOWER(name) LIKE '%disney%' OR (LOWER(name) LIKE '%d+%') THEN TRUE
+          ELSE FALSE
+      END
+        AS disney,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%flatv%' THEN TRUE
+          ELSE FALSE
+      END
+        AS flatv,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%lionsgate%' THEN TRUE
+          ELSE FALSE
+      END
+        AS lionsgate,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%premiere%' THEN TRUE
+          ELSE FALSE
+      END
+        AS premiere,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%star%' THEN TRUE
+          ELSE FALSE
+      END
+        AS star,
+        CASE
+          WHEN LOWER(pd.name) LIKE '%combate%' THEN TRUE
+          ELSE FALSE
+      END
+        AS combate
+      FROM
+         ${ref('sales_gold', 'subscription_details')} sd
+      JOIN
+      ${ref('sales_gold', 'product_details')} pd
+      ON
+        sd.product_id = pd.id
+      LEFT JOIN
+            ${ref('sales_gold', 'customer_details')} cd
+      ON
+        sd.customer_id = cd.id
+      WHERE
+        sd.subscription_status='Ativo'
+        AND LOWER(sd.product_name) NOT LIKE '%globoplay%' )
+    GROUP BY
+      1 )
+  USING
+    (globo_id) ),
+  titular_sf AS (
+  SELECT
+    globo_id,
+    tipo_assinante,
+    ARRAY_AGG( STRUCT( id_asset,
+        data_hora_compra,
+        dt_assinatura_comeco,
+        activation_at,
+        unsubscribe_at,
+        scheduled_unsubscribe_at,
+        end_cycle_at,
+        canal_compra,
+        flag_claro_wholesale,
+        Produto_Contratado,
+        produto,
+        origem,
+        assinatura_gplay,
+        subscription_type,
+        subscription_status,
+        status,
+        origin_id,
+        origin_name,
+        tempo_de_base,
+        tempo_de_base_agrupado,
+        mais_canais,
+        gplay_basico,
+        gplay_padrao,
+        gplay_padrao_ads,
+        combo ) ) AS info,
+    telecine,
+    cartola,
+    deezer,
+    discovery,
+    disney,
+    flatv,
+    lionsgate,
+    premiere,
+    star,
+    combate
+  FROM
+    step_final
+  GROUP BY
+    globo_id,
+    tipo_assinante,
+    telecine,
+    cartola,
+    deezer,
+    discovery,
+    disney,
+    flatv,
+    lionsgate,
+    premiere,
+    star,
+    combate ),
+      dependentes_sf_step1 AS (
+SELECT distinct parent_customer_id,parent_globo_id,dependent_customer_id,dependent_globoid FROM ${ref('sales_gold', 'subscription_dependent_details')}
+where status='Active'  ),
+      dependentes_sf AS (
+  SELECT
+    dependentes_sf_step1.dependent_globoid AS globo_id,
+    'dependente' AS tipo_assinante,
+    titular_sf.info,
+    telecine,
+    cartola,
+    deezer,
+    discovery,
+    disney,
+    flatv,
+    lionsgate,
+    premiere,
+    star,
+    combate
+  FROM
+    dependentes_sf_step1
+  INNER JOIN
+    titular_sf
+  ON
+    dependentes_sf_step1.parent_globo_id = titular_sf.globo_id ),
+  base_martech AS (
+  SELECT
+    *
+  FROM
+    dependentes_sf
+  UNION ALL
+  SELECT
+    *
+  FROM
+    titular_sf )
+SELECT
+  DISTINCT *
+FROM
+  base_martech where globo_id is not null

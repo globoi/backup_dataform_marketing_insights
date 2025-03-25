@@ -1,0 +1,62 @@
+config {
+  type: "table",
+  name: "Descricao_Cancelamento_Pesquisa_Assinantes_30D_new",
+  schema: "pesquisas",
+  tags: ["pesquisas_staging_3",
+        "schedule_tag=pesquisa_Descricao_Cancelamento_Pesquisa_Assinantes_30D_new",
+        "schedule_cron=0 11 * * *"
+  ]
+}
+
+WITH base_cancelamento AS (
+  SELECT *
+  FROM ${ref("usuarios", "base_cancelamento_new")}
+  WHERE LOWER(name) LIKE "%globoplay%"
+),
+
+base_bruta AS (
+  SELECT * 
+  FROM ${ref("pesquisas", "pesquisa_assinante_30")}
+),
+
+dados_usuarios_assinantes AS (
+  SELECT * 
+  FROM ${ref("usuarios", "dados_usuarios_assinantes")}
+),
+
+cancelados AS (
+  SELECT 
+    user_id,
+    respondent_id,
+    date_modified
+  FROM base_bruta
+  LEFT JOIN dados_usuarios_assinantes
+  ON base_bruta.user_id = dados_usuarios_assinantes.globo_id
+  WHERE tempo_de_base_agrupado IS NULL
+),
+
+descricao_cancelamento_agg AS (
+  SELECT
+    globo_id, 
+    MAX(data_hora_cancelamento) as MAX_of_data_hora_cancelamento
+  FROM base_cancelamento
+  LEFT JOIN cancelados
+  ON base_cancelamento.globo_id = cancelados.user_id
+  GROUP BY globo_id
+)
+
+SELECT 
+  agg.globo_id,
+  MAX_of_data_hora_cancelamento,
+  data_hora_cancelamento,
+  dt_hr_cancelamento_final_ciclo,
+  motivo_cancelamento,
+  tipo_cancelamento,
+  u30_total_de_horas,
+  u30_total_horas_conteudos_pagos,
+  u30_programas_distintos,
+  u30_programas_pagos,
+  canal_compra
+FROM descricao_cancelamento_agg as agg
+LEFT JOIN base_cancelamento 
+ON agg.globo_id = base_cancelamento.globo_id AND agg.MAX_of_data_hora_cancelamento = base_cancelamento.data_hora_cancelamento

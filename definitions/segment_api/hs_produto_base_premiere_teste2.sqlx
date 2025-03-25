@@ -1,0 +1,22 @@
+config {
+  type: 'table',
+  tags: ['schedule_tag=segment_api_hs_produto_base_premiere_teste2'],
+  name: 'hs_produto_base_premiere_teste2',
+  schema: 'segment_api',
+  description: '',
+  columns: {
+  }
+}
+
+-- Atribuir atualização a segment_api
+
+-- CREATE OR REPLACE TABLE 
+-- `gglobo-mkt-ins-hdg-prd.segment_api.hs_produto_base_premiere_teste2` AS
+
+SELECT
+globo_id as user_id
+-- FROM `gglobo-mkt-ins-hdg-prd.experimentos.hs_produto_base_premiere_grupos_semana`
+FROM ${ref("experimentos", "hs_produto_base_premiere_grupos_semana")} 
+WHERE
+grupo_n = 2
+

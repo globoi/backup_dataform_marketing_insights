@@ -1,0 +1,489 @@
+config {
+    type: 'table',
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            tags: "olimpiadas_2024",
+            owner: "martech",
+            horario: "10h30min_18h30min"
+        }
+    },
+
+    name: 'raiox_olimpiadas_2024',
+    schema: 'olimpiadas_2024',
+    description: 'Tabela com os usuários que estão consumindo pelo menos 5 minutos de algum conteúdo olímpico.',
+    columns: {
+        globo_id: 'Código que identifica o usuário.',
+        DATA: 'Data do consumo.',
+        frequencia: 'Frequencia que o usuário assistiu o conteúdo.',
+        horas_episode: 'Quantidade de horas em íntegra que o usuário assistiu no dia.',
+        freq_episode: 'Quantidade de dias que o usuário consumiu em íntegras.',
+        horas_live: 'Quantidade de horas em live que o usuário assistiu no dia.',
+        freq_live: 'Quantidade de dias que o usuário consumiu em lives no dia.',
+        total_hrs_tvg: 'Quantidade de horas que o usuário assistiu conteúdos olímpicos na TVG.',
+        total_horas: 'Quantidade de horas que o usuário assistiu programas relacionados às Olimpíadas sem ser TVG.',
+        total_hrs_com_tvg: 'Soma das horas assistidas de olimpíadas na TVG e conteúdos olímpicos.',
+        cluster_olimpiadas: 'Classificação do usuários em Light User, Mid User e Heavy User, sendo: Heavy User consumo em TVG e conteúdos olímpicos por mais de 5 hrs, Mid User consumo entre 2 a 5 horas e Light User entre 0.05 e 2 horas.',
+        share_olimpiadas: 'Horas consumidas em olimpíadas sob todo o consumo dos usuários inclusive o de olimpíadas',
+        cluster_share_olimpiadas: 'Porcentagem de consumo do usuário sob as Olimpíadas.',
+        perfil_consumo: 'Subset mais assistido pelo assinante no dia desconsiderando o consumo em Olimpíadas',
+        canal_growth: 'Identifica se a assinatura do usuário foi através de algum canal de Growth.',
+        venda_growth: 'Identifica se foi uma venda oriunda de Growth.',
+        dt_assinatura_comeco: "Identifica a data mínima de assinatura do usuário.",
+        assinou_cancelou_olimp_21: "Identifica se o usuário assinou durante o período de 13/07/2021 a 15/08/21 e solicitou cancelamento no período de 15/08/2021 a 31/08/2021 e teve a assinatura cancelada definitivamente no ano de 2021.",
+        tipo_usuario: "Classifica se o usuário é um Assinante, Ex-Assinante ou Logado Free.",
+        assinou_2021: "Identifica se o usuário assinou no período de 13/07/2021 a 15/08/2021.",
+        sol_cancel_vol_21: "Identifica se o usuário solicitou cancelamento no período de 15/08/2021 a '31/08/2021.",
+        cancel_efet_21: "Identifica se o usuário teve a assinatura cancelada definitivamente no período de 15/08/2021 a 31/08/2021.",
+        assinou_2024: "Identifica se o usuário assnou no período de 22/07/2024 a 11/08/2024.",
+        sol_cancel_vol_24: "Identifica se o usuário solicitou cancelamento no período de 22/07/2024 a 11/08/2024.",
+        assistiu_olimp_2021: "Identifica se o usuário assistiu a Olimpíada de 2021.",
+        acessou_ge_d1: 'Identifica se o usuário acessou alguma matéria relacionada à Olimpiadas no ge no dia anterior.'
+
+    },
+}
+
+WITH
+  conteudo AS(
+  SELECT
+    *
+  FROM
+    ${ref("olimpiadas_2024", "ids_olimpiadas_2024")}),
+  base AS(
+  SELECT
+    userId AS globo_id,
+    mediaid,
+    program_id,
+    hours_watched,
+    DATE(TIMESTAMP, "America/Sao_Paulo") AS DATA,
+    date,
+    kind,
+    service_id
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  INNER JOIN
+    conteudo
+  USING
+    (mediaid)
+  WHERE
+    DATE(timestamp, "America/Sao_Paulo") BETWEEN '2024-07-22'
+    AND '2024-08-11'
+    AND date BETWEEN '2024-07-22'
+    AND '2024-08-11'),
+  usuarios AS(
+  SELECT
+    *
+  FROM
+    ${ref("olimpiadas_2024", "usuarios")}),
+  all_impjoin AS (
+  SELECT
+    *
+  FROM
+    base a
+  INNER JOIN
+    usuarios b4
+  USING
+    (globo_id)),
+  all_impjoin2 AS(
+  SELECT
+    *,
+    COUNT(DISTINCT date) OVER(PARTITION BY globo_id, DATA) AS frequencia
+  FROM
+    all_impjoin),
+  base1 AS(
+  SELECT
+    *
+  FROM (
+    SELECT
+      globo_id,
+      dt_assinatura_comeco,
+      assinou_cancelou_olimp_21,
+      assinou_2021,
+      sol_cancel_vol_21,
+      cancel_efet_21,
+      assinou_2024,
+      tipo_usuario,
+      hours_watched,
+      DATA,
+      date,
+      frequencia,
+      kind
+    FROM
+      all_impjoin2) PIVOT(SUM(IFNULL(hours_watched, 0)) horas,
+      COUNT(DISTINCT date) freq FOR kind IN('episode',
+        'live'))),
+  base2 AS(
+  SELECT
+    globo_id,
+    dt_assinatura_comeco,
+    assinou_cancelou_olimp_21,
+    assinou_2021,
+    sol_cancel_vol_21,
+    cancel_efet_21,
+    tipo_usuario,
+    DATA,
+    frequencia,
+    COALESCE(horas_episode, 0) AS horas_episode,
+    freq_episode,
+    COALESCE(horas_live, 0) AS horas_live,
+    freq_live
+  FROM
+    base1),
+  simulcast AS(
+  SELECT
+    DISTINCT sim.globoid.id_globoid AS globo_id,
+    DATA,
+    SUM(horas) AS total_hrs_simulcast
+  FROM
+    ${ref("pesquisa", "vw_simulcast_olimpiadas")} AS sim
+  WHERE
+    DATA >= '2024-07-22'
+    AND sim.globoid.id_globoid IS NOT NULL
+    AND LENGTH(sim.globoid.id_globoid) - LENGTH(REPLACE(sim.globoid.id_globoid, '-', '')) = 4
+    AND LOWER(canal) LIKE '%globo%'
+  GROUP BY
+    1,
+    2 ),
+  base5 AS(
+  SELECT
+    * EXCEPT(total_hrs_simulcast),
+    CASE
+      WHEN total_hrs_simulcast IS NULL THEN 0
+      ELSE total_hrs_simulcast
+  END
+    AS total_hrs_tvg,
+    (SUM(horas_episode + horas_live) OVER(PARTITION BY globo_id, DATA)) AS total_horas
+  FROM
+    base2
+  FULL OUTER JOIN
+    simulcast
+  USING
+    (globo_id,
+      DATA)),
+  base6 AS(
+  SELECT
+    *
+    --,
+    -- SUM(total_hrs_tvg+total_horas ) OVER(PARTITION BY globo_id, DATA) AS total_hrs_com_tvg
+  FROM
+    base5 ),
+  impression1 AS(
+  SELECT
+    userId AS globo_id,
+    mediaid,
+    program_id,
+    hours_watched,
+    DATE(TIMESTAMP, "America/Sao_Paulo") AS DATA
+  FROM
+    ${ref("consumo_enriched", "all_impression")}
+  WHERE
+    DATE(timestamp, "America/Sao_Paulo") BETWEEN '2024-07-22'
+    AND '2024-08-11'
+    AND date BETWEEN '2024-07-22'
+    AND '2024-08-11'),
+  impression2 AS(
+  SELECT
+    *
+  FROM
+    impression1 i
+  WHERE
+    NOT EXISTS(
+    SELECT
+      *
+    FROM
+      conteudo AS c
+    WHERE
+      i.mediaid = c.mediaid)),
+  impression_join AS(
+  SELECT
+    * EXCEPT(mediaid),
+    i.mediaid,
+    CASE
+      WHEN service_id = 6807 THEN 'mais_canais'
+      WHEN program_subset = 'novelas' THEN 'novela'
+      WHEN program_subset = 'series' THEN 'series'
+      WHEN program_subset IN('filmes',
+      'movies') THEN 'filmes'
+      WHEN program_id = 9095 THEN 'ao_vivo_globo'
+      ELSE 'outros_conteudos'
+  END
+    AS grupo
+  FROM
+    impression2 i
+  LEFT JOIN (
+    SELECT
+      id AS mediaid,
+      kind,
+      program_subset,
+      service_id
+    FROM
+      ${ref("conteudo_enriched", "all_content")}) AS conteudo
+    USING
+      (mediaid)),
+    base_geral AS(
+    SELECT
+      DISTINCT globo_id,
+      dt_assinatura_comeco
+    FROM
+      base6),
+    ai AS(
+    SELECT
+      *
+    FROM
+      base_geral b
+    LEFT JOIN
+      impression_join i
+    USING
+      (globo_id)),
+    ai2 AS(
+    SELECT
+      *
+    FROM (
+      SELECT
+        globo_id,
+        dt_assinatura_comeco,
+        DATA,
+        hours_watched,
+        grupo
+      FROM
+        ai) PIVOT(SUM(IFNULL(hours_watched, 0)) horas FOR grupo IN('mais_canais',
+          'novela',
+          'series',
+          'filmes',
+          'ao_vivo_globo',
+          'outros_conteudos'))),
+    consulta AS(
+    SELECT
+      *
+    FROM
+      ai2),
+    consulta2 AS(
+    SELECT
+      *
+    FROM
+      base6
+    LEFT JOIN
+      consulta
+    USING
+      (globo_id,
+        dt_assinatura_comeco,
+        DATA)),
+    consulta3 AS(
+    SELECT
+      * EXCEPT(horas_filmes,
+        horas_mais_canais,
+        horas_novela,
+        horas_series,
+        horas_outros_conteudos,
+        horas_ao_vivo_globo,
+        total_horas),
+      COALESCE(total_horas, 0) AS total_horas,
+      COALESCE(horas_filmes, 0) AS horas_filmes,
+      COALESCE(horas_mais_canais, 0) AS horas_mais_canais,
+      COALESCE(horas_novela, 0) AS horas_novela,
+      COALESCE(horas_series, 0) AS horas_series,
+      COALESCE(horas_outros_conteudos, 0) AS horas_outros_conteudos,
+      COALESCE(horas_ao_vivo_globo, 0) AS horas_ao_vivo_globo
+    FROM
+      consulta2),
+    baseolimp2 AS(
+    SELECT
+      * EXCEPT(horas_ao_vivo_globo),
+      CASE WHEN(horas_ao_vivo_globo - total_hrs_tvg) < 0 THEN 0 ELSE(horas_ao_vivo_globo - total_hrs_tvg)
+    END
+      AS horas_ao_vivo_globo
+    FROM
+      consulta3),
+    share_olimp AS(
+    SELECT
+      *
+    FROM
+      baseolimp2),
+    cluster_share AS(
+    SELECT
+      *
+    FROM
+      share_olimp),
+    final AS(
+    SELECT
+      *,
+      CASE WHEN((horas_filmes > horas_novela) AND(horas_filmes > horas_series) AND(horas_filmes > horas_mais_canais) AND(horas_filmes > horas_outros_conteudos) AND(horas_filmes > horas_ao_vivo_globo)) THEN 'Filmes' WHEN((horas_novela > horas_outros_conteudos) AND(horas_novela > horas_series) AND(horas_novela > horas_mais_canais) AND(horas_novela > horas_ao_vivo_globo)) THEN 'Novelas' WHEN((horas_series > horas_outros_conteudos) AND(horas_series > horas_mais_canais) AND(horas_series > horas_ao_vivo_globo)) THEN 'Series' WHEN((horas_mais_canais > horas_outros_conteudos) AND(horas_mais_canais > horas_ao_vivo_globo)) THEN 'Mais Canais' WHEN(horas_ao_vivo_globo > horas_outros_conteudos) THEN 'Ao Vivo Globo'
+        ELSE 'Outros Conteudos'
+    END
+      AS perfil_consumo
+    FROM
+      cluster_share
+    ORDER BY
+      globo_id,
+      DATA ASC),
+    ge AS(
+    SELECT
+      DATA,
+      globoId,
+      h.tipoConsumo,
+      h.screenName,
+      h.pagePath,
+      h.pageTitle,
+      h.pathEditoria
+    FROM
+      ${ref("foundation_ge", "foundation_ge_sessions_v3")} AS ge,
+      UNNEST(ge.hits) AS h
+    WHERE
+      DATE(DATA) = DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+      AND globoId IS NOT NULL
+      AND LENGTH(globoId) - LENGTH(REPLACE(globoId, '-', '')) = 4
+      AND LOWER(h.pagePath) LIKE '%olimpiadas%'),
+    ge2 AS(
+    SELECT
+      DATA,
+      globoId,
+      pagePath,
+      videoPrograma,
+      videoEpisodio,
+      editoriaN1,
+      editoriaN2,
+      editoriaN3
+    FROM
+      ${ref("foundation_ge_videos", "foundation_ge_videos_raw")}
+    WHERE
+      DATE(DATA) = DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 1 DAY)
+      AND globoId IS NOT NULL
+      AND LENGTH(globoId) - LENGTH(REPLACE(globoId, '-', '')) = 4
+      AND LOWER(pagePath) LIKE '%olimpiadas%'),
+    uniao_ge AS(
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS acessou_ge_d1
+    FROM
+      ge
+    UNION DISTINCT
+    SELECT
+      DISTINCT globoId AS globo_id,
+      TRUE AS acessou_ge_d1
+    FROM
+      ge2),
+    consumo_all AS(
+    SELECT
+      *
+    FROM
+      final
+    LEFT JOIN
+      uniao_ge
+    USING
+      (globo_id)),
+    cte_web AS(
+    SELECT
+      DISTINCT globo_id,
+      canal_growth,
+      TRUE AS venda_growth
+    FROM
+      ${ref("reports", "vendas_sf")} AS vd
+    INNER JOIN (
+      SELECT
+        DISTINCT origem_id,
+        origem,
+        produto,
+        canal AS canal_growth
+      FROM
+        ${ref("comunicacao", "origemids_growth")}
+      WHERE
+        LOWER(produto) LIKE '%%globoplay') AS web
+    USING
+      (origem_id)
+    WHERE
+      dt_venda >= '2024-07-22'),
+    cte_app AS(
+    SELECT
+      customer_user_id AS globo_id,
+      COALESCE(af_prt, media_source) AS canal_growth,
+      TRUE AS venda_growth
+    FROM
+      ${ref("AppsFlyer", "VendasAppsflyer_v2_1")}
+    WHERE
+      DATE(event_time_utc) >= '2024-07-22'
+      AND LOWER(service_name) LIKE '%globoplay%'),
+    uniao_growth AS(
+    SELECT
+      *
+    FROM
+      cte_web
+    UNION DISTINCT
+    SELECT
+      *
+    FROM
+      cte_app),
+    bloco_final AS (
+    SELECT
+      * EXCEPT(acessou_ge_d1,
+        dt_assinatura_comeco,
+        assinou_cancelou_olimp_21,
+        tipo_usuario,
+        assinou_2021,
+        sol_cancel_vol_21,
+        cancel_efet_21,
+        assinou_2024,
+        sol_cancel_vol_24,
+        assistiu_olimp_2021),
+      --  horas_filmes,
+      --  horas_mais_canais,
+      --  horas_novela,
+      -- horas_series,
+      -- horas_outros_conteudos,
+      -- horas_ao_vivo_globo),
+      usuarios.dt_assinatura_comeco,
+      usuarios.assinou_cancelou_olimp_21,
+      usuarios.tipo_usuario,
+      usuarios.assinou_2021,
+      usuarios.sol_cancel_vol_21,
+      usuarios.cancel_efet_21,
+      usuarios.assinou_2024,
+      usuarios.sol_cancel_vol_24,
+      usuarios.assistiu_olimp_2021,
+      IFNULL(acessou_ge_d1, FALSE) AS acessou_ge_d1
+    FROM
+      usuarios
+    INNER JOIN
+      consumo_all
+    USING
+      (globo_id)
+    LEFT JOIN
+      uniao_growth
+    USING
+      (globo_id) ),
+    tvg AS (
+    SELECT
+      *,
+      SUM(total_hrs_tvg+total_horas) OVER(PARTITION BY globo_id, DATA) AS total_hrs_com_tvg
+    FROM
+      bloco_final),
+    CLUSTER AS (
+    SELECT
+      * EXCEPT(horas_filmes,
+        horas_mais_canais,
+        horas_novela,
+        horas_series,
+        horas_outros_conteudos,
+        horas_ao_vivo_globo),
+      CASE
+        WHEN total_hrs_com_tvg >= 5 THEN '3. Heavy User'
+        WHEN total_hrs_com_tvg BETWEEN 0.05
+      AND 2 THEN '1. Light User'
+        WHEN total_hrs_com_tvg BETWEEN 2 AND 5 THEN '2. Mid User'
+        ELSE 'Fora do cluster'
+    END
+      AS cluster_olimpiadas,
+      SAFE_DIVIDE(total_hrs_com_tvg,horas_mais_canais + horas_novela + horas_series + horas_filmes + horas_ao_vivo_globo + horas_outros_conteudos + total_hrs_com_tvg) AS share_olimpiadas
+    FROM
+      tvg)
+  SELECT
+    *,
+    CASE
+      WHEN share_olimpiadas <= 0.5 THEN '00%-50%'
+      WHEN share_olimpiadas <= 0.8 THEN '51%-80%'
+      ELSE '81%-100%'
+  END
+    AS cluster_share_olimpiadas
+  FROM
+    CLUSTER
+  WHERE
+    total_hrs_com_tvg>=0.084

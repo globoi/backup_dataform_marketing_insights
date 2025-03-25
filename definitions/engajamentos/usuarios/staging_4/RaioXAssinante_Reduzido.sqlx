@@ -1,0 +1,85 @@
+config {
+  type: "table",
+  name: "RaioXAssinante_Reduzido",
+  schema: "usuarios",
+  tags: ["usuarios_staging_4",
+        "schedule_tag=usuarios_raioxassinante_reduzido"
+  ],
+    bigquery: {
+        labels: {
+            schedule: "diario",
+            consumo: "semanal",
+            tags: "usuarios",
+            owner: "mins",
+            horario: "11h00min"
+        }
+    },
+    description: 'Tabela das últimas 4 semanas com o consumo e clusters de engajamento dos assinantes ativos.',
+    columns: {
+        globo_id: 'Código de identificação do usuário.',
+        semana: 'Semana que o usuário consumiu algum conteúdo.',
+        assetid: 'Código que identifica a assinatura.',
+        data_hora_compra: 'Identifica a data e hora da compra da assinatura.',
+        frequencia: 'Quantidade de dias na semana que o usuário consumiu algum conteúdo.',
+        Ao_Vivo_Tv_Globo_horas: 'Quantidade de horas assistidas na semana do ao vivo Globo TVG (program_id 9095).',
+        Ao_Vivo_Tv_Globo_qtnd_programas: 'Quantidade de programas assistidos na semana do ao vivo Globo TVG (program_id 9095). Nesse caso o valor é 0 ou 1, pois só existe 1 program_id.',
+        Ao_Vivo_Tv_Globo_freq: 'Quantidade de dias na semana que o usuário consumiu o ao vivo Globo TVG (program_id 9095).',
+        Ao_Vivo_Tv_Globo_qtnd_midias: 'Quantidade de mídias assistidas na semana do ao vivo Globo TVG (program_id 9095). Alguma mídia atrelada a esse program_id.',
+        Filmes_horas: 'Quantidade de horas de filmes assistidos na semana. Exemplo: Conteúdos do Telecine, Megapix, Universal, Studio Universal, USA e programas que contenham os subsets filmes e movies.',
+        Filmes_qtnd_programas: 'Quantidade de filmes assistidos na semana.',
+        Filmes_freq: 'Quantidades de dias que o usuário assistiu algum filme na semana.',
+        Filmes_qtnd_midias: 'Quantidade de filmes assistidos na semana.',
+        Novelas_horas: 'Quantidade de horas de novelas assistidas na semana.',
+        Novelas_qtnd_programas: 'Quantidade de novelas assistidas na semana.',
+        Novelas_freq: 'Quantidades de dias que o usuário assistiu alguma novela na semana.',
+        Novelas_qtnd_midias: 'Quantidade de mídias distintas de novelas assistidas na semana.',
+        Series_horas: 'Quantidade de horas de séries assistidas na semana.',
+        Series_qtnd_programas: 'Quantidade de séries assistidas na semana.',
+        Series_freq: 'Quantidades de dias que o usuário assistiu alguma série na semana.',
+        Series_qtnd_midias: 'Quantidade de mídias distintas de séries assistidas na semana.',
+        Esportes_horas: 'Quantidade de horas de conteúdos esportivos assistidos na semana. Exemplo: Conteúdos do Combate, Premiere, Sportv, GE ou que tenham o subset sports atrelado.',
+        Esportes_qtnd_programas: 'Quantidade de programas de conteúdos esportivos assistidos na semana.',
+        Esportes_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo esportivo na semana.',
+        Esportes_qtnd_midias: 'Quantidade de mídias distintas de conteúdos esportivos assistidos na semana.',
+        Variedades_horas: 'Quantidade de horas de conteúdos de variedades assistidos na semana. Exemplo: Conteúdos do Receitas, Multishow, Viva (que não contenha o subset novela) e programas com o subset varieties.',
+        Variedades_qtnd_programas: 'Quantidade de programas de conteúdos de variedades assistidos na semana.',
+        Variedades_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo de variedades na semana.',
+        Variedades_qtnd_midias: 'Quantidade de mídias distintas de conteúdos de variedades assistidos na semana.',
+        Jornalismo_horas: 'Quantidade de horas de conteúdos jornalísticos assistidos na semana. Exemplo: Conteúdos GloboNews, G1 ou programas que contenham o subset news.',
+        Jornalismo_qtnd_programas: 'Quantidade de programas de conteúdos jornalísticos assistidos na semana.',
+        Jornalismo_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo jornalístico na semana.',
+        Jornalismo_qtnd_midias: 'Quantidade de mídias distintas de conteúdos jornalísticos assistidos na semana.',
+        Reality_horas: 'Quantidade de horas de realities assistidos na semana. Exemplo: Programas que contenham o subset realities.',
+        Reality_qtnd_programas: 'Quantidade de programas de realities assistidos na semana.',
+        Reality_freq: 'Quantidades de dias que o usuário assistiu algum conteúdo de reality na semana.',
+        Reality_qtnd_midias: 'Quantidade de mídias distintas de realities assistidos na semana.',
+        Outros_Conteudos_horas: 'Quantidade de horas de outros conteúdos assistidos na semana. Exemplo: Todos os outros conteúdos que não se enquadram nos clusters anteriores.',
+        Outros_Conteudos_qtnd_programas: 'Quantidade de programas de outros conteúdos assistidos na semana.',
+        Outros_Conteudos_freq: 'Quantidades de dias que o usuário assistiu algum programa de outros conteúdos na semana.',
+        Outros_Conteudos_qtnd_midias: 'Quantidade de mídias distintas de outros conteúdos assistidos na semana.',
+        total_horas: 'Total de horas assistidas pelo usuário na semana.',
+        Cluster_Conteudo_Mais_Assistido: 'Identifica o cluster do conteúdo mais assistido pelo usuário naquela semana. Exemplo: Ao Vivo Tv Globo, Esportes, Filmes, Jornalismo, Novelas, Outros Conteúdos, Reality, Series, Variedades ou Sem Consumo Suficiente (assistiu menos de 1 hora em todos os clusters).',
+        horas_dia_de_semana: 'Quantidade de horas que o usuário consumiu de Segunda a Quinta.',
+        horas_final_de_semana: 'Quantidade de horas que o usuário consumiu de Sexta a Domingo.',
+        perfil_dia_da_semana: 'Identifica se o usuário consome mais em dia da semana ou final de semana.',
+        horas_madrugada: 'Quantidade de horas que o usuário consumiu entre 00:00 e 05:59.',
+        horas_manha: 'Quantidade de horas que o usuário consumiu entre 06:00 e 11:59.',
+        horas_noite: 'Quantidade de horas que o usuário consumiu entre 18:00 e 23:59.',
+        horas_tarde: 'Quantidade de horas que o usuário consumiu entre 12:00 e 17:59.',
+        perfil_periodo_do_dia: 'Identifica qual o período que o usuário mais consume, sendo de manhã, tarde, noite ou madrugada.',
+        Cluster_Engajamento: 'Cluster de engajamento antigo, utilizado até 09/24. Onde dividíamos a base em quartis, particionado pela semana e ordenado pela quantidade total de horas na semana. Ou seja, quartil 1 = 4. Heavy Users, quartil 2 = 3. Mid-Heavy Users, quartil 3 = 2. Mid-Light Users e quartil 4 = 1. Light Users.',
+        novo_cluster_engajamento: 'Novo cluster de engajamento base no total de horas consumidas na semana. Exemplo: Se o usuário consumiu mais de 10 horas na semana, ele é considerado 4. Heavy Users, se consumiu entre 0 e 1 hora, ele é considerado 1. Light Users, se consumiu entre 1 e 5 horas, ele é considerado 2. Mid-Light Users, se consumiu entre 5 e 10 horas é considerado 3. Mid-Heavy Users e se não estiver em nenhum range desse, é considerado Sem consumo suficiente.',
+        diversidade: 'É a soma de clusters que o usuário consumiu na semana. Exemplo, se o usuário consumiu mais de 1 hr de filmes e novelas, ele terá uma diversidade de 2, mas se ele consumiu menos de 1 hora de filmes e mais de uma hora de novelas, ele terá uma diversidade de 1.',
+        Diversidade_Conteudo: 'É a soma de todos os programas assistidos pelo usuário na semana. Exemplo: Se o usuário assistiu 2 novelas e 3 filmes, ele terá uma diversidade de conteúdo de 5.'
+    }
+}
+
+
+
+
+SELECT
+*
+FROM
+   ${ref("usuarios", "RaioXAssinante")}
+WHERE
+  DATE_DIFF(CURRENT_DATE(), semana, DAY) <= 35

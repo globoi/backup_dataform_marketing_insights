@@ -1,0 +1,82 @@
+config {
+  type: 'table',
+  name: 'base_ultima_abertura_app',
+  schema: 'comunicacao',
+  tags: ['comunicacao_staging_4','schedule_tag=comunicacao_base_ultima_abertura_app'],
+  description: '',
+  columns: {
+  }
+}
+WITH
+max_data_abertura_app_1 AS (
+  SELECT
+    globo_id,
+    MAX(occurred) AS Data_Abertura
+  FROM
+    ${ref("clean", "urban_app_open_event")}
+  WHERE
+    product = 'globoplay'
+  GROUP BY
+    globo_id
+),
+
+max_data_abertura_app_2 AS (
+  SELECT
+    globo_id, 
+    occurred AS Data_Abertura,
+    push_id
+  FROM
+    ${ref("clean", "urban_app_open_event")}
+  WHERE
+    product = 'globoplay'
+),
+
+max_data_abertura_app_3 AS (
+  SELECT
+    *
+  FROM
+    max_data_abertura_app_2
+    INNER JOIN max_data_abertura_app_1
+    USING(globo_id, Data_Abertura)
+),
+
+max_data_abertura_com_push_1 AS (
+  SELECT
+  up.alert AS Push_Descricao,
+  up.ios_alert_title AS Push_Titulo,
+  md.push_id,
+  md.globo_id,
+  md.Data_Abertura
+  FROM
+    max_data_abertura_app_3 md
+    LEFT JOIN ${ref("derived", "urban_push_campaign")} AS up  
+    ON up.push_id = md.push_id
+    AND up.product = 'globoplay'
+),
+
+max_data_abertura_com_push_2 AS (
+  SELECT
+   * EXCEPT(Data_Abertura),
+   DATE(Data_Abertura, "America/Sao_Paulo") AS Data_Abertura
+  FROM
+    max_data_abertura_com_push_1
+),
+
+dados_usarios_assinantes AS (
+  SELECT
+    globo_id, id_asset, tipo_assinante, mais_canais,
+    dt_assinatura_comeco, canal_compra, data_hora_compra, 
+    produto, tempo_de_base_agrupado, numero_assinaturas, 
+    numero_dependentes, gender, age, address_state, first_play, 
+    first_play_subset, data_first_play, ultimo_consumo, 
+    ultimo_consumo_subset, data_ultimo_consumo
+  FROM
+    ${ref("usuarios", "dados_usuarios_assinantes")}
+)
+
+SELECT
+  *
+FROM
+  dados_usarios_assinantes
+  LEFT JOIN max_data_abertura_com_push_2
+  USING(globo_id)

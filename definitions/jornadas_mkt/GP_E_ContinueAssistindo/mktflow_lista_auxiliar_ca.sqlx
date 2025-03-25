@@ -1,0 +1,54 @@
+config {
+  type: "table",
+  name: "mktflow_lista_auxiliar_ca",
+  schema: "jornadas_mkt",
+  tags: ["GP_E_ContinueAssistindo",'schedule_tag=jornadas_mkt_mktflow_lista_auxiliar_ca']
+,bigquery: {
+    labels: {
+      mktcloud: "true"
+    }
+  }
+}
+
+WITH
+new_dataset AS (
+    SELECT
+        *
+    FROM
+        ${ref("jornadas_mkt", "continue_assistindo_incremental")}
+    WHERE
+        dt_proc BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 14 DAY) AND DATE_SUB(CURRENT_DATE(), INTERVAL 5 DAY)
+    QUALIFY
+        ROW_NUMBER() OVER(PARTITION BY globo_id, program_id, ultimo_consumo ORDER BY dt_proc) = 1     
+),
+
+
+new_dataset_1 AS (
+    SELECT
+        nd.*,
+        imp.`timestamp`
+    FROM
+        new_dataset nd
+        LEFT JOIN (
+            SELECT `timestamp`, userid, program_id
+            FROM ${ref("consumo_enriched","impression")}
+            WHERE DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) <= `date`
+        ) imp
+        ON nd.globo_id = imp.userid
+        AND nd.program_id = imp.program_id
+        AND DATE(imp.`timestamp`) >= nd.dt_proc
+    QUALIFY
+        ROW_NUMBER() OVER(PARTITION BY globo_id, program_id, ultimo_consumo ORDER BY `timestamp`) = 1
+        
+),
+
+lista_auxiliar AS (
+    SELECT
+        globo_id,
+        program_id,
+        `timestamp` IS NOT NULL AS Consumiu
+    FROM
+        new_dataset_1
+)
+
+SELECT * FROM lista_auxiliar
