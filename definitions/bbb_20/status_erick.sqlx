@@ -1,0 +1,51 @@
+config {
+  type: 'table',
+  name: 'status_erick',
+  schema: 'bbb_20',
+  tags: ['bbb_20'],
+  description: '',
+  columns: {
+    globo_id: ''
+  },
+}
+
+WITH base_1 AS (
+  SELECT 
+      globo_id,
+      Tipo_Assinante,
+      status_calculado,
+      plano,
+      canal_compra,
+      dt_assinatura_inicio,
+      data_da_suspensao,
+      dt_assinatura_fim,
+      sistema,
+  ROW_NUMBER() OVER(PARTITION BY globo_id ORDER BY dt_assinatura_inicio DESC) AS `last`
+  FROM ${ref("usuarios", "base_completa")} 
+),
+base AS (
+  SELECT * EXCEPT(last) 
+  FROM base_1
+  WHERE last = 1
+),
+asset AS (
+  SELECT
+    globo_id,
+    data_hora_compra AS data_hora_compra_asset,
+    data_reativacao,
+    data_conversao_efetiva AS data_conversao_efetiva_asset,
+    data_hora_cancelamento AS data_hora_cancelamento_asset,
+    dt_hr_cancelamento_final_ciclo AS dt_hr_cancelamento_final_ciclo_asset,
+    canal_compra AS canal_compra_asset,
+    status AS status_asset,
+    Cancelamento
+  FROM ${ref("usuarios", "asset_tratada")} 
+
+)
+
+
+select *
+from 
+  ${ref("bbb_20", "retencao_bbb")} 
+  LEFT JOIN asset USING(globo_id)
+  LEFT JOIN base USING(globo_id)

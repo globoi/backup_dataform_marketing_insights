@@ -1,0 +1,126 @@
+config {
+  type: 'table',
+  name: 'Base_bbb',
+  tags: ['bbb_20'],
+  schema: 'bbb_20',
+  description: '',
+  columns: {
+    globo_id: '',
+    program_subset: '',
+    program_id: '',
+    program_title: '',
+    mediaid: '',
+    title: '',
+    horas_consumidas: '',
+    primeiro_consumo: '',
+    ultimo_consumo: '',
+    history_sum: '',
+    videoviews: '',
+    terminou_conteudo: '',
+    serie_da_camapanha: '',
+    consumiu_antes_da_campanha: '',
+    consumiu_um_episodio: ''
+  }
+}
+
+WITH watched_end AS (
+  SELECT
+    userid as globo_id,
+    program_subset,
+    program_id,
+    program_title,
+    hours_watched,
+    mediaid,
+    title,
+    history_sum,
+    min_timestamp as primeiro_consumo,
+    max_timestamp as ultimo_consumo,
+    history_row
+  FROM
+   ${ref("consumo_derived", "watched_end")}
+  WHERE
+    program_subset = 'series'
+    OR program_subset = 'novelas'
+    OR program_subset = 'movies'
+    OR program_id = 11866
+),
+df_join AS (
+  SELECT
+    *
+  EXCEPT
+    (globo_id),
+    we.globo_id
+  FROM
+    watched_end we
+    RIGHT JOIN ${ref("bbb_20", "retencao_bbb")} ret ON we.globo_id = ret.globo_id
+),
+df_agg AS (
+  SELECT
+    globo_id,
+    program_subset,
+    program_id,
+    program_title,
+    mediaid,
+    title,
+    SUM (hours_watched) AS horas_consumidas,
+    MAX(primeiro_consumo) AS primeiro_consumo,
+    MAX (ultimo_consumo) AS ultimo_consumo,
+    MAX(history_sum) AS history_sum,
+    MAX(history_row) AS videoviews
+  FROM
+    df_join
+  GROUP BY
+    globo_id,
+    program_subset,
+    program_id,
+    program_title,
+    mediaid,
+    title
+),
+df_tratada AS (
+  SELECT
+    *,
+    IF(history_sum >= 75, TRUE, FALSE) AS terminou_conteudo,
+    IF(
+      program_id IN (11866, 10962, 11458, 11093, 11759),
+      TRUE,
+      FALSE
+    ) AS serie_da_campanha,
+    MIN(primeiro_consumo) OVER(PARTITION BY globo_id, program_id) AS Row,
+  FROM
+    df_agg
+),
+df_tratada2 AS (
+  SELECT
+    *,
+    IF(Row <= '2020-03-30', TRUE, FALSE) AS consumiu_antes_da_campanha,
+  FROM
+    df_tratada
+),
+df_tratada3 AS (
+  SELECT
+    *,
+    MAX(history_sum) OVER(
+      PARTITION BY globo_id,
+      program_id,
+      consumiu_antes_da_campanha
+    ) AS RowNumber,
+  FROM
+    df_tratada2
+),
+df_tratada4 AS (
+  SELECT
+    *,
+    IF(
+      consumiu_antes_da_campanha IS TRUE
+      AND RowNumber >= 75,
+      TRUE,
+      FALSE
+    ) AS consumiu_um_episodio,
+  FROM
+    df_tratada3
+)
+select
+  * EXCEPT (Row, RowNumber)
+from
+  df_tratada4

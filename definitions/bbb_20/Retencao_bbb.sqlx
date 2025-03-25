@@ -1,0 +1,64 @@
+config {
+  type: 'table',
+  name: 'retencao_bbb',
+  schema: 'bbb_20',
+  tags: ['bbb_20'],
+  description: '',
+  columns: {
+    globo_id: ''
+  },
+}
+
+WITH impression AS (
+  select
+    userid AS globo_id,
+    hours_watched,
+    timestamp,
+    EXTRACT(
+      YEAR
+      FROM
+        timestamp
+    )
+  from
+    ${ref("consumo_enriched", "all_impression")}
+  where
+    program_id = 12082
+    AND EXTRACT(
+      YEAR
+      FROM
+        timestamp
+    ) = 2020
+    AND date < '2021-01-01'
+),
+bcompleta AS(
+  select
+    globo_id
+  from
+    ${ref("usuarios", "base_completa")}
+  where
+    CAST(dt_assinatura_inicio AS DATE) between '2020-01-21'
+    AND '2020-04-20'
+),
+imp_join_bc AS (
+  SELECT
+    I.globo_id,
+    hours_watched
+  FROM
+    impression I
+    INNER JOIN bcompleta B ON I.globo_id = B.globo_id
+),
+ai AS (
+  SELECT
+    globo_id,
+    SUM(hours_watched) AS horas
+  FROM
+    imp_join_bc
+  GROUP BY
+    globo_id
+)
+select
+  globo_id
+from
+  ai
+where
+  horas > 0.25

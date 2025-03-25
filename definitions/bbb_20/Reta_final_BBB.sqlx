@@ -1,0 +1,332 @@
+config {
+  type: 'table',
+  name: 'Reta_final_BBB',
+  tags: ['bbb_20'],
+  schema: 'bbb_20',
+  description: '',
+}
+
+WITH step1 AS (
+  SELECT *,
+  CASE 
+    WHEN history_sum < 50 THEN 'Inferior_a_50'
+    WHEN history_sum < 75 THEN 'Entre_50_e_75'
+    WHEN history_sum >= 75 THEN 'Superior_a_75'
+    ELSE 'Sem consumo'
+  END AS Faixa_Completude
+  FROM ${ref("bbb_20", "Base_bbb")}
+),
+
+pivot1 AS (
+  SELECT * FROM (
+    SELECT 
+      primeiro_consumo,
+      globo_id,
+      program_subset,
+      program_id,
+      program_title,
+      serie_da_campanha,
+      mediaid,
+      horas_consumidas,
+      videoviews,
+      Faixa_Completude
+    FROM step1
+  )
+  PIVOT(
+    COUNT(DISTINCT mediaid) AS Midia, 
+    SUM(horas_consumidas) AS Horas, 
+    SUM(videoviews) AS Videoviews
+  FOR Faixa_Completude IN ('Inferior_a_50', 'Entre_50_e_75', 'Superior_a_75')
+  )
+),
+
+pivot2 AS (
+  SELECT * REPLACE(
+    IF(Midia_Inferior_a_50 IS NULL, 0, Midia_Inferior_a_50) AS Midia_Inferior_a_50,
+    IF(Horas_Inferior_a_50 IS NULL, 0, Horas_Inferior_a_50) AS Horas_Inferior_a_50,
+    IF(Videoviews_Inferior_a_50 IS NULL, 0, Videoviews_Inferior_a_50) AS Videoviews_Inferior_a_50,
+    IF(Midia_Entre_50_e_75 IS NULL, 0, Midia_Entre_50_e_75) AS Midia_Entre_50_e_75,
+    IF(Horas_Entre_50_e_75 IS NULL, 0, Horas_Entre_50_e_75) AS Horas_Entre_50_e_75,
+    IF(Videoviews_Entre_50_e_75 IS NULL, 0, Videoviews_Entre_50_e_75) AS Videoviews_Entre_50_e_75,
+    IF(Midia_Superior_a_75 IS NULL, 0, Midia_Superior_a_75) AS Midia_Superior_a_75,
+    IF(Horas_Superior_a_75 IS NULL, 0, Horas_Superior_a_75) AS Horas_Superior_a_75,
+    IF(Videoviews_Superior_a_75 IS NULL, 0, Videoviews_Superior_a_75) AS Videoviews_Superior_a_75
+  )
+  FROM pivot1
+),
+
+organized AS (
+  SELECT
+  TIMESTAMP_TRUNC(primeiro_consumo, DAY, "America/Sao_Paulo") AS Data,
+  globo_id,
+  program_subset,
+  program_id,
+  program_title,
+  Horas_Inferior_a_50 + Horas_Entre_50_e_75 + Horas_Superior_a_75 AS Horas_Total,
+  Videoviews_Inferior_a_50 + Videoviews_Entre_50_e_75 + Videoviews_Superior_a_75 AS Videoviews_Total,
+  Midia_Inferior_a_50 AS Inferior_50_Midia,
+  Horas_Inferior_a_50 AS Inferior_50_Horas,
+  Videoviews_Inferior_a_50 AS Inferior_50_Videoviews,
+  Midia_Entre_50_e_75 AS Entre_50_75_Midia,
+  Horas_Entre_50_e_75 AS Entre_50_75_Horas,
+  Videoviews_Entre_50_e_75 AS Entre_50_75_Videoviews,
+  Midia_Superior_a_75 AS Superior_75_Midias,
+  Horas_Superior_a_75 AS Superior_75_Horas,
+  Videoviews_Superior_a_75 AS Superior_75_Videoviews,
+  FROM pivot2
+),
+
+assistiu_killing_eve AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_Killing_Eve
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 10941 AND primeiro_consumo >= TIMESTAMP("2020-03-29 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_manifest AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_Manifest
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 11759 AND primeiro_consumo >= TIMESTAMP("2020-03-31 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_tbbt AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_TBBT
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 11093 AND primeiro_consumo >= TIMESTAMP("2020-03-31 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_chicago_fire AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_Chicago_Fire
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 10962 AND primeiro_consumo >= TIMESTAMP("2020-03-31 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_vampire_diaries AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_Vampire_Diaries
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 11458 AND primeiro_consumo >= TIMESTAMP("2020-03-31 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_1_contra_todos AS (
+  SELECT *,
+  CASE
+    WHEN  `true` >= 1 THEN 'Já assistiu anteriormente'
+    WHEN  `true` IS NULL AND `false` = 1 THEN 'Um episódio incompleto'
+    WHEN `true` IS NULL AND `false` >1 THEN 'Já assistiu anteriormente'
+    ELSE 'Entender'
+  END AS Status_1_Contra_Todos
+  FROM (
+    SELECT 
+    globo_id,
+    mediaid,
+    terminou_conteudo
+    FROM ${ref("bbb_20" ,"Base_bbb")}
+    WHERE program_id = 11866 AND primeiro_consumo >= TIMESTAMP("2020-03-31 00:00:00-03")
+  )
+  PIVOT (COUNT(DISTINCT mediaid) FOR terminou_conteudo IN (TRUE, FALSE))
+),
+
+assistiu_columns AS (
+  SELECT 
+  Data,
+  organized.globo_id,
+  program_subset,
+  program_id,
+  program_title,
+  Horas_Total,
+  Videoviews_Total,
+  CASE
+    WHEN Status_Killing_Eve is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_Killing_Eve
+  END AS KillingEve_Status,
+  CASE
+    WHEN Status_Manifest is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_Manifest
+  END AS Manifest_Status,
+  CASE
+    WHEN Status_TBBT is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_TBBT
+  END AS TBBT_Status,
+  CASE
+    WHEN Status_Chicago_Fire is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_Chicago_Fire
+  END AS ChicagoFire_Status,
+  CASE
+    WHEN Status_Vampire_Diaries is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_Vampire_Diaries
+  END AS VampireDiares_Status,
+  CASE
+    WHEN Status_1_Contra_Todos is null THEN 'Não Assistiu anteriormente'
+    ELSE Status_1_Contra_Todos
+  END AS Um_Contra_Todos_Status,
+  Inferior_50_Midia,
+  Inferior_50_Horas,
+  Inferior_50_Videoviews,
+  Entre_50_75_Midia,
+  Entre_50_75_Horas,
+  Entre_50_75_Videoviews,
+  Superior_75_Horas,
+  Superior_75_Midias,
+  Superior_75_Videoviews,
+  CONCAT(globo_id, ";", program_id) AS Conc_GID_ID
+  FROM organized
+  LEFT JOIN assistiu_killing_eve USING (globo_id)
+  LEFT JOIN assistiu_manifest USING (globo_id)
+  LEFT JOIN assistiu_tbbt USING (globo_id)
+  LEFT JOIN assistiu_chicago_fire USING (globo_id)
+  LEFT JOIN assistiu_vampire_diaries USING (globo_id)
+  LEFT JOIN assistiu_1_contra_todos USING (globo_id)
+),
+
+primeiro_acesso AS (
+  SELECT * FROM 
+  (
+    SELECT
+    CONCAT(globo_id, ";", program_id) AS Conc_GID_ID,
+    MIN(TIMESTAMP_TRUNC(primeiro_consumo, DAY, "America/Sao_Paulo")) AS Primeiro_Consumo
+    FROM ${ref("bbb_20", "Base_bbb")}
+    GROUP BY CONCAT(globo_id, ";", program_id)
+  )
+  WHERE Primeiro_Consumo <= TIMESTAMP("2020-05-12 00:00:00-03")
+),
+
+primeiro_ultimo_acesso_geral AS (
+  SELECT
+    globo_id,
+    MIN(TIMESTAMP_TRUNC(primeiro_consumo, DAY, "America/Sao_Paulo")) AS Primeiro_Consumo_Global,
+    MAX(TIMESTAMP_TRUNC(ultimo_consumo, DAY, "America/Sao_Paulo")) AS Ultimo_Consumo_Global,
+    MAX(TIMESTAMP_TRUNC(primeiro_consumo, DAY, "America/Sao_Paulo")) AS Ultimo_Consumo_Global_Iniciado
+  FROM ${ref("bbb_20", "Base_bbb")}
+  GROUP BY globo_id
+),
+
+base_ativa_pagante_com_trial AS (
+  SELECT
+  globo_id,
+  tipo_assinante,
+  MAX(dt_assinatura_comeco) AS MAX_of_dt_assinatura_comeco
+  FROM ${ref("usuarios", "base_ativa_pagante_com_trial")}
+  WHERE dt_assinatura_comeco >= DATE(2020, 01, 01)
+  GROUP BY globo_id, tipo_assinante
+),
+
+base_cancelados AS (
+  SELECT 
+  at1.globo_id,
+  MAX_of_data_hora_compra,
+  tipo_cancelamento,
+  canal_compra,
+  status,
+  data_hora_cancelamento,
+  dt_hr_cancelamento_final_ciclo,
+  Cancelamento
+  FROM (
+    SELECT
+    globo_id,
+    MAX(data_hora_compra) AS MAX_of_data_hora_compra
+    FROM ${ref("usuarios", "asset_tratada")}
+    INNER JOIN ${ref("bbb_20", "Base_bbb")} USING (globo_id)
+    GROUP BY globo_id
+    ) AS at1
+    LEFT JOIN ${ref("usuarios", "asset_tratada")} at2 
+    ON (at1.globo_id = at2.globo_id AND at1.MAX_of_data_hora_compra = at2.data_hora_compra)
+),
+
+first_play_geral AS (
+  SELECT *
+  FROM ${ref("consumo", "First_Play_Geral")}
+  WHERE data_hora_compra BETWEEN TIMESTAMP("2020-01-21 00:00:00+00") AND TIMESTAMP("2020-04-20 23:59:59+00")
+  AND (Convertido OR LOWER(Tipo_Venda) LIKE '%direta%')
+)
+
+SELECT 
+  assistiu_columns.*,
+  Primeiro_Consumo,
+  Primeiro_Consumo_Global,
+  Ultimo_Consumo_Global,
+  Ultimo_Consumo_Global_Iniciado,
+  tipo_assinante,
+  MAX_of_dt_assinatura_comeco,
+  tipo_cancelamento,
+  canal_compra,
+  status,
+  data_hora_cancelamento,
+  dt_hr_cancelamento_final_ciclo,
+  Cancelamento,
+  CASE 
+    WHEN tipo_assinante IS NOT NULL THEN tipo_assinante
+    ELSE CONCAT(Cancelamento, canal_compra)
+  END AS Status_Assinattura,
+  Churn_Score,
+  first_watched_title
+FROM assistiu_columns
+LEFT JOIN primeiro_acesso USING (Conc_GID_ID)
+LEFT JOIN primeiro_ultimo_acesso_geral USING (globo_id)
+LEFT JOIN base_ativa_pagante_com_trial USING (globo_id)
+LEFT JOIN base_cancelados USING (globo_id)
+LEFT JOIN ${ref("bbb_20", "20200421_base_jump")} ON (globo_id = subscriberid)
+LEFT JOIN first_play_geral USING (globo_id)
