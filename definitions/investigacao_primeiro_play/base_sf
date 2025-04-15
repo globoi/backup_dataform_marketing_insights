@@ -1,0 +1,131 @@
+-- BASE DE VENDAS GROWTH
+--WITH
+  --conversoes AS (
+  WITH
+    base_sf AS (
+    SELECT
+      sf.dt_venda AS DATA,
+      globo_id,
+      asset_id,
+      tipo_venda,
+      oid.area_mkt AS area_growth,
+      sf.canal_compra,
+      oid.origem,
+      oid.origem_id,
+      oid.bu,
+      oid.canal,
+      nome_produto,
+      periodicidade,
+      tier,
+      '' AS conversion_type,
+      'Salesforce' AS base,
+      oid.produto AS produto_origem_id,
+      flag_internacional,
+      COUNT(*) AS vendas
+    FROM `gglobo-mkt-ins-hdg-prd.reports.vendas_sf` sf
+    INNER JOIN `gglobo-mkt-ins-hdg-prd.temp.origemids_growth_gus` oid
+    ON
+      sf.origem_id = oid.origem_id
+    LEFT JOIN `gglobo-vendas-hdg-prd.sales_gold.product_details` dt
+    ON
+      sf.codigo_produto = dt.code
+    WHERE
+      dt_venda BETWEEN '2025-04-05' AND '2025-04-13' and globo_id='54a57811-5203-4993-9c06-34b1e4a0b64d'
+      --and globo_id='00fc876b-eec6-466a-812b-3a5217b224ac'
+      --BETWEEN '2024-01-01'
+      --AND '2024-12-31'
+      AND oid.produto = 'Globoplay'
+      AND ( (tipo_venda IN ('venda_direta')
+          AND (LOWER(nome_produto) LIKE '%globoplay%'
+            OR LOWER(nome_produto) = 'telecine'
+            OR LOWER(nome_produto) = 'premiere'))
+        OR (tipo_venda IN ('upgrade',
+            'cross_up')
+          AND LOWER(subscription_type) LIKE '%globoplay%')
+        OR (tipo_venda IN ('adicional')) )
+      AND ( (oid.area_mkt = 'CRM'
+          AND (LOWER(oid.canal) NOT LIKE 'push'
+            OR oid.canal IS NULL)
+          AND sf.canal_compra IN ('WEB',
+            'Inapp Apple',
+            'Inapp Google'))
+        OR (oid.area_mkt = 'Mídia Paga'
+          AND sf.canal_compra = 'WEB')
+        OR (oid.area_mkt = 'Mídia Orgânica'
+          AND sf.canal_compra IN ('WEB',
+            'Inapp Apple',
+            'Inapp Google')) )
+    GROUP BY
+      ALL ),
+    base_apf AS (
+    SELECT
+      DISTINCT DATE(event_time_utc, 'America/Sao_Paulo') AS DATA,
+            customer_user_id AS globo_id,
+      case when (apsf.customer_user_id = sf.globo_id and DATE(event_time_utc, 'America/Sao_Paulo') = DATE(TIMESTAMP(ts_venda, 'America/Sao_Paulo'))) then 
+      sf.asset_id else null end as asset_id,
+      'venda_direta' AS tipo_venda,
+      CASE
+        WHEN (media_source != 'crm' AND media_source IS NOT NULL) THEN 'Mídia Paga'
+        WHEN media_source = 'crm' THEN 'CRM'
+    END
+      AS area_growth,
+      CASE
+        WHEN PLATFORM = 'android' THEN 'Inapp Google'
+        WHEN PLATFORM = 'ios' THEN 'Inapp Apple'
+    END
+      AS canal_compra,
+      CASE
+        WHEN LOWER(af_prt) = 'dgmax' THEN CONCAT('winclap', ' - ', af_prt)
+        WHEN LOWER(media_source) = 'dgmaxinteractive_int' THEN CONCAT('winclap', ' - ', 'dgmax')
+        WHEN af_prt IS NULL THEN media_source
+        ELSE CONCAT(af_prt, ' - ', media_source)
+    END
+      AS origem,
+      ' ' AS origem_id,
+      ' ' AS bu,
+      COALESCE(af_prt, media_source) AS canal,
+      COALESCE(apsf.Name, apsf.service_name, dt2.name) AS nome_produto,
+      af_period AS periodicidade,
+      dt.tier,
+      conversion_type,
+      'Appsflyer' AS base,
+      'Globoplay' AS produto_origem_id,
+      CASE
+        WHEN country_code != 'BR' THEN TRUE
+        ELSE FALSE
+    END
+      AS flag_internacional,
+     -- concat(customer_user_id,'-',DATE(event_time_utc, 'America/Sao_Paulo')) as chave_apsf,
+      --concat(globo_id,'-',DATE(TIMESTAMP(ts_venda, 'America/Sao_Paulo'))) as chave_sf,
+      COUNT(*) AS vendas
+    FROM `gglobo-gplay-aquisicao-hdg-prd.AppsFlyer.VendasAppsflyer_v2` apsf 
+    LEFT JOIN `gglobo-vendas-hdg-prd.sales_gold.product_details` dt
+    ON
+      apsf.ProductCode = dt.code
+    LEFT JOIN `gglobo-vendas-hdg-prd.sales_gold.product_details` dt2
+    ON
+      UPPER(SPLIT(apsf.af_content_id, '-Br')[
+      OFFSET
+        (0)]) = dt2.code
+        inner join `gglobo-mkt-ins-hdg-prd.reports.vendas_sf` sf on sf.globo_id=apsf.customer_user_id and COALESCE(apsf.Name, apsf.service_name, dt2.name) = sf.nome_produto
+       /* inner join (SELECT distinct globo_id,object_id ,DATE(TIMESTAMP(event_at, 'America/Sao_Paulo')) as event_at,event, concat(globo_id,'-',object_id,'-',DATE(TIMESTAMP(event_at, 'America/Sao_Paulo'))) as chave 
+FROM `gglobo-vendas-hdg-prd.sales_gold.customer_events` where globo_id='00fc876b-eec6-466a-812b-3a5217b224ac' and event='subscription' and event_at>='2024-01-01'
+order by event_at desc) as g on apsf.customer_user_id=g.globo_id*/
+
+    WHERE
+      ( LOWER(COALESCE(apsf.Name, service_name)) LIKE '%globoplay%'
+        OR LOWER(COALESCE(apsf.Name, service_name)) IN ('telecine',
+          'premiere')
+        OR LOWER(dt2.name) LIKE 'globoplay%'
+        OR LOWER(dt2.name) IN ('telecine',
+          'premiere') )
+      AND LOWER(event_name) NOT LIKE '%upgrade%'
+      AND DATE(event_time_utc, 'America/Sao_Paulo') BETWEEN '2025-04-05' AND '2025-04-13' 
+      and customer_user_id='54a57811-5203-4993-9c06-34b1e4a0b64d'
+      --and customer_user_id='00fc876b-eec6-466a-812b-3a5217b224ac'
+    GROUP BY
+      ALL)
+  SELECT
+    *
+  FROM
+    base_sf
